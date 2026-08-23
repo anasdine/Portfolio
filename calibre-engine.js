@@ -13067,42 +13067,77 @@ function buildScene(){
       p2[j + 1] = nd[1] + (Math.random() - .5) * .44;
       p2[j + 2] = nd[2] + (Math.random() - .5) * .44;
     }
-    /* IV — L'ADN : deux brins de 0 et de 1, des barreaux entre les deux,
-       et deux harnais qui remontent la forme en la serrant. Deux tours
-       complets et un rayon large : sans cela on lisait deux traits croisés. */
-    var rIV = Math.random(), SPAN = 9.2, TOUR = 1.34, RAD = 1.9;
-    if(rIV < .58){                                  /* les deux brins */
-      var st4 = i % 2;
-      var ty4 = (Math.random() - .5) * SPAN;
-      var an4 = ty4 * TOUR + st4 * 3.1416;
-      p3[j] = Math.cos(an4) * RAD;
-      p3[j + 1] = ty4;
-      p3[j + 2] = Math.sin(an4) * RAD;
-      aH4[i] = st4;                                 /* 0 ou 1 : un brin, une teinte */
-    }else if(rIV < .88){                            /* les barreaux, à pas régulier */
-      var lv4 = (Math.round(Math.random() * 14) - 7) * (SPAN / 14);
-      var ab4 = lv4 * TOUR;
-      var u4 = Math.random() * 2 - 1;
-      if(Math.abs(u4) < .18) u4 = u4 < 0 ? -.18 : .18;
-      p3[j] = Math.cos(ab4) * RAD * u4;
-      p3[j + 1] = lv4;
-      p3[j + 2] = Math.sin(ab4) * RAD * u4;
-      aH4[i] = 2;
-    }else{                                          /* les harnais */
-      var ah4 = Math.random() * 6.2832;
-      p3[j] = Math.cos(ah4) * (RAD + .6);
-      p3[j + 1] = (Math.random() < .5 ? -.6 : .6) + (Math.random() - .5) * .1;
-      p3[j + 2] = Math.sin(ah4) * (RAD + .6);
-      aH4[i] = 3;
+    /* IV — L'ADN-B, mesuré plutôt que dessiné. Deux nombres réels commandent
+       tout le reste : 10,5 paires de bases par tour, et 3,4 Å de montée pour
+       10 Å de rayon — d'où RISE = .34 × RAD, qui inscrit dans le code le
+       rapport pas/diamètre de 1,785 de la molécule réelle.
+       Les deux brins étaient à 180°, ce qui donne une tresse symétrique.
+       Ils sont ici à 140° : c'est ce décalage qui creuse le grand et le petit
+       sillon, et c'est à eux qu'un ADN se reconnaît au premier coup d'œil.
+       L'hélice tourne à DROITE (z = −sin, pas +sin) : à gauche, ce serait de
+       l'ADN-Z, une curiosité de laboratoire.
+       Torsion, respiration, cintrage et inclinaison des paires sont calculés
+       ici, une fois au démarrage : le nuanceur ne reçoit qu'une position. */
+    var RAD3 = 1.62, NBP3 = 15, OFF3 = 2.4434, TWBP3 = 6.2831853 / 10.5;
+    var RISE3 = RAD3 * .34, HALF3 = (NBP3 - 1) * RISE3 * .5, TWY3 = TWBP3 / RISE3;
+    var SEQ3 = 'GATTACAGCTTAAGC';           /* 15 bases, 40 % GC : le taux humain */
+    var blk3 = (i / 5) | 0, r53 = i % 5, y3, h3, rk3, t3 = .5, pu3 = 1, wY3, gD3;
+    if(r53 < 3){                            /* 3 sur 5 : les deux squelettes */
+      var oS3 = blk3 * 3 + r53, cS3 = oS3 >> 1, nS3 = Math.ceil(N * .3);
+      h3 = oS3 & 1;                         /* brin A ou brin B, à parts exactement égales */
+      y3 = -HALF3 + 2 * HALF3 * Math.min(1, (cS3 + Math.random()) / nS3);
+      rk3 = 1 + (Math.random() - .5) * .07; /* le squelette est un ruban, pas un fil */
+      if(cS3 % 3 === 0){                    /* un phosphate par pas : la chaîne est perlée */
+        y3 = -HALF3 + Math.round((y3 + HALF3) / RISE3) * RISE3; rk3 = 1.06;
+      }else y3 += (Math.random() - .5) * .08;
+      wY3 = .36 + Math.random() * .64;      /* gros et lumineux : la silhouette, c'est eux */
+      gD3 = h3 ? 0 : 1;                     /* un brin de 1 face à un brin de 0 */
+    }else{                                  /* 2 sur 5 : les paires de bases */
+      var oB3 = blk3 * 2 + (r53 - 3), k3 = oB3 % NBP3, bc3 = SEQ3.charCodeAt(k3);
+      var gc3 = (bc3 === 71 || bc3 === 67) ? 1 : 0;   /* G ou C : trois liaisons hydrogène */
+      pu3 = (bc3 === 65 || bc3 === 71) ? 1 : 0;       /* A ou G : la purine, le gros cycle */
+      var gp3 = gc3 ? .10 : .24;            /* la A-T ne tient qu'à deux liaisons : elle est fendue */
+      var eg3 = gc3 ? .03 : .08;            /* ... et elle n'atteint pas tout à fait les squelettes */
+      var ln3 = 1 - 2 * eg3 - gp3, uu3 = Math.random(), PU3 = .56;
+      t3 = uu3 < PU3 ? eg3 + uu3 / PU3 * ln3 * PU3
+                     : eg3 + ln3 * PU3 + gp3 + (uu3 - PU3) / (1 - PU3) * ln3 * (1 - PU3);
+      if(!pu3) t3 = 1 - t3;                 /* la grosse moitié du côté qui porte la purine */
+      y3 = -HALF3 + k3 * RISE3 + (t3 - .5) * (pu3 ? .16 : -.16) + (Math.random() - .5) * .05;
+      rk3 = 1; h3 = 2 + gc3;                /* aH vaut 2 pour une A-T, 3 pour une G-C */
+      wY3 = .04 + Math.random() * .38;      /* fins et discrets : une texture, pas la forme */
+      gD3 = t3 < .5 ? 1 : 0;
     }
+    /* torsion — ±8° de sur- et sous-enroulement — et respiration du rayon,
+       partagées par les squelettes et les barreaux : l'échelle reste soudée */
+    var an3 = TWY3 * y3 + .14 * Math.sin(y3 * 1.55);
+    var ra3 = RAD3 * rk3 * (1 + .055 * Math.sin(y3 * .68 + 1.1));
+    var ox3 = .12 * Math.sin(y3 * .36 + .6);          /* un axe parfaitement droit sonne faux */
+    var ax3 = Math.cos(an3) * ra3, az3 = -Math.sin(an3) * ra3;               /* brin A */
+    var bx3 = Math.cos(an3 + OFF3) * ra3, bz3 = -Math.sin(an3 + OFF3) * ra3; /* brin B, à 140° */
+    if(r53 < 3){
+      p3[j] = (h3 ? bx3 : ax3) + ox3; p3[j + 1] = y3; p3[j + 2] = h3 ? bz3 : az3;
+    }else{
+      /* le barreau est une CORDE et non un diamètre : il passe à distance de
+         l'axe, du côté du petit sillon, et cet écart tourne avec l'hélice.
+         L'empilement des bases dessine ainsi une troisième hélice, fine, à
+         l'intérieur des deux autres. */
+      p3[j] = ax3 + (bx3 - ax3) * t3 + ox3; p3[j + 1] = y3; p3[j + 2] = az3 + (bz3 - az3) * t3;
+    }
+    aH4[i] = h3;
     /* V — la sortie : neuf machines alignées, faites des mêmes chiffres */
     var k4 = i % 3;
     robotPt(Math.random(), Math.random(), Math.random(), tmp);
     p4[j] = (k4 - 1) * 4.6 + tmp[0] * 2.4;
     p4[j + 1] = -3.4 + tmp[1] * 2.4;
     p4[j + 2] = ((k4 % 3) - 1) * .8 + (Math.random() - .5) * .12;
-    aR[j] = Math.random(); aR[j + 1] = Math.random(); aR[j + 2] = Math.random();
-    aG[i] = Math.random() < .5 ? 0 : 1;
+    aR[j] = Math.random(); aR[j + 2] = Math.random();
+    /* aR.y pilote déjà la taille et l'opacité dans le nuanceur : on s'en sert
+       pour hiérarchiser l'hélice — squelettes gros et lumineux, barreaux fins.
+       Sa moyenne reste à .50, celle du tirage uniforme qu'il remplace, donc la
+       luminosité des quatre autres phases ne bouge pas d'un cheveu. */
+    aR[j + 1] = wY3;
+    /* et le glyphe suit le brin : une chaîne de 1 face à une chaîne de 0 */
+    aG[i] = gD3;
   }
 
   var base = new T.PlaneGeometry(1, 1);
@@ -13163,19 +13198,17 @@ function buildScene(){
          par sommet et par image, c'est ce qui faisait saccader ce passage. */
       '  float spin = uT * .42;',
       '  float ringY = sin(uT * .3) * 3.7;',
-      '  vec3 c3;',
-      '  if(aH > 2.5){',
-      '    float a4 = -spin * .8, c4 = cos(a4), s4 = sin(a4);',
-      '    vec2 rz = vec2(aP3.x * c4 - aP3.z * s4, aP3.x * s4 + aP3.z * c4) * (.94 + .06 * sin(uT * 2.4));',
-      '    c3 = vec3(rz.x, ringY + aP3.y, rz.y);',
-      '  }else{',
-      '    float dy = aP3.y - ringY;',
-      '    float sq = exp(-dy * dy * .75);',
-      '    float c5 = cos(spin), s5 = sin(spin);',
-      '    float k5 = 1. - .32 * sq;',
-      '    vec2 rz2 = vec2(aP3.x * c5 - aP3.z * s5, aP3.x * s5 + aP3.z * c5) * k5;',
-      '    c3 = vec3(rz2.x, aP3.y + dy * .07 * sq, rz2.y);',
-      '  }',
+      /* Les deux harnais ont disparu : ils ne décrivaient rien de réel et
+         coûtaient trois transcendantes par sommet et par image — un cosinus,
+         un sinus, et un sin(uT) — plus une divergence de branche. La valeur 3
+         de aH ne signifie donc plus « harnais » mais « paire G-C ».
+         Le pincement passe de .32 à .22, l'hélice étant devenue plus fine. */
+      '  float dy = aP3.y - ringY;',
+      '  float sq = exp(-dy * dy * .75);',
+      '  float c5 = cos(spin), s5 = sin(spin);',
+      '  float k5 = 1. - .22 * sq;',
+      '  vec2 rz2 = vec2(aP3.x * c5 - aP3.z * s5, aP3.x * s5 + aP3.z * c5) * k5;',
+      '  vec3 c3 = vec3(rz2.x, aP3.y + dy * .07 * sq, rz2.y);',
       '  vec3 c2 = aP2 + aEV * fract(aR.x + uT * (.055 + aR.z * .06));',
       '  vec3 pos = mix(aP0, c1, w1);',
       '  pos = mix(pos, c2, w2);',
@@ -13195,7 +13228,11 @@ function buildScene(){
       '  vCol = mix(vCol, uColC, uPulse * .55);',
       /* l'ADN se lit à la couleur : un brin cyan, l'autre bleu, barreaux et
          harnais en ivoire */
-      '  vec3 adn = aH < .5 ? uColA : (aH < 1.5 ? uColC : uColB);',
+      /* la molécule se lit à la couleur : un brin cyan face à un brin bleu —
+         c'est le contraste qui dit « deux brins » — puis les paires de bases.
+         Une A-T ne tient qu'à deux liaisons hydrogène : elle est plus terne.
+         Une G-C en a trois : c'est le point le plus lumineux de l'hélice. */
+      '  vec3 adn = aH < .5 ? uColA : (aH < 1.5 ? uColC : (aH < 2.5 ? mix(uColB, uColA, .45) : uColB));',
       '  vCol = mix(vCol, adn, clamp(w3 - w4, 0., 1.) * .9);',
       '  vA = (.26 + .74 * aR.y) * fog * (.6 + .55 * uOrder) * (1. + uPulse * .7);',
       '}'
