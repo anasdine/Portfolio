@@ -864,8 +864,47 @@ if(!RM && !CALM){
     var maniSrc = mani.getAttribute('data-i18n-fr') ||
                   (mani.textContent || '').replace(/\s+/g, ' ').trim();
     mani.setAttribute('data-flap-src', maniSrc);
+    /* Le paragraphe est fait de trois morceaux — du texte, un <strong>, du
+       texte — et chacun est une clé de la table. Leur CONCATÉNATION, elle,
+       n'en est pas une : traduire la chaîne aplatie ne trouvait rien et
+       l'animation rejouait du français dans les six langues. On conserve donc
+       les morceaux et on traduit chacun séparément. */
+    var maniParts = [];
+    (function(){
+      var kids = mani.childNodes;
+      for(var i = 0; i < kids.length; i++){
+        var brut = mani.getAttribute('data-i18n-fr-' + i);
+        var t = brut !== null ? brut : (kids[i].textContent || '');
+        if(t) maniParts.push(t);
+      }
+      if(!maniParts.length) maniParts.push(maniSrc);
+    })();
+    /* le chinois, le japonais et l'arabe n'espacent pas comme nous : un
+       raccord ajouté entre deux idéogrammes se voit comme une faute */
+    var SANS_ESPACE = /[぀-ヿ㐀-鿿豈-﫿؀-ۿ＀-￯]/;
+    function maniFull(){
+      var out = '';
+      for(var i = 0; i < maniParts.length; i++){
+        var seg = TR(maniParts[i]) || maniParts[i];
+        if(!seg) continue;
+        /* la traduction perd parfois l'espace de raccord : on le remet, sauf
+           devant une ponctuation qui se colle au mot précédent, et sauf entre
+           deux écritures qui ne séparent pas leurs mots */
+        if(out && !/\s$/.test(out) && !/^[\s.,;:!?)]/.test(seg) &&
+           !SANS_ESPACE.test(out.charAt(out.length - 1)) && !SANS_ESPACE.test(seg.charAt(0))){
+          out += ' ';
+        }
+        out += seg;
+      }
+      /* les écritures sans espace laissent parfois un raccord hérité du
+         français : on le retire devant leur ponctuation propre */
+      return out.replace(/\s+/g, ' ')
+                .replace(/\s+([、。，．！？；：）」』])/g, '$1')
+                .replace(/([（「『])\s+/g, '$1')
+                .trim();
+    }
     function flap(){
-      var full = (TR(maniSrc) || maniSrc).replace(/\s+/g, ' ').trim();
+      var full = maniFull() || maniSrc.replace(/\s+/g, ' ').trim();
       if(!full) return;
       mani.__full = full;
       var run = ++flapRun;
@@ -906,7 +945,23 @@ if(!RM && !CALM){
           C.textContent = full.slice(h);
           if(h >= n){
             mani.textContent = full;
-            mani.removeAttribute('data-i18n-skip');   /* le texte est posé */
+            /* Poser le texte fusionne les trois morceaux en un seul nœud, mais
+               les empreintes fragmentaires, elles, survivent : une affectation
+               de textContent ne touche pas aux attributs. Le rescan ci-dessous
+               reclassait alors le paragraphe comme « mixte », lisait
+               data-i18n-fr-0 — le premier tiers, désormais périmé — et écrasait
+               les trois cents caractères par sa seule traduction. On purge, et
+               on laisse une empreinte unique qui décrit ce qui est réellement
+               affiché. */
+            for(var ai = mani.attributes.length - 1; ai >= 0; ai--){
+              var an = mani.attributes[ai].name;
+              if(an.indexOf('data-i18n-fr-') === 0) mani.removeAttribute(an);
+            }
+            /* On garde data-i18n-skip : ce paragraphe est désormais géré par
+               l'animation, qui le recompose morceau par morceau à chaque
+               changement de langue. Le rendre au traducteur ne servirait à
+               rien — la chaîne fusionnée n'est pas une clé — et il le
+               réécrirait en français à chaque passage. */
             try{ if(window.I18N && window.I18N.rescan) window.I18N.rescan(); }catch(err){}
             mani.style.color = '#E4E8EA';
             return;
@@ -929,7 +984,7 @@ if(!RM && !CALM){
     /* on rejoue à chaque salve traduite, pas une seule fois après la
        bascule : la traduction arrive souvent plus tard */
     window.CalibreEngine.relabel(function(){
-      var want = (TR(maniSrc) || maniSrc).replace(/\s+/g, ' ').trim();
+      var want = maniFull();
       if(want === mani.__shownFlap) return;
       mani.__shownFlap = want;
       mani.__full = null;
