@@ -13144,7 +13144,18 @@ function buildScene(){
       '  float w1 = es(clamp(ph, 0., 1.));',
       '  float w2 = es(clamp(ph - 1., 0., 1.));',
       '  float w3 = es(clamp(ph - 2., 0., 1.));',
-      '  float w4 = es(clamp(ph - 3., 0., 1.));',
+      /* Le dernier passage ne se terminait jamais. Le retard par glyphe est
+         pris DANS ph, or ph est plafonné à 4 : une particule dont aR.x vaut 0
+         culminait à ph = 3,625, donc à es(.625) = .68. La moitié du nuage
+         restait indéfiniment entre l'hélice et la machine, jamais nette.
+         On sort donc le retard de ph et on le remet après, avec de la marge :
+         le glyphe le plus tardif atteint 1,11, tout le monde arrive. Le retard
+         suit la hauteur puis la profondeur, si bien que la forme se pose du
+         bas vers le haut et de l'arrière vers l'avant, au lieu de scintiller. */
+      '  float t4 = clamp(uPh - 3., 0., 1.);',
+      '  float lag = .24 * (.5 - aP3.y * .109) + .38 * (aP4.z + 2.6) * .192 + .18 * aR.x;',
+      '  float u4 = clamp(t4 * 1.88 - lag, 0., 1.);',
+      '  float w4 = es(u4);',
       /* la colonne coule vers le bas au lieu de flotter */
       '  vec3 c1 = vec3(aP1.x, mod(aR.z * 13. - uT * 1.9, 13.) - 6.5, aP1.z);',
       /* l'ADN tourne, et les harnais le serrent au passage. Rotation par
