@@ -12877,6 +12877,19 @@ if(!GL){ threeReadyRes(); var cgl = qs('[data-gl]'); if(cgl) cgl.style.display =
 function buildScene(){
   var T = window.THREE;
   var cvs = qs('[data-gl]'); if(!cvs) return null;
+  /* Zoom au pincement, surtout sur iOS : le fond est en position fixe, donc
+     ancré au viewport de mise en page, pendant que le contenu grossit avec le
+     viewport visuel. Les deux se désolidarisent et l'écart saute aux yeux.
+     Tant que le zoom est actif on efface le fond ; il revient à l'échelle 1. */
+  var zoomActif = 0;
+  (function(){
+    var vv = window.visualViewport;
+    if(!vv) return;
+    var maj = function(){ zoomActif = vv.scale > 1.02 ? 1 : 0; };
+    vv.addEventListener('resize', maj, { passive: true });
+    vv.addEventListener('scroll', maj, { passive: true });
+    maj();
+  })();
   var renderer;
   try{
     renderer = keepGL(new T.WebGLRenderer({ canvas: cvs, antialias: false, alpha: false,
@@ -13289,6 +13302,7 @@ function buildScene(){
        dense coûte cher en remplissage, et c'est là que ça saccadait */
     if(w4 > .01) op = Math.max(op, iE * .52 * w4);
     op = clamp(op * (MOBW ? .72 : 1), 0, 1);
+    if(zoomActif) op = 0;
     cvs.style.opacity = op.toFixed(3);
     return op;
   }
