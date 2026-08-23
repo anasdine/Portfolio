@@ -10403,8 +10403,12 @@ var VOICE = (function(){
     if(t) el.setAttribute('data-explain', t);
   });
 
-  /* --- le repère visible : on sait où viser --- */
-  if(TOUCH) return;
+  /* --- le repère visible : on sait où viser ---
+     Il n'était pas posé du tout sur appareil tactile, alors que l'assistante
+     invite justement à « cliquer un haut-parleur jaune » : la fonction était
+     annoncée puis introuvable sur téléphone, là où se trouve une grande part
+     des visiteurs. On la pose donc partout ; seul le survol, qui n'a pas de
+     sens au doigt, reste l'affaire du pointeur fin. */
   var list = qsa('[data-explain]');
   /* un repère au coin d'une carte, mais dans la gouttière pour un texte :
      sinon le point tombe au milieu d'une ligne et se lit comme une coquille */
@@ -10425,8 +10429,19 @@ var VOICE = (function(){
       '<path d="M17.4 7.6a7 7 0 0 1 0 8.8" stroke="#0A0C0E" stroke-width="1.5" fill="none" stroke-linecap="round" opacity=".72"/>' +
       '</svg>';
     d.setAttribute('data-explain-dot', '1');
+    /* le repère d'un texte se pose dans la gouttière de gauche. Sur un écran
+       étroit cette gouttière peut manquer, et il sortait alors de l'écran :
+       on le mesure, et faute de place on le pose juste au-dessus du texte. */
+    var placement;
+    if(inText){
+      var bg0 = 0;
+      try{ bg0 = host.getBoundingClientRect().left; }catch(eP){ bg0 = 99; }
+      placement = bg0 > 28 ? 'left:-25px;top:.34em;' : 'left:0;top:-21px;';
+    }else{
+      placement = 'top:6px;right:6px;';
+    }
     d.style.cssText = 'position:absolute;width:18px;height:18px;border-radius:50%;' +
-      (inText ? 'left:-25px;top:.34em;' : 'top:6px;right:6px;') +
+      placement +
       'box-shadow:0 0 0 2px #0A0C0E, 0 0 0 4px rgba(255,197,61,.5), 0 0 16px rgba(255,197,61,.55);' +
       /* seul le point répond au clic : le reste du paragraphe est rendu à
          la lecture et à la sélection */
