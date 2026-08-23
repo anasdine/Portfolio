@@ -144,9 +144,13 @@ var PERF = { avg: .016, lvl: 0, n: 0, acc: 0, frame: 0, floor: 0 };
 function CDPR(){
   var d = devicePixelRatio || 1;
   var t = (typeof BOOT_TIER === 'number' ? BOOT_TIER : 0);
-  if(t >= 2) return Math.min(.85, d);
-  if(innerWidth < 640) return Math.min(1, d);
-  return Math.min(1.5, d);
+  /* Un téléphone récent affiche à 3× : rendre à 1× revenait à peindre au tiers
+     de la définition de l'écran, et c'est ce qui rendait les toiles et les vues
+     3D floues sur iPhone. On suit l'écran, borné pour ne pas noyer le GPU —
+     2× suffit à paraître net, au-delà on paie sans que cela se voie. */
+  if(t >= 2) return Math.min(1, d);
+  if(innerWidth < 640) return Math.min(2, d);
+  return Math.min(1.75, d);
 }
 var g = window.gsap;
 if(!g){ rescue(); qsa('[data-reveal]').forEach(function(e){ e.style.opacity=1; }); return; }
@@ -251,13 +255,27 @@ var SH3D = (function(){
     var T = window.THREE;
     if(!T){ failed = true; return null; }
     off = doc.createElement('canvas');
-    off.width = 900; off.height = 900;
+    /* le tampon borne la finesse : à 900 de côté, une vue un peu large sur un
+       écran à forte densité était rééchantillonnée vers le bas, d'où des vues
+       3D floues sur téléphone. On l'agrandit, sauf sur les machines modestes. */
+    var cote = 900;
+    try{
+      var tier3 = (typeof BOOT_TIER === 'number' ? BOOT_TIER : 0);
+      var mem3 = navigator.deviceMemory || 4;
+      if(tier3 < 2 && mem3 >= 4) cote = 1600;
+    }catch(e3){}
+    off.width = cote; off.height = cote;
     try{
       r = keepGL(new T.WebGLRenderer({ canvas: off, antialias: true, alpha: true,
         powerPreference: 'low-power', preserveDrawingBuffer: true }));
     }catch(e){ failed = true; console.warn('[3d partagé]', e && e.message); return null; }
     if(!r.getContext()){ failed = true; r = null; return null; }
-    r.setPixelRatio(innerWidth < 640 ? .85 : 1);
+    /* Three.js multiplie setViewport et setScissor par ce ratio, alors que la
+       recopie de draw() ci-dessous raisonne en pixels bruts. Toute valeur autre
+       que 1 désaccorde la zone rendue et la zone recopiée : sur téléphone, où
+       ce ratio valait .85, une bande du tampon précédent était recopiée avec
+       l'image. La finesse se règle par le dpr passé à draw(), pas ici. */
+    r.setPixelRatio(1);
     if('toneMapping' in r && T.NoToneMapping !== undefined) r.toneMapping = T.NoToneMapping;
     r.shadowMap.enabled = true;
     r.shadowMap.type = T.PCFSoftShadowMap;
@@ -488,7 +506,7 @@ window.setTR = setTR;
   /* tous les libellés dessinés sur les toiles du site : on les demande dès
      le changement de langue, pour qu'une animation atteinte en défilant
      soit déjà écrite dans la bonne langue au lieu de basculer sous les yeux */
-  var PRE = ["# ALERTES BRUTES","# cartes · # équipements","ADA · cliquez un haut-parleur jaune","ADA · je suis là pour vous guider","ADA · une question ? cliquez-moi","BAIE","BRUIT","CE QU'ON ME DEMANDE","CŒUR RÉSEAU","DISPONIBILITÉ","EXÉCUTENT\",","HYPERVISEUR","LE MATÉRIEL TIENT","LE SOCLE QUE JE RÉUTILISE","ONDULEUR","PARE-FEU","RÉPARÉS","SAUVEGARDE","STOCKAGE","TICKETS OUVERTS","TOUT EST LISIBLE","TROIS AGENTS AU TRAVAIL — CLIQUEZ POUR PRIORISER","assemble","aucune panne — tout tourne","cause + action","force brute","hameçonnage","injection","je valide","le filtre corrèle, écarte, et ne garde que ce qui compte","longueur","ordre de remise en service","pare-feu","rançongiciel","scan de ports","temps de réaction sur alerte","À POSER"];
+  var PRE = ["# ALERTES BRUTES","# cartes · # équipements","ADA · cliquez un haut-parleur jaune","ADA · je suis là pour vous guider","ADA · une question ? cliquez-moi","BAIE","BRUIT","CE QU'ON ME DEMANDE","CŒUR RÉSEAU","DISPONIBILITÉ","LES TÂCHES S'EXÉCUTENT","LES DONNÉES RESTENT ICI","HYPERVISEUR","LE MATÉRIEL TIENT","LE SOCLE QUE JE RÉUTILISE","ONDULEUR","PARE-FEU","RÉPARÉS","SAUVEGARDE","STOCKAGE","TICKETS OUVERTS","TOUT EST LISIBLE","TROIS AGENTS AU TRAVAIL — CLIQUEZ POUR PRIORISER","assemble","aucune panne — tout tourne","cause + action","force brute","hameçonnage","injection","je valide","le filtre corrèle, écarte, et ne garde que ce qui compte","longueur","ordre de remise en service","pare-feu","rançongiciel","scan de ports","temps de réaction sur alerte","À POSER"];
   var preFor = null;
   function prewarm(){
     var l = lang();
@@ -1496,7 +1514,8 @@ CE.onLangAdd(function(){
   }, 400);
 });
 CE.onLang = function(code){
-  if(langCode) langCode.textContent = code.toUpperCase();
+  /* un code composé ne tient pas dans la pastille : « de-CH » s'y affiche « CH » */
+  if(langCode) langCode.textContent = String(code).split('-').pop().toUpperCase();
   if(langMenu) qsa('[data-lang-opt]', langMenu).forEach(function(li){
     var on = li.getAttribute('data-lang-opt') === code;
     li.style.color = on ? '#048B9A' : '#9AA4AC';
@@ -1642,7 +1661,7 @@ if(langBtn && langMenu && window.I18N){
     li.style.cssText = "display:flex;align-items:center;gap:9px;padding:9px 11px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11.5px;letter-spacing:.06em;color:#9AA4AC;cursor:pointer;min-height:38px";
     var tag = doc.createElement('span');
     tag.style.cssText = 'flex:0 0 22px;font-size:9.5px;letter-spacing:.16em;color:#56606A';
-    tag.textContent = code.toUpperCase();
+    tag.textContent = String(code).split('-').pop().toUpperCase();
     var nm = doc.createElement('span');
     nm.textContent = window.I18N.names[code];
     /* le nom d'une langue s'écrit dans sa langue : « Français » reste
@@ -7680,7 +7699,7 @@ var VOICE = (function(){
       a:"Quatre règles : chaque chiffre vient avec la commande qui le produit, les données restent à la maison, rien n'entre sans revue, et les tests doivent pouvoir échouer. Je ne liste pas des postes, je liste des écarts mesurés." },
     { id:'jeux', c:'Les mini-jeux',
       t:'jeu mini-jeu vaisseau sonde triage pare-feu baie salle modèle bonus vitesse',
-      a:"En bas de page, six terrains d'essai : triage d'alertes, pare-feu à tenir, montage de baie, un vol 3D dans un corridor de données, une traversée de salle machine, et un modèle local à élever." }
+      a:"En bas de page, treize terrains d'essai, dont : triage d'alertes, pare-feu à tenir, montage de baie, un vol 3D dans un corridor de données, une traversée de salle machine, et un modèle local à élever." }
   ];
   var STOP = {'le':1,'la':1,'les':1,'un':1,'une':1,'des':1,'du':1,'de':1,'et':1,'ou':1,'a':1,'à':1,'au':1,'en':1,'que':1,'qui':1,'quoi':1,'est':1,'ce':1,'vous':1,'je':1,'il':1,'on':1,'pour':1,'par':1,'sur':1,'dans':1,'avec':1,'sans':1,'plus':1,'tout':1,'comment':1,'pourquoi':1,'mon':1,'ma':1,'mes':1,'as':1,'ai':1,'peux':1,'peut':1,'fait':1,'faire':1,'veux':1,'ne':1,'pas':1,'the':1,'is':1,'of':1,'son':1,'ses':1,'leur':1,'nos':1};
   function fold(x){ x = (x || '').toLowerCase(); return x.normalize ? x.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : x; }
