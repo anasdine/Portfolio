@@ -529,7 +529,11 @@ window.setTR = setTR;
       }, 60);
     }
     if(!MOT.test(t)) return t;            /* codes, nombres, unités : intacts */
-    if(CODE.test(t)) return t;            /* nom de matériel : jamais traduit */
+    /* La garde ne vaut que pour un nom de matériel SEUL : il ne contient
+       jamais d'espace. Dès qu'une phrase suivait le code, elle partait en
+       français avec lui — « VPN actif », « patch : réservé à la défense. » —
+       et huit fiches déjà écrites dans la table restaient inatteignables. */
+    if(CODE.test(t) && t.indexOf(' ') < 0) return t;
     var nums = t.match(/\d+/g);
     var key = nums ? t.replace(/\d+/g, '#') : t;
     var got = MEM.get(key);
@@ -575,12 +579,15 @@ window.setTR = setTR;
   }
   var relance = function(){ flush(); prewarm(); prewarmDots(); };
   addEventListener('ad:lang', relance);
-  /* la fiche i18n prévient par son propre crochet quand il existe */
+  /* la fiche i18n prévient par son propre crochet quand il existe.
+     onLang est le DIFFUSEUR : il attend un code de langue, et lui passer une
+     fonction écrivait le texte de cette fonction dans la pastille de langue
+     de l'en-tête. L'abonnement, c'est onLangAdd. */
   var hook = setInterval(function(){
     try{
-      if(window.CalibreEngine && window.CalibreEngine.onLang){
+      if(window.CalibreEngine && window.CalibreEngine.onLangAdd){
         clearInterval(hook);
-        window.CalibreEngine.onLang(relance);
+        window.CalibreEngine.onLangAdd(relance);
         relance();
       }
     }catch(e){ clearInterval(hook); }
@@ -1189,8 +1196,13 @@ function navResponsive(){
     links.style.fontSize = '';
     qsa('a[data-anchor]', links).forEach(function(a2){
       a2.style.fontSize = '';
-      /* libellé complet retrouvé : la place peut être revenue */
-      if(a2.__full !== undefined && a2.textContent !== a2.__full) a2.textContent = a2.__full;
+      /* libellé complet retrouvé : la place peut être revenue. On retraduit
+         la source au lieu de reposer le rendu mémorisé : celui-ci datait de
+         la langue précédente, et comme il écrit en dernier il gagnait. */
+      if(a2.__full !== undefined){
+        var plein = (window.I18N && window.I18N.t) ? window.I18N.t(a2.__full) : a2.__full;
+        if(a2.textContent !== plein) a2.textContent = plein;
+      }
     });
   }
   var shrinkLinks = function(gap, fs){
@@ -1211,9 +1223,12 @@ function navResponsive(){
     function(){
       if(!links) return;
       qsa('a[data-anchor]', links).forEach(function(a2){
-        if(a2.__full === undefined) a2.__full = a2.textContent;
-        var cut = a2.__full.indexOf('/');
-        if(cut > 0) a2.textContent = a2.__full.slice(cut + 1);
+        /* l'empreinte française fait foi : le rendu affiché, lui, change de
+           langue et gravait la précédente comme source */
+        if(a2.__full === undefined) a2.__full = a2.getAttribute('data-i18n-fr') || a2.textContent;
+        var plein2 = (window.I18N && window.I18N.t) ? window.I18N.t(a2.__full) : a2.__full;
+        var cut = plein2.indexOf('/');
+        if(cut > 0) a2.textContent = plein2.slice(cut + 1);
       });
     },
     /* dernier recours : la barre cède la place à un bouton de sommaire.
@@ -1558,16 +1573,9 @@ var langBtn = qs('[data-lang-btn]'), langMenu = qs('[data-lang-menu]'), langCode
 var LANGCB = [];
 CE.__langHooks = CE.__langHooks || [];
 CE.onLangAdd = function(fn){ if(typeof fn === 'function') CE.__langHooks.push(fn); };
-/* garde-fou de révélation : un élément visible ne doit pas rester décalé */
-CE.onLangAdd(function(){
-  setTimeout(function(){
-    var els = doc.querySelectorAll('[data-reveal]');
-    for(var i = 0; i < els.length; i++){
-      var el = els[i];
-      if(getComputedStyle(el).opacity === '1' && el.style.transform) el.style.transform = '';
-    }
-  }, 400);
-});
+/* le garde-fou de révélation est déjà enregistré plus haut. Ce second
+   exemplaire refaisait le même balayage de page à chaque bascule,
+   getComputedStyle sur chaque élément compris. */
 CE.onLang = function(code){
   /* un code composé ne tient pas dans la pastille : « de-CH » s'y affiche « CH » */
   if(langCode) langCode.textContent = String(code).split('-').pop().toUpperCase();
@@ -1738,10 +1746,33 @@ if(langBtn && langMenu && window.I18N){
       }
       /* la voix se tait pendant la bascule : plus de phrase coupée en deux langues */
       VOICE.stop();
+      /* le voile doit être PEINT avant que la réécriture ne bloque le fil.
+         Avec la transition, il n'arrivait qu'une fois le gel passé : on
+         voyait exactement ce qu'il était censé masquer. */
+      veil.style.transition = 'none';
       veil.style.opacity = '.42';
+      void veil.offsetWidth;
+      var leverVoile = function(){
+        veil.style.transition = 'opacity .25s ease';
+        veil.style.opacity = '0';
+      };
+      /* filet : si la bascule n'aboutit pas, le voile ne reste pas posé */
+      var secours = setTimeout(leverVoile, 2500);
+      /* deux images : la première fait le calcul de style, la seconde
+         garantit que le voile est à l'écran avant le blocage */
       requestAnimationFrame(function(){
-        window.I18N.set(code);
-        setTimeout(function(){ veil.style.opacity = '0'; }, 220);
+        requestAnimationFrame(function(){
+          window.I18N.set(code, function(){
+            clearTimeout(secours);
+            /* les libellés traduits n'ont pas la longueur des français : les
+               repères de section et les épingles sont faux tant qu'on n'a pas
+               remesuré. Une seule fois, et derrière le voile. */
+            try{ measure(); }catch(e){}
+            try{ if(lenis && lenis.resize) lenis.resize(); }catch(e){}
+            try{ if(window.ScrollTrigger) window.ScrollTrigger.refresh(); }catch(e){}
+            leverVoile();
+          });
+        });
       });
     };
     li.addEventListener('click', pick);
@@ -2349,9 +2380,13 @@ function buildChain(cv){
     c2.fillStyle = col; c2.fillText(txt, x, y);
   }
   function clip(txt, max){
+    /* On traduit AVANT de rogner. Rogner d'abord détruit la clé : la chaîne
+       amputée n'est plus reconnue, et le libellé repartait en français avec
+       une ellipse en prime. */
+    var s = (window.__adCanvasTr && window.__adCanvasTr.voir) ? window.__adCanvasTr.voir(txt) : txt;
     c2.font = FS + 'px "IBM Plex Mono", ui-monospace, monospace';
-    if(c2.measureText(txt).width <= max) return txt;
-    var t = txt;
+    if(c2.measureText(s).width <= max) return s;
+    var t = s;
     while(t.length > 2 && c2.measureText(t + '…').width > max) t = t.slice(0, -1);
     return t + '…';
   }
@@ -3307,7 +3342,10 @@ var VOICE = (function(){
   var SS = window.speechSynthesis;
   var V = { on: true, ok: !!SS, voice: null, lg: null, cur: null, selOn: false };
   try{ if(localStorage.getItem('ad2026.voix') === '0') V.on = false; }catch(e){}
-  var LOC = { fr: 'fr-FR', en: 'en-GB', de: 'de-DE', it: 'it-IT', zh: 'zh-CN', ar: 'ar-SA', ja: 'ja-JP' };
+  /* 'de-CH' doit figurer ici : sans entrée, code() retombait sur 'fr-FR' et le
+     suisse allemand était lu par une voix française. pick() choisit sur les deux
+     premières lettres, un timbre de-DE prend le relais s'il n'y a pas de de-CH. */
+  var LOC = { fr: 'fr-FR', en: 'en-GB', de: 'de-DE', it: 'it-IT', zh: 'zh-CN', ar: 'ar-SA', ja: 'ja-JP', 'de-CH': 'de-CH' };
   function code(){
     var l = 'fr';
     try{ if(window.I18N && window.I18N.get) l = window.I18N.get() || 'fr'; }catch(e){}
@@ -3423,10 +3461,14 @@ var VOICE = (function(){
       ADA.say(score >= 14 ? 'Tri juste. C\'est exactement ce que Leonhard automatise.'
                           : 'Le tri prend du temps, et il se fait à chaud. D\'où l\'outil.', 5000);
     }
-    alertEl.textContent = 'Terminé — ' + score + ' point' + (Math.abs(score) > 1 ? 's' : '') + ' sur ' + 40 + ' secondes.';
-    verdict.textContent = (meilleure >= 3 ? 'Meilleure série : ' + meilleure + ' d\'affilée. ' : '') +
-      (score >= 14 ? 'Vous savez trier. Le reste, Leonhard le fait pour vous.'
-                   : 'Le tri, c\'est ce qui coûte le plus de temps en vrai.');
+    /* la phrase de fin était assemblée avant d'être écrite : aucune clé ne
+       pouvait lui correspondre. On traduit des gabarits à trou, le nombre
+       reprend sa place ensuite. */
+    alertEl.textContent = TR(Math.abs(score) > 1 ? 'Terminé — # points sur 40 secondes.'
+                                                 : 'Terminé — # point sur 40 secondes.').replace('#', score);
+    verdict.textContent = (meilleure >= 3 ? TR('Meilleure série : # d\'affilée.').replace('#', meilleure) + ' ' : '') +
+      TR(score >= 14 ? 'Vous savez trier. Le reste, Leonhard le fait pour vous.'
+                     : 'Le tri, c\'est ce qui coûte le plus de temps en vrai.');
     verdict.style.color = '#7C8791';
     setTR(startBtn, 'REJOUER');
   }
@@ -3490,7 +3532,9 @@ var VOICE = (function(){
     idle = 0; helped = 0;
     if(ADA.ready){
       ADA.focus(alertEl);
-      ADA.say('Je trie avec vous. ' + G1TIP[(Math.random() * G1TIP.length) | 0], 5200);
+      /* la phrase et l'indice sont traduits chacun de son côté : collés
+         avant l'appel, ils ne correspondaient à aucune clé */
+      ADA.say(TR('Je trie avec vous.') + ' ' + TR(G1TIP[(Math.random() * G1TIP.length) | 0]), 5200);
     }
     clearInterval(iv);
     clearInterval(coach);
@@ -3584,7 +3628,7 @@ var VOICE = (function(){
         else if(aLock <= 0){
           b3.state = 0; b3.flash = 1; b3.ok = true; b3.byAda = 1;
           score++; scoreEl.textContent = score;
-          if(hint) hint.textContent = TR('ADA a bloqué :') + b3.port + ' — gardez la gauche, je tiens la droite';
+          if(hint) hint.textContent = TR('ADA a bloqué :') + b3.port + ' ' + TR('— gardez la gauche, je tiens la droite');
           aCell = -1;
         }
       }else if(aT > .55){
@@ -3638,7 +3682,10 @@ var VOICE = (function(){
         if(ADA.ready){ ADA.release(cv); ADA.say(leaks ? 'Trois secondes de retard et ça passe. C\'est pour ça qu\'on automatise.' : 'Mur tenu. À deux, c\'est plus simple.', 4600); }
         clearInterval(iv); iv = null; run = false;
         setTR(startBtn, 'REJOUER');
-        if(hint) hint.textContent = score + ' bloqués, ' + leaks + ' fuites — c\'est exactement ce que le filtre automatise';
+        /* gabarit à trou : les deux nombres reprennent leur place après la
+           traduction, la phrase entière devient une clé possible */
+        if(hint) hint.textContent = TR('# bloqués, # fuites — c\'est exactement ce que le filtre automatise')
+          .replace('#', score).replace('#', leaks);
       }
     }, 1000);
   });
@@ -3981,7 +4028,7 @@ var VOICE = (function(){
       }
       var bonus = Math.round(T2.stab * 200) + (T2.p <= pwrCap ? 100 : 0) + (T2.c <= coolCap ? 100 : 0);
       score += bonus;
-      if(stEl){ stEl.textContent = TR('inspection passée · ') + score + ' pts'; stEl.style.color = GRN; }
+      if(stEl){ stEl.textContent = TR('inspection passée · # pts').replace('#', score); stEl.style.color = GRN; }
       setTimeout(function(){
         level++;
         U = Math.min(20, 14 + level);
@@ -4386,7 +4433,8 @@ var VOICE = (function(){
     run = false; over = true;
     if(score > best){ best = score; try{ localStorage.setItem('ad2026.sonde.best', String(best)); }catch(e){} }
     setTR(startBtn, 'REJOUER');
-    if(hint) hint.textContent = TR('sonde perdue à la vague ') + wave + ' — ' + score + ' points · record ' + best;
+    if(hint) hint.textContent = TR('sonde perdue à la vague # — # points · record #')
+      .replace('#', wave).replace('#', score).replace('#', best);
     if(wave >= 4) TROPHY.win('g4');
   }
 
@@ -4706,7 +4754,7 @@ var VOICE = (function(){
     if(dist > best){ best = dist; try{ localStorage.setItem('ad2026.salle.best', String(Math.round(best))); }catch(e){} }
     if(bestEl) bestEl.textContent = TR('record ') + Math.round(best) + ' m';
     startBtn.textContent = TR('REPARTIR');
-    if(hint) hint.textContent = Math.round(dist) + ' m — la salle est plus longue qu\'elle n\'en a l\'air';
+    if(hint) hint.textContent = TR('# m — la salle est plus longue qu\'elle n\'en a l\'air').replace('#', Math.round(dist));
     if(dist >= 400) TROPHY.win('g5');
   }
   function step(dt){
@@ -4921,7 +4969,7 @@ var VOICE = (function(){
   try{ var sv = parseFloat(localStorage.getItem('ad2026.salle.mult')); if(sv > 0) mult = sv; }catch(e){}
   function paintMult(){
     if(!multBtn) return;
-    multBtn.textContent = 'VITESSE ×' + String(mult).replace('.', ',');
+    multBtn.textContent = TR('VITESSE ×#').replace('#', String(mult).replace('.', ','));
     var hot = mult >= 2;
     multBtn.style.color = hot ? '#F5A524' : '#048B9A';
     multBtn.style.borderColor = hot ? '#F5A524' : '#048B9A';
@@ -4933,7 +4981,7 @@ var VOICE = (function(){
       mult = MULTS[(i + 1) % MULTS.length];
       try{ localStorage.setItem('ad2026.salle.mult', String(mult)); }catch(e){}
       paintMult();
-      if(hint) hint.textContent = mult > 1 ? 'vitesse ×' + String(mult).replace('.', ',') + ' — les distances comptent double' : 'vitesse normale';
+      if(hint) hint.textContent = mult > 1 ? TR('vitesse ×# — les distances comptent double').replace('#', String(mult).replace('.', ',')) : TR('vitesse normale');
     });
   }
   startBtn.addEventListener('click', function(){ layout(); api.vis = true; reset(); });
@@ -5010,16 +5058,19 @@ var VOICE = (function(){
       if(k === 'data') el.style.background = M.data < 16 ? '#FF5C4D' : '#048B9A';
     });
     if(sizeEl) sizeEl.textContent = t[1];
-    if(ageEl) ageEl.textContent = TR('âge') + ' ' + Math.max(0, Math.floor((Date.now() - M.born) / 86400000)) + ' ' + TR('j');
+    if(ageEl) ageEl.textContent = TR('âge # j').replace('#', Math.max(0, Math.floor((Date.now() - M.born) / 86400000)));
     var mo = mood();
     if(stateEl){ stateEl.textContent = TR(LBL[mo]); stateEl.style.color = mo === 'heureux' ? '#048B9A' : (mo === 'nominal' ? '#7C8791' : '#FF5C4D'); }
     if(sayEl && mo !== lastMood){
       lastMood = mo;
       var l = SAY[mo][(Math.random() * SAY[mo].length) | 0];
-      if(RM) sayEl.textContent = l;
+      /* la réplique passait dans le document sans jamais toucher la fiche :
+         neuf des dix phrases y sont pourtant déjà */
+      var lt = TR(l);
+      if(RM) sayEl.textContent = lt;
       else{
         g.killTweensOf(sayEl);
-        g.to(sayEl, { opacity: 0, duration: .15, onComplete: function(){ sayEl.textContent = l; g.to(sayEl, { opacity: 1, duration: .4 }); } });
+        g.to(sayEl, { opacity: 0, duration: .15, onComplete: function(){ sayEl.textContent = lt; g.to(sayEl, { opacity: 1, duration: .4 }); } });
       }
     }
   }
@@ -5307,6 +5358,16 @@ var VOICE = (function(){
     c2.font = ((sz || 9) * SC()).toFixed(1) + 'px "IBM Plex Mono", ui-monospace, monospace';
     return c2.measureText(txt).width;
   }
+  /* Le point médian est décoratif. Collé au libellé avant l'écriture, il
+     entrait dans la clé demandée à la fiche : « · # pannes par mois » n'y
+     figure pas, et l'indicateur restait en français dans les sept langues.
+     On traduit d'abord, on décore ensuite. */
+  function puce(txt){
+    try{
+      if(window.__adCanvasTr && window.__adCanvasTr.voir) return '· ' + window.__adCanvasTr.voir(txt);
+    }catch(e){}
+    return '· ' + txt;
+  }
   /* --- le bandeau : on nomme le passage, et on chiffre le résultat --- */
   var CAP = [
     { l: 'CE QUI SE PASSE AUJOURD\'HUI', r: 'CE QUE VOUS OBTENEZ',
@@ -5344,8 +5405,8 @@ var VOICE = (function(){
     c2.fillText(cap.r, W - 12 - c2.measureText(cap.r).width, 13);
     /* les indicateurs, en pied de chaque moitié */
     for(var i = 0; i < 2; i++){
-      label('· ' + cap.kl[i], 12, H - 26 + i * 12 * SC(), 'rgba(255,130,116,.9)', 9);
-      var tr2 = '· ' + cap.kr[i];
+      label(puce(cap.kl[i]), 12, H - 26 + i * 12 * SC(), 'rgba(255,130,116,.9)', 9);
+      var tr2 = puce(cap.kr[i]);
       c2.font = (9 * SC()).toFixed(1) + 'px "IBM Plex Mono", ui-monospace, monospace';
       c2.fillStyle = 'rgba(140,226,238,.95)';
       c2.fillText(tr2, W - 12 - c2.measureText(tr2).width, H - 26 + i * 12 * SC());
@@ -5746,8 +5807,18 @@ var VOICE = (function(){
         b.style.cssText = "background:rgba(4,139,154,.12);border:1px solid rgba(4,139,154,.42);color:#5FD3E3;" +
           "font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.04em;" +
           'padding:6px 8px;cursor:pointer;min-height:30px;white-space:nowrap;transition:color .2s,border-color .2s,background .2s';
+        /* l'empreinte francaise reste posee sur le bouton : ouverte
+           directement en allemand ou en anglais, la page n'offrait au
+           balayage que du texte deja traduit, et chaque bascule laissait
+           voir la langue precedente pendant les 480 ms du relabel. */
+        b.setAttribute('data-i18n-fr', g.name);
         b.textContent = TR(g.name);
-        window.CalibreEngine.relabel(function(){ b.textContent = TR(g.name); }, 'layer-' + g.name);
+        window.CalibreEngine.relabel(function(){
+          /* reposee a chaque relabel : un retour par le francais peut
+             graver le libelle etranger a la place de la source */
+          b.setAttribute('data-i18n-fr', g.name);
+          b.textContent = TR(g.name);
+        }, 'layer-' + g.name);
         b.addEventListener('click', function(){
           g.visible = !g.visible;
           b.setAttribute('aria-pressed', g.visible ? 'true' : 'false');
@@ -6189,7 +6260,9 @@ var VOICE = (function(){
     if(!e2) return;
     if(F.name) F.name.textContent = e2.n;
     if(F.ip) F.ip.textContent = e2.ip;
-    if(F.slot) F.slot.textContent = 'Baie A-04 · U' + String(e2.u).padStart(2, '0') + ' · ' + e2.h + ' U';
+    /* seul « Baie » est traduisible ici : collé au numéro d'unité, le
+       gabarit entier ne correspondrait à aucune clé de la fiche. */
+    if(F.slot) F.slot.textContent = TR('Baie') + ' A-04 · U' + String(e2.u).padStart(2, '0') + ' · ' + e2.h + ' U';
     if(F.cpu) F.cpu.textContent = TR(e2.cpu);
     if(F.pwr) F.pwr.textContent = TR(e2.pwr);
     if(F.cbl) F.cbl.textContent = TR(e2.cbl);
@@ -6203,6 +6276,7 @@ var VOICE = (function(){
     /* la fiche se réécrit si la langue change pendant qu'elle est ouverte */
     window.CalibreEngine.relabel(function(){
       if(!F.cpu || !F.cpu.isConnected) return;
+      if(F.slot) F.slot.textContent = TR('Baie') + ' A-04 · U' + String(e2.u).padStart(2, '0') + ' · ' + e2.h + ' U';
       F.cpu.textContent = TR(e2.cpu);
       if(F.pwr) F.pwr.textContent = TR(e2.pwr);
       if(F.cbl) F.cbl.textContent = TR(e2.cbl);
@@ -6295,6 +6369,17 @@ var VOICE = (function(){
 (function(){
   var stamp = qs('[data-kpi-stamp]'), tipEl = qs('[data-kpi-tip]'), gainEl = qs('[data-kpi-gain]');
   if(!stamp && !tipEl) return;
+  /* ce bloc réécrit le conseil et son gain à chaque relevé : sans ce marqueur
+     le traducteur du document retient la phrase française qu'il trouve au
+     passage et la repose ensuite par-dessus, figeant le conseil affiché. */
+  if(tipEl) tipEl.setAttribute('data-i18n-skip', '1');
+  if(gainEl) gainEl.setAttribute('data-i18n-skip', '1');
+  /* la fiche seule : ces textes sont des gabarits à jetons, il faut les
+     traduire AVANT d'y poser les valeurs, sinon plus aucune clé ne répond. */
+  function TRK(s){
+    try{ if(window.I18N && window.I18N.t) return window.I18N.t(s); }catch(e){}
+    return s;
+  }
   var E = {}, B = {};
   qsa('[data-kpi]').forEach(function(el){ E[el.getAttribute('data-kpi')] = el; });
   qsa('[data-kpi-bar]').forEach(function(el){ B[el.getAttribute('data-kpi-bar')] = el; });
@@ -6347,30 +6432,43 @@ var VOICE = (function(){
     });
     if(stamp){
       var d = new Date();
-      stamp.textContent = 'maj ' + String(d.getHours()).padStart(2, '0') + ':' +
+      stamp.textContent = TRK('maj') + ' ' + String(d.getHours()).padStart(2, '0') + ':' +
         String(d.getMinutes()).padStart(2, '0') + ':' + String(d.getSeconds()).padStart(2, '0');
     }
     return vals;
   }
+  var derniersVals = null, conseilPose = null;
   function advise(vals){
     if(!tipEl) return;
+    derniersVals = vals;
     var t = TIPS[ti % TIPS.length];
-    var txt = t[0]
+    /* le gabarit d'abord, les valeurs ensuite : une fois les nombres posés
+       la phrase n'est plus une clé et ressortait en français */
+    var txt = TRK(t[0])
       .replace('{dt}', vals.dt.toFixed(1).replace('.', ','))
       .replace('{hot}', vals.hot.toFixed(1).replace('.', ','))
       .replace('{kw}', (vals.kw * .27).toFixed(1).replace('.', ','))
       .replace('{load}', String(Math.round(vals.load)))
       .replace('{hum}', String(Math.round(vals.hum)))
       .replace('{free}', String(Math.round(vals.free)));
-    if(RM){ tipEl.textContent = txt; if(gainEl) gainEl.textContent = 'gain estimé · ' + t[1]; return; }
+    var gain = TRK('gain estimé') + ' · ' + TRK(t[1]);
+    /* rejoué à chaque bascule de langue : sans ce garde-fou le conseil
+       repartirait en fondu pour se réafficher à l'identique */
+    if(txt === conseilPose) return;
+    conseilPose = txt;
+    if(RM){ tipEl.textContent = txt; if(gainEl) gainEl.textContent = gain; return; }
     g.killTweensOf([tipEl, gainEl]);
     g.to([tipEl, gainEl], { opacity: 0, y: 5, duration: .2, ease: 'power2.in', onComplete: function(){
       tipEl.textContent = txt;
-      if(gainEl) gainEl.textContent = 'gain estimé · ' + t[1];
+      if(gainEl) gainEl.textContent = gain;
       g.to([tipEl, gainEl], { opacity: 1, y: 0, duration: .45, ease: EASE });
     } });
   }
   var v0 = paint(); advise(v0);
+  /* le conseil ne se renouvelle que toutes les sept secondes : à la bascule
+     de langue il resterait français jusque-là. On le repose sans attendre —
+     le garde-fou d'advise absorbe l'appel immédiat de l'inscription. */
+  try{ window.CalibreEngine.relabel(function(){ if(derniersVals) advise(derniersVals); }, 'kpi-conseil'); }catch(e){}
   if(RM) return;
   var api = { vis: false };
   api.frame = function(dt, t){
@@ -6843,7 +6941,12 @@ var VOICE = (function(){
       x.fillText(t.id, 30, y - 4);
       x.font = '13px "IBM Plex Mono", ui-monospace, monospace';
       x.fillStyle = 'rgba(124,135,145,.9)';
-      x.fillText(UNITS[t.u].n + ' · ' + t.txt, 30, y + 13);
+      /* Le nom de machine est un code : conv() le laisse intact — et il
+         emportait avec lui le libellé de panne collé derrière. Deux écritures
+         séparées, pour que seul le libellé passe par la table. */
+      var nomU = UNITS[t.u].n + ' · ';
+      x.fillText(nomU, 30, y + 13);
+      x.fillText(t.txt, 30 + x.measureText(nomU).width, y + 13);
       x.fillStyle = col;
       x.font = '600 14px "IBM Plex Mono", ui-monospace, monospace';
       x.fillText(t.pri === 1 ? 'P1' : 'P2', W2 - 42, y - 4);
@@ -7248,7 +7351,12 @@ var VOICE = (function(){
     x.fillStyle = '#56606A'; x.font = mono(x, 13);
     x.textBaseline = 'middle';
     x.fillText('CE QU\'ON ME DEMANDE', 58, 17);
+    /* La phrase est tapée caractère par caractère, encadrée de guillemets,
+       puis recoupée en lignes : au moment de l'écriture il ne reste que des
+       morceaux, dont aucun n'est une clé. On la traduit donc entière, avant
+       la frappe — les cinq demandes sont déjà dans la fiche. */
     var full = ASKS[askIdx];
+    try{ if(window.I18N && window.I18N.t) full = window.I18N.t(full) || full; }catch(e){}
     var shown = full.slice(0, Math.max(0, Math.floor(typed * full.length)));
     x.fillStyle = '#D6DEE4'; x.font = mono(x, 22);
     wrapTxt(x, '« ' + shown + (shown.length >= full.length ? ' »' : ''), 24, 76, w - 48, 30, h - 96);
@@ -7650,15 +7758,37 @@ var VOICE = (function(){
   var logEl = qs('[data-ada-log]'), chipsEl = qs('[data-ada-chips]'), form = qs('[data-ada-form]');
   var input = qs('[data-ada-input]'), closeBtn = qs('[data-ada-close]'), webBtn = qs('[data-ada-web]');
   function trA(x){ try{ return (window.I18N && window.I18N.t) ? window.I18N.t(x) : x; }catch(e){ return x; } }
+  /* la table range les phrases chiffrées avec des « # » à la place des nombres,
+     comme les libellés dessinés sur les toiles. La correspondance étant exacte,
+     « Section 06 : … » n'y trouvait rien et restait en français. On normalise,
+     on cherche, puis on remet les nombres en place ; si les repères ont disparu
+     à la traduction, on garde le français plutôt qu'une phrase amputée. */
+  function trNum(x){
+    if(typeof x !== 'string' || !x) return x;
+    var d = trA(x);
+    if(d !== x) return d;
+    var nums = x.match(/\d+/g);
+    if(!nums) return x;
+    var got = trA(x.replace(/\d+/g, '#'));
+    var parts = got.split('#');
+    if(parts.length !== nums.length + 1) return x;
+    var out = parts[0];
+    for(var i = 0; i < nums.length; i++) out += nums[i] + parts[i + 1];
+    return out;
+  }
   /* les deux bascules de l'en-tête sont écrites par le script : le balayage
      de traduction ne les voit pas, on tient donc leur libellé à la main */
   function lgNow(){ try{ return (window.I18N && window.I18N.get && window.I18N.get()) || 'fr'; }catch(e){ return 'fr'; } }
+  /* les dictionnaires écrits à la main dans ce fichier n'ont pas de colonne
+     « de-CH » : sans ce repli sur l'allemand, le suisse allemand retombait sur
+     le français — accueil, bascules et proposition de voix comprises */
+  function base(l){ return l === 'de-CH' ? 'de' : l; }
   var LBL = {
     voix: { fr:'VOIX', en:'VOICE', de:'STIMME', it:'VOCE', zh:'语音', ar:'الصوت', ja:'音声' },
     on:   { fr:'ON', en:'ON', de:'EIN', it:'ON', zh:'开', ar:'تشغيل', ja:'オン' },
     off:  { fr:'OFF', en:'OFF', de:'AUS', it:'OFF', zh:'关', ar:'إيقاف', ja:'オフ' }
   };
-  function L(k){ var t = LBL[k] || {}; return t[lgNow()] || t.fr; }
+  function L(k){ var t = LBL[k] || {}; return t[base(lgNow())] || t.fr; }
   /* une phrase du fil, traduite : rendue tout de suite si elle est connue,
      remplacée dès que la traduction arrive. Les nœuds ajoutés après la
      bascule de langue ne sont plus balayés : sans ce rappel ils restaient
@@ -7799,6 +7929,29 @@ var VOICE = (function(){
     }catch(e){}
     return x;
   }
+  /* la question posée dans la langue affichée ne rencontre rien : l'index est
+     bâti sur des mots-clés français, et toks() efface tout ce qui n'est pas
+     [a-z0-9] — en chinois, en arabe et en japonais il ne reste aucun jeton.
+     On reconnaît donc d'abord le libellé traduit d'une fiche : ponctuation,
+     casse et espaces retirés, c'est le seul repère qui tienne dans les huit
+     langues, y compris celles qui n'ont pas d'espaces. */
+  function nuLbl(s){ return fold(s).replace(/[^a-z0-9؀-ۿ぀-ヿ一-鿿]+/g, ''); }
+  function ficheLbl(q){
+    var n = nuLbl(q);
+    if(n.length < 2) return null;
+    for(var i = 0; i < KB.length; i++){
+      if(nuLbl(KB[i].c) === n || nuLbl(tr(KB[i].c)) === n) return KB[i];
+    }
+    return null;
+  }
+  /* la minuscule initiale n'est une norme qu'en français et en italien : en
+     allemand elle détruit la majuscule obligatoire des substantifs —
+     « Cybersicherheit » devenait « cybersicherheit » — et en anglais elle
+     abîme les noms propres. Ailleurs elle ne change rien. */
+  function lcTitre(s){
+    var l = lgNow();
+    return (l === 'de' || l === 'de-CH' || l === 'en') ? s : String(s).toLowerCase();
+  }
   var HAS_LLM = !!(window.claude && typeof window.claude.complete === 'function');
   var hist = [], webOn = false, lastWeb = null;
   try{ webOn = localStorage.getItem('ad2026.ada.web') === '1'; }catch(e){}
@@ -7829,7 +7982,12 @@ var VOICE = (function(){
           })).then(function(l){ return l.filter(Boolean); });
         }).catch(function(){ return null; });
     }
-    return wiki('fr').then(function(fr){ return (fr && fr.length) ? fr : wiki('en'); })
+    /* la Wikipédia de la langue affichée d'abord : le contexte versé dans le
+       prompt restait français, quelle que soit la langue du visiteur */
+    var lw = 'fr';
+    try{ if(window.I18N && window.I18N.get) lw = window.I18N.get() || 'fr'; }catch(e){}
+    if(lw === 'de-CH') lw = 'de';
+    return wiki(lw).then(function(a){ return (a && a.length) ? a : wiki('en'); })
       .then(function(res){
         if(!res || !res.length) return 'Aucun résultat exploitable.';
         lastWeb = res[0];
@@ -7920,7 +8078,9 @@ var VOICE = (function(){
       b.textContent = tr(e.c);
       b.addEventListener('pointerenter', function(){ b.style.borderColor = '#048B9A'; b.style.color = '#5FD3E3'; });
       b.addEventListener('pointerleave', function(){ b.style.borderColor = 'rgba(228,232,234,.14)'; b.style.color = '#9AA4AC'; });
-      b.addEventListener('click', function(){ ask(tr(e.c), e); });
+      /* la recherche travaille sur l'index français : on lui passe le libellé
+         source, pas sa traduction. push() se charge de l'afficher traduit. */
+      b.addEventListener('click', function(){ ask(e.c, e); });
       chipsEl.appendChild(b);
     });
     /* et une invitation à jouer, toujours présente */
@@ -7930,7 +8090,7 @@ var VOICE = (function(){
     pb.textContent = tr('On joue ?');
     pb.addEventListener('click', function(){
       push('moi', tr('On joue ?'));
-      push('ada', tr('Volontiers : morpion, échecs, dames, coupe de cartes, rami express, puissance 4, pacman — ou les mini-jeux de la section 06.'));
+      push('ada', trNum('Volontiers : morpion, échecs, dames, coupe de cartes, rami express, puissance 4, pacman — ou les mini-jeux de la section 06.'));
       offerGames();
     });
     chipsEl.appendChild(pb);
@@ -7943,7 +8103,12 @@ var VOICE = (function(){
      modèle et du web — pour qu'une question tordue ne le contourne pas. */
   var CONF = /(rançongiciel|ransomware|cryptolocker|crypto-?verrou|piraté|piratage|intrusion (?:réelle|chez)|fuite de données|vol de données|incident chez|panne chez|attaque chez|attaqué chez|s'est passé chez|arrivé chez|150 postes|nom du client|quel client|ses clients|coordonnées (?:privées|personnelles)|adresse personnelle|numéro de téléphone|salaire|mot de passe|identifiant|login|clé (?:api|ssh)|jeton d'accès)/i;
   var CONF_MSG = "Je ne raconte pas ce qui se passe chez un client : incidents, événements rattachés à une entreprise, données personnelles ou identifiants, rien de tout cela ne sort d'ici. Je peux décrire la méthode et les garde-fous.";
-  function sensible(x){ return !!x && CONF.test(String(x)); }
+  /* la question n'est pas ramenée au français avant d'être testée : un visiteur
+     germanophone, anglophone ou japonais passait à travers le filtre. Des
+     sous-chaînes, et non des mots délimités : le chinois et le japonais n'ont
+     pas d'espaces. */
+  var CONF_X = /(ransom|erpressung|riscatto|勒索|ランサム|رانسوم|data (?:leak|breach)|datenleck|datenpanne|datenabfluss|violazione dei dati|fuga di dati|数据泄露|情報漏|تسريب البيانات|تسريب بيانات|(?:incident|breach|attack|hack|outage|vorfall|zwischenfall|angriff|ausfall|panne|incidente|attacco|guasto)[^.?!]{0,24}(?:kunden|kunde|client|customer|cliente)|(?:bei|beim) (?:ihrem|einem|dem|einer) kund|at (?:a|your|the|one) (?:client|customer)|(?:presso|da) un cliente|client name|customer name|kundenname|name des kunden|nome del cliente|客户名|顧客名|اسم العميل|password|passwort|kennwort|credential|zugangsdaten|credenziali|密码|パスワード|كلمة المرور|كلمة السر|\bsalary\b|\bgehalt\b|stipendio|工资|給与|راتب|phone number|telefonnummer|numero di telefono|电话号码|電話番号|رقم الهاتف|api key|api-key|api-schlüssel|ssh key|chiave api)/i;
+  function sensible(x){ var s = String(x); return !!x && (CONF.test(s) || CONF_X.test(s)); }
   /* garde de sortie : au moindre doute, la phrase de cadrage remplace tout */
   function safe(txt){ return sensible(txt) ? tr(CONF_MSG) : txt; }
   function setBusy(v){
@@ -8343,7 +8508,9 @@ var VOICE = (function(){
       (function(k){
         var b = doc.createElement('button');
         b.type = 'button';
-        b.setAttribute('aria-label', 'colonne ' + ((k % W) + 1));
+        /* le numéro collé au mot ne peut correspondre à aucune clé : on
+           traduit le mot seul et on recolle le chiffre */
+        b.setAttribute('aria-label', tr('colonne') + ' ' + ((k % W) + 1));
         b.style.cssText = 'aspect-ratio:1;min-height:30px;border:1px solid rgba(228,232,234,.14);border-radius:50%;' +
           'background:rgba(11,14,17,.7);cursor:pointer;padding:0';
         b.addEventListener('click', function(){
@@ -8880,7 +9047,7 @@ var VOICE = (function(){
     if(/pacman|pac.?man|labyrinthe|gober|gobe|fant/.test(f)) return startPac;
     if(/carte|bataille|coupe|poker|belote/.test(f)) return startCards;
     if(/jouer|jeu|jeux|joue|partie|amuser|distraire/.test(f)) return function(){
-      push('ada', tr('Avec plaisir, ici même : morpion, échecs, dames, coupe de cartes, rami express, puissance 4, pacman. Et treize mini-jeux en section 06.'));
+      push('ada', trNum('Avec plaisir, ici même : morpion, échecs, dames, coupe de cartes, rami express, puissance 4, pacman. Et treize mini-jeux en section 06.'));
       offerGames();
     };
     return null;
@@ -8895,6 +9062,10 @@ var VOICE = (function(){
     var play = forced ? null : playIntent(q);
     if(play){ hist.push({ role: 'user', content: q }); play(); return; }
     hist.push({ role: 'user', content: q });
+    /* l'index est français : une question posée dans une autre langue n'y
+       rencontre rien. On regarde d'abord si elle reprend le libellé d'une
+       fiche, tel qu'il vient d'être affiché sur une puce. */
+    if(!forced) forced = ficheLbl(q);
     var hits = forced ? [{ s: 99, e: forced }].concat(search(q)) : search(q);
     var top = hits[0], second = hits[1];
     var p = push('ada', '·');
@@ -8912,7 +9083,7 @@ var VOICE = (function(){
       var kbC = null;
       for(var kc = 0; kc < KB.length; kc++) if(KB[kc].id === 'cyber'){ kbC = KB[kc]; break; }
       type(p, tr(CONF_MSG) + (kbC ? ' ' + trA(kbC.a) : ''));
-      source('confidentialité');
+      source(tr('confidentialité'));
       suggest(hits.slice(0, 4));
       return;
     }
@@ -8936,8 +9107,10 @@ var VOICE = (function(){
       suggest(hits.slice(0, 4));
       return;
     }
-    type(p, (function(x){ try{ return (window.I18N && window.I18N.t) ? window.I18N.t(x) : x; }catch(e){ return x; } })(top.e.a) + (second && top.s - second.s < .2 ? ' — ' + tr('si vous visiez plutôt') + ' ' + tr(second.e.c).toLowerCase() + ', ' + tr('dites-le.') : ''));
-    source(top.e.id);
+    type(p, (function(x){ try{ return (window.I18N && window.I18N.t) ? window.I18N.t(x) : x; }catch(e){ return x; } })(top.e.a) + (second && top.s - second.s < .2 ? ' — ' + tr('si vous visiez plutôt') + ' ' + lcTitre(tr(second.e.c)) + ', ' + tr('dites-le.') : ''));
+    /* le libellé de la fiche plutôt que son identifiant interne : « source · Le
+       diplôme » se traduit, « source · diplome » restait français partout */
+    source(tr(top.e.c));
     suggest(hits.slice(1, 5));
   }
 
@@ -8977,8 +9150,9 @@ var VOICE = (function(){
 
   function say(txt, ms, silent, hint, force, src){
     if(!bubble) return;
-    /* les messages sont écrits en français dans le code : on les traduit */
-    try{ if(window.I18N && window.I18N.t) txt = window.I18N.t(txt); }catch(e){}
+    /* les messages sont écrits en français dans le code : on les traduit. Les
+       phrases chiffrées sont rangées avec des « # », trNum va les y chercher. */
+    txt = trNum(txt);
     if(!BUB.claim('robot', ms || 5200, force)) return;
     bubble.setAttribute('data-bubble', '1');
     /* déjà traduite ici : le traducteur n'y touche pas */
@@ -9578,7 +9752,7 @@ var VOICE = (function(){
       if(host.__insT && performance.now() - host.__insT < 14000) return;
       host.__insT = performance.now();
       stampHow(el);
-      droneSay('À manipuler — ' + txt, 8400, true);
+      droneSay(tr('À manipuler —') + ' ' + trNum(txt), 8400, true);
     });
     if(window.IntersectionObserver) new IntersectionObserver(function(en){
       if(!en[0].isIntersecting || howStamp[i] || A.open) return;
@@ -9586,7 +9760,7 @@ var VOICE = (function(){
       if(performance.now() < helloUntil) return;
       howStamp[i] = 1;
       stampHow(el);
-      droneSay('À manipuler — ' + txt, 9000, true);
+      droneSay(tr('À manipuler —') + ' ' + trNum(txt), 9000, true);
     }, { threshold: [.5, .75] }).observe(host);
   }
   function armHowto(){
@@ -9601,7 +9775,7 @@ var VOICE = (function(){
         if(host.__insT && performance.now() - host.__insT < 14000) return;
         host.__insT = performance.now();
         stampHow(el);
-        droneSay('À manipuler — ' + row[1], 8400, true);
+        droneSay(tr('À manipuler —') + ' ' + trNum(row[1]), 8400, true);
       });
       /* et à l'entrée en vue, une fois par visite */
       if(window.IntersectionObserver){
@@ -9610,7 +9784,7 @@ var VOICE = (function(){
           if(en[0].intersectionRatio < .5) return;
           howStamp[i] = 1;
           stampHow(el);
-          droneSay('À manipuler — ' + row[1], 9000, true);
+          droneSay(tr('À manipuler —') + ' ' + trNum(row[1]), 9000, true);
         }, { threshold: [.5, .75] }).observe(host);
       }
     });
@@ -9630,13 +9804,13 @@ var VOICE = (function(){
     if(VOICE.on) return null;   /* déjà active : rien à proposer */
     var l = 'fr';
     try{ if(window.I18N && window.I18N.get) l = window.I18N.get() || 'fr'; }catch(e){}
-    return VHINT[l] || VHINT.fr;
+    return VHINT[base(l)] || VHINT.fr;
   }
   function droneSay(txt, ms, silent, hint){
     var attente = false;
     try{
       var t0 = txt;
-      if(window.I18N && window.I18N.t) txt = window.I18N.t(txt);
+      txt = trNum(txt);
       /* la fiche n'a rien : la traduction automatique, avec rappel dès
          qu'elle revient — la phrase se dit alors dans la bonne langue */
       if(txt === t0 && window.I18N && window.I18N.tAuto && window.I18N.get && window.I18N.get() !== 'fr'){
@@ -9649,15 +9823,11 @@ var VOICE = (function(){
         else attente = true;            /* la traduction n'est pas là : on l'attend */
       }
     }catch(e){}
-    /* on ne prononce pas du français avec un timbre étranger : c'est
-       inaudible. Si la traduction tarde plus de deux secondes et demie,
-       on lit l'original plutôt que de rester muet. */
-    if(!silent){
-      if(!attente) VOICE.speak(txt);
-      else setTimeout(function(){
-        if(attente){ attente = false; VOICE.speak(txt); }
-      }, 4200);
-    }
+    /* on ne fait pas lire du français par un timbre allemand ou japonais :
+       c'est inintelligible et cela passe pour une panne. Tant que la traduction
+       n'est pas là, la bulle s'affiche et la voix se tait ; le rappel de tAuto
+       plus haut prononce la phrase si elle finit par arriver. */
+    if(!silent && !attente) VOICE.speak(txt);
     if(!dBub) { say(txt, ms, true); return; }
     dBub.__src = arguments[0];
     if(!BUB.claim('drone', ms || 6200, !silent)) return;
@@ -10022,7 +10192,7 @@ var VOICE = (function(){
     try{ if(window.I18N && window.I18N.get) l = window.I18N.get() || 'fr'; }catch(e){}
     /* la ligne d'activation ne s'ajoute que si la voix est réellement
        coupée : sinon l'accueil demandait d'activer ce qui l'était déjà */
-    var h = HELLO[l] || HELLO.fr, vh = voiceHint();
+    var h = HELLO[base(l)] || HELLO.fr, vh = voiceHint();
     return vh ? h + ' ' + vh : h;
   }
   var helloT = null, helloUntil = 0, helloLang = null;
@@ -10696,13 +10866,13 @@ var VOICE = (function(){
   function lose(){
     lives--;
     if(livesEl){
-      livesEl.textContent = Math.max(0, lives) + (lives === 1 ? ' vie' : ' vies');
+      livesEl.textContent = TR(lives === 1 ? '# vie' : '# vies').replace('#', Math.max(0, lives));
       livesEl.style.color = lives > 1 ? '#048B9A' : '#FF5C4D';
     }
     if(lives <= 0){
       run = false;
       setTR(startBtn, 'REJOUER');
-      if(hint) hint.textContent = TR('pare-feu percé — ') + score + ' points';
+      if(hint) hint.textContent = TR('pare-feu percé — # points').replace('#', score);
       return;
     }
     ball.x = pad.x; ball.y = H - 42; ball.vx = 150 * (Math.random() < .5 ? -1 : 1); ball.vy = -190;
@@ -10744,7 +10914,7 @@ var VOICE = (function(){
     if(!left){
       run = false;
       setTR(startBtn, 'REJOUER');
-      if(hint) hint.textContent = TR('toutes les tentatives bloquées — ') + score + ' points';
+      if(hint) hint.textContent = TR('toutes les tentatives bloquées — # points').replace('#', score);
       TROPHY.win('g8');
     }
   }
@@ -11039,7 +11209,7 @@ var VOICE = (function(){
     open.push(i);
     if(open.length === 2){
       moves++;
-      if(movesEl) movesEl.textContent = moves + (moves > 1 ? ' coups' : ' coup');
+      if(movesEl) movesEl.textContent = TR(moves > 1 ? '# coups' : '# coup').replace('#', moves);
       var a = cards[open[0]], b = cards[open[1]];
       if(a.v === b.v){
         a.done = b.done = 1;
@@ -11049,7 +11219,7 @@ var VOICE = (function(){
         if(pairs === 8){
           run = false;
           setTR(startBtn, 'REJOUER');
-          if(hint) hint.textContent = TR('inventaire complet en ') + moves + ' coups';
+          if(hint) hint.textContent = TR('inventaire complet en # coups').replace('#', moves);
       TROPHY.win('g10');
         }
       }else lock = .85;
@@ -11408,7 +11578,8 @@ var VOICE = (function(){
         if(bestEl) bestEl.textContent = TR('record ') + best + ' ms';
       }
       state = 'done';
-      if(hint) hint.textContent = last + ' ms · moyenne ' + Math.round(sum / tries) + ' ms sur ' + tries;
+      if(hint) hint.textContent = TR('# ms · moyenne # ms sur #')
+        .replace('#', last).replace('#', Math.round(sum / tries)).replace('#', tries);
       startBtn.textContent = TR('RELANCER');
       if(tries >= 3 && sum / tries < 420) TROPHY.win('g11');
       return;
@@ -11497,7 +11668,7 @@ var VOICE = (function(){
     lvl++;
     seq.push((Math.random() * 6) | 0);
     input = [];
-    if(lvlEl) lvlEl.textContent = 'palier ' + lvl;
+    if(lvlEl) lvlEl.textContent = TR('palier #').replace('#', lvl);
     state = 'show'; showing = 0; showT = 0;
     if(hint) hint.textContent = TR('regardez la séquence…');
   }
@@ -11510,7 +11681,8 @@ var VOICE = (function(){
     state = 'idle';
     if(lvl - 1 > best){ best = lvl - 1; try{ localStorage.setItem('ad2026.g12.best', String(best)); }catch(e){} }
     if(bestEl) bestEl.textContent = TR('record ') + best;
-    if(hint) hint.textContent = TR('ordre rompu au palier ') + lvl + ' — l\'onduleur passe toujours en premier';
+    if(hint) hint.textContent = TR('ordre rompu au palier # — l\'onduleur passe toujours en premier')
+      .replace('#', lvl);
     setTR(startBtn, 'REJOUER');
   }
   function tap(i){
@@ -11521,7 +11693,7 @@ var VOICE = (function(){
     if(seq[input.length - 1] !== i){ fail(); return; }
     if(input.length === seq.length){
       if(lvl >= 5) TROPHY.win('g12');
-      if(hint) hint.textContent = TR('palier ') + lvl + ' réussi';
+      if(hint) hint.textContent = TR('palier # réussi').replace('#', lvl);
       state = 'wait';
       setTimeout(function(){ if(state === 'wait') next(); }, 700);
     }
@@ -11628,7 +11800,7 @@ var VOICE = (function(){
     paintHud();
   }
   function paintHud(){
-    if(turnEl) turnEl.textContent = TR('tour ') + G.tour + ' / ' + G.max;
+    if(turnEl) turnEl.textContent = TR('tour # / #').replace('#', G.tour).replace('#', G.max);
     if(sideEl){
       sideEl.textContent = TR(G.camp === 'rouge' ? 'rôle : attaque' : 'rôle : défense');
       sideEl.style.color = G.camp === 'rouge' ? '#FF5C4D' : '#4169E1';
@@ -11864,7 +12036,10 @@ var VOICE = (function(){
     });
     c2.font = '8px "IBM Plex Mono", ui-monospace, monospace';
     c2.fillStyle = '#39424A';
-    c2.fillText(TR('objectif : ') + CIBLE, 10, 11);
+    /* Deux traductions se superposaient : TR() sur le préfixe, puis conv() sur
+       la phrase recollée. Le préfixe seul est une clé ; la cible est un nom de
+       machine et n'a rien à faire dedans. */
+    c2.fillText(TR('objectif :') + ' ' + CIBLE, 10, 11);
   }
 
   cv.addEventListener('pointerdown', function(ev){
@@ -12123,6 +12298,32 @@ var VOICE = (function(){
 })();
 
 /* =============================================================
+   MESSAGE WHATSAPP — le texte pré-rempli suit la langue
+============================================================= */
+(function(){
+  /* Le message part dans le paramètre ?text= d'un href. i18n.js ne relit que
+     les nœuds de texte et trois attributs : un lien ne passe jamais sous ses
+     yeux, et un prospect germanophone envoyait un message en français. */
+  function repose(){
+    var liens = qsa('a[href*="wa.me/"]');
+    for(var i = 0; i < liens.length; i++){
+      var a = liens[i], h = a.getAttribute('href') || '';
+      var p = h.indexOf('?text=');
+      if(p < 0) continue;
+      /* la source française est gravée au premier passage : sans elle, la
+         bascule suivante traduirait une traduction */
+      if(a.__waFr === undefined){
+        try{ a.__waFr = decodeURIComponent(h.slice(p + 6)); }catch(e){ a.__waFr = ''; }
+      }
+      if(!a.__waFr) continue;
+      a.setAttribute('href', h.slice(0, p + 6) + encodeURIComponent(TR(a.__waFr)));
+    }
+  }
+  CE.onLangAdd(repose);
+  repose();
+})();
+
+/* =============================================================
    TROPHÉES — trois jeux gagnés ouvrent une formation offerte
 ============================================================= */
 var TROPHY = (function(){
@@ -12143,20 +12344,29 @@ var TROPHY = (function(){
     if(panel) return;
     panel = doc.createElement('div');
     panel.setAttribute('role', 'dialog');
-    panel.setAttribute('aria-label', 'Formation offerte');
+    /* le panneau est ajouté après la construction du registre : la passe
+       d'attributs ne le verrait qu'à la bascule suivante */
+    panel.setAttribute('aria-label', TR('Formation offerte'));
     panel.style.cssText = 'position:fixed;inset:0;z-index:140;display:flex;align-items:center;justify-content:center;' +
       'padding:20px;background:rgba(7,9,11,.86);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);opacity:0;transition:opacity .4s ease';
-    var names = Object.keys(won).map(function(k){ return NAMES[k] || k; });
+    /* le panneau naît après la construction du registre de i18n.js et n'y est
+       donc jamais inscrit : chaque libellé se traduit ici, à l'écriture */
+    var names = Object.keys(won).map(function(k){ return TR(NAMES[k] || k); });
+    var waFr = 'Bonjour Anas, j\'ai gagné trois jeux sur votre portfolio — je suis intéressé(e) par la formation offerte.';
     panel.innerHTML =
       '<div style="max-width:520px;width:100%;border:1px solid rgba(4,139,154,.5);background:rgba(9,12,15,.98);padding:clamp(20px,4vw,34px)">' +
-      '<span style="display:block;font-family:\'IBM Plex Mono\',ui-monospace,monospace;font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:#048B9A">Trois jeux gagnés</span>' +
-      '<h3 style="margin:12px 0 0;font-family:\'IBM Plex Sans Condensed\',sans-serif;font-weight:700;font-size:clamp(24px,3.4vw,36px);line-height:1.02;letter-spacing:-.015em;text-transform:uppercase;color:#E4E8EA">Une formation offerte</h3>' +
-      '<p style="margin:14px 0 0;font-size:15px;line-height:1.6;color:#9AA4AC">Vous avez terminé ' + names.length + ' épreuves : <span style="color:#5FD3E3">' + names.join(', ') + '</span>. Écrivez-moi en mentionnant « trois jeux » et je vous offre une séance de formation — sur le sujet de votre choix : infrastructure, automatisation, ou IA hébergée chez vous.</p>' +
+      '<span style="display:block;font-family:\'IBM Plex Mono\',ui-monospace,monospace;font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:#048B9A">' + TR('Trois jeux gagnés') + '</span>' +
+      '<h3 style="margin:12px 0 0;font-family:\'IBM Plex Sans Condensed\',sans-serif;font-weight:700;font-size:clamp(24px,3.4vw,36px);line-height:1.02;letter-spacing:-.015em;text-transform:uppercase;color:#E4E8EA">' + TR('Une formation offerte') + '</h3>' +
+      '<p style="margin:14px 0 0;font-size:15px;line-height:1.6;color:#9AA4AC">' + TR('Vous avez terminé {n} épreuves :').replace('{n}', names.length) + ' <span style="color:#5FD3E3">' + names.join(', ') + '</span>. ' + TR('Écrivez-moi en mentionnant « trois jeux » et je vous offre une séance de formation — sur le sujet de votre choix : infrastructure, automatisation, ou IA hébergée chez vous.') + '</p>' +
       '<div style="margin-top:20px;display:flex;flex-wrap:wrap;gap:10px">' +
-      '<a data-egg-go="1" href="https://wa.me/41774939480?text=Bonjour%20Anas%2C%20j%27ai%20gagn%C3%A9%20trois%20jeux%20sur%20votre%20portfolio%20%E2%80%94%20je%20suis%20int%C3%A9ress%C3%A9(e)%20par%20la%20formation%20offerte." target="_blank" rel="noopener" style="flex:1 1 190px;text-align:center;border:1px solid #048B9A;background:rgba(4,139,154,.16);color:#5FD3E3;font-family:\'IBM Plex Mono\',ui-monospace,monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;text-decoration:none;padding:14px 16px">Réclamer sur WhatsApp</a>' +
-      '<button type="button" data-egg-close="1" style="flex:0 0 auto;background:none;border:1px solid rgba(228,232,234,.18);color:#7C8791;font-family:\'IBM Plex Mono\',ui-monospace,monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;padding:14px 18px;cursor:pointer">Plus tard</button>' +
+      '<a data-egg-go="1" href="https://wa.me/41774939480?text=' + encodeURIComponent(TR(waFr)) + '" target="_blank" rel="noopener" style="flex:1 1 190px;text-align:center;border:1px solid #048B9A;background:rgba(4,139,154,.16);color:#5FD3E3;font-family:\'IBM Plex Mono\',ui-monospace,monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;text-decoration:none;padding:14px 16px">' + TR('Réclamer sur WhatsApp') + '</a>' +
+      '<button type="button" data-egg-close="1" style="flex:0 0 auto;background:none;border:1px solid rgba(228,232,234,.18);color:#7C8791;font-family:\'IBM Plex Mono\',ui-monospace,monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;padding:14px 18px;cursor:pointer">' + TR('Plus tard') + '</button>' +
       '</div></div>';
     doc.body.appendChild(panel);
+    /* la source française reste attachée au lien : c'est elle que relit le
+       crochet de langue, sinon la bascule suivante traduirait une traduction */
+    var waLien = qs('[data-egg-go]', panel);
+    if(waLien) waLien.__waFr = waFr;
     requestAnimationFrame(function(){ panel.style.opacity = '1'; });
     function shut(){
       if(!panel) return;
@@ -12176,9 +12386,9 @@ var TROPHY = (function(){
       won[id] = 1; save();
       var n = count();
       var bar = qs('[data-trophy]');
-      if(bar) bar.textContent = n + TR(' / 3 épreuves gagnées');
+      if(bar) bar.textContent = TR('# / 3 épreuves gagnées').replace('#', n);
       if(typeof ADA !== 'undefined' && ADA.ready && n < 3){
-        ADA.say('Épreuve gagnée — ' + n + ' sur 3. Trois victoires ouvrent une surprise.', 5200);
+        ADA.say(TR('Épreuve gagnée — # sur 3. Trois victoires ouvrent une surprise.').replace('#', n), 5200);
       }
       if(n >= 3) setTimeout(open, 900);
     },
@@ -12210,6 +12420,11 @@ var TROPHY = (function(){
   GAMES.forEach(function(row){
     var btn = qs(row[0]), cv = qs(row[1]);
     if(!btn || !cv) return;
+    /* le libellé propre du bouton — NOUVELLE BAIE, DÉCOLLER, ENTRER,
+       ENTRAÎNER, NOUVELLE ANALYSE — relevé avant toute réécriture : le
+       crochet de langue le remplaçait par un « JOUER » générique et effaçait
+       cinq intitulés sur douze à chaque bascule. */
+    var btnFr = ((btn.getAttribute('data-i18n-fr') || btn.textContent || '') + '').trim() || 'JOUER';
     /* le parent suffit dans tous les cas : cadre du canevas, ou zone de jeu
        du jeu 01 — l'en-tête et le pied restent dégagés */
     var host = cv.parentElement;
@@ -12244,7 +12459,14 @@ var TROPHY = (function(){
       '<path d="M1 1 L16 9.5 L1 18 Z" fill="currentColor"></path></svg><span></span>';
     var playLbl = play.lastElementChild;
     setTR(playLbl, 'Jouer');
-    setTR(play, 'Jouer — ' + row[2], 'aria-label');
+    /* deux morceaux traduits chacun de son côté : concaténée avant l'appel,
+       la phrase entière ne correspondait à aucune clé et restait française */
+    var ariaJouer = function(){
+      var s = TR('Jouer — #').replace('#', TR(row[2]));
+      play.setAttribute('aria-label', s);
+      play.setAttribute('title', s);
+    };
+    ariaJouer();
     play.addEventListener('pointerenter', function(){
       play.style.background = 'rgba(4,139,154,.3)';
       play.style.transform = 'scale(1.04)';
@@ -12270,7 +12492,10 @@ var TROPHY = (function(){
       setTR(sub, row[3]);
       if(playLbl) setTR(playLbl, 'Jouer');
       if(tagP) setTR(tagP, 'en pause');
-      if(btn && !btn.__playing) setTR(btn, 'JOUER');
+      /* le dernier libellé posé par setTR fait foi, sinon celui d'origine :
+         __playing n'est écrit nulle part, la condition était toujours vraie */
+      if(btn) setTR(btn, btn.__frTxt || btnFr);
+      ariaJouer();
     }, 'cover-' + row[0]);
     cover.appendChild(sub);
     host.appendChild(cover);
@@ -14051,10 +14276,13 @@ if(window.gsap) CE.init();
 else{
   /* arrivée tardive : on guette, et on réessaie à chaque réveil */
   var wake = function(){ if(window.gsap) CE.init(); };
-  doc.addEventListener('visibilitychange', wake);
+  /* « doc » n'existe qu'à l'intérieur de run() : ici, hors de la fonction, il
+     levait une ReferenceError et ce filet ne s'armait jamais — le moteur ne
+     démarrait plus du tout, et la langue persistée restait lettre morte */
+  document.addEventListener('visibilitychange', wake);
   addEventListener('pageshow', wake);
   addEventListener('load', wake);
-  if(doc.readyState !== 'loading') setTimeout(wake, 0);
-  doc.addEventListener('DOMContentLoaded', wake);
+  if(document.readyState !== 'loading') setTimeout(wake, 0);
+  document.addEventListener('DOMContentLoaded', wake);
 }
 })();
