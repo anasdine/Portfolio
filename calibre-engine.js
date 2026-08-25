@@ -5738,7 +5738,61 @@ var VOICE = (function(){
 (function(){
   /* --- LE BOÎTIER LEAP57 : le cadre open-frame conçu par Anas Dine, en
          construction. Le modèle vient de son fichier, cotes inchangées. --- */
-  var cv = qs('[data-gpu3d]'); if(!cv || !window.THREE) return;
+  var cv = qs('[data-gpu3d]'); if(!cv) return;
+  /* Sur un appareil tactile, cette vue est la plus chere de la page : geometrie
+     reelle, ombres douces, ventilateurs qui tournent. C'est la qu'une tablette
+     tombait a une quinzaine d'images par seconde. On y montre donc une video du
+     meme boitier — meme objet, meme lecture, fluidite garantie — et on retire
+     les commandes de manipulation, qui n'auraient plus rien a piloter.
+     L'ordinateur, lui, garde la scene interactive : la conception du boitier
+     n'est pas touchee, seule sa maniere d'etre montree change. */
+  var sansGL = (typeof SANS_GPU === 'boolean' && SANS_GPU) ||
+               (typeof BOOT_TIER === 'number' && BOOT_TIER >= 2);
+  if(TOUCH || sansGL || !window.THREE){
+    try{ videoLeap(); }catch(eV){ console.warn('[leap57] video', eV && eV.message); }
+    return;
+  }
+  function videoLeap(){
+    if(cv.__remplace) return;
+    cv.__remplace = 1;
+    var v = doc.createElement('video');
+    v.src = 'leap57.mp4';
+    v.poster = 'leap57-poster.jpg';
+    v.muted = true; v.loop = true; v.autoplay = true; v.controls = false;
+    v.setAttribute('muted', '');            /* iOS exige l'attribut, pas seulement la propriete */
+    v.setAttribute('playsinline', '');      /* sinon Safari passe en plein ecran de lui-meme */
+    v.setAttribute('webkit-playsinline', '');
+    v.setAttribute('aria-label', cv.getAttribute('aria-label') || '');
+    v.setAttribute('role', 'img');
+    /* on n'entame pas le reseau tant que la section n'approche pas : la video
+       pese un mega-octet et rien ne presse tant qu'on lit le haut de la page */
+    v.preload = 'none';
+    v.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;' +
+      'object-fit:contain;display:block;background:#07090B';
+    var ex = cv.getAttribute('data-explain');
+    if(ex) v.setAttribute('data-explain', ex);
+    cv.parentNode.insertBefore(v, cv);
+    cv.style.display = 'none';
+    /* les boutons de manipulation ne commandent plus rien : les retirer vaut
+       mieux que les laisser inertes sous le doigt */
+    ['[data-leap-side]', '[data-leap-zin]', '[data-leap-zout]', '[data-leap-fit]',
+     '[data-leap-ecl]', '[data-leap-anim]', '[data-leap-list]'].forEach(function(sel){
+      var el = qs(sel);
+      if(el && el.style) el.style.display = 'none';
+    });
+    var lance = function(){
+      v.preload = 'auto';
+      var p = v.play();
+      if(p && p.catch) p.catch(function(){ /* lecture refusee : le poster reste */ });
+    };
+    if(window.IntersectionObserver){
+      var io = new IntersectionObserver(function(en){
+        if(!en[0].isIntersecting) return;
+        io.disconnect(); lance();
+      }, { rootMargin: '300px' });
+      io.observe(v);
+    }else lance();
+  }
   var eclEl = qs('[data-leap-ecl]'), animEl = qs('[data-leap-anim]'), listEl = qs('[data-leap-list]');
   start();
   function start(){
