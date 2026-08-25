@@ -1758,7 +1758,18 @@ if(langBtn && langMenu && window.I18N){
        de la liste reconstruite */
     langMenu.textContent = '';
     langMenu.setAttribute('data-i18n-skip', '1');
-  window.I18N.langs.forEach(function(code){
+  /* ORDRE D'AFFICHAGE DU MENU — il n'a rien a voir avec l'ordre des COLONNES de
+     la table de traduction, qui est fige et qu'on ne touche pas : `idx[code]`
+     designe une colonne, pas un rang de menu. On ne reordonne donc que ce qui
+     se voit. Suisse allemand colle a l'allemand, comme demande. */
+  var ORDRE = ['fr', 'it', 'de-CH', 'de', 'en'];
+  var langsAffichees = window.I18N.langs.slice().sort(function(a, b){
+    var ia = ORDRE.indexOf(a), ib = ORDRE.indexOf(b);
+    if(ia < 0) ia = ORDRE.length + window.I18N.langs.indexOf(a);
+    if(ib < 0) ib = ORDRE.length + window.I18N.langs.indexOf(b);
+    return ia - ib;
+  });
+  langsAffichees.forEach(function(code){
     var li = doc.createElement('li');
     li.setAttribute('role', 'option');
     li.setAttribute('data-lang-opt', code);
@@ -11395,6 +11406,13 @@ window.__ditAuDoigt.cache = function(){
        On donne au conteneur la même hauteur minimale qu'à sa toile. */
     'canvas[data-g13]{display:block;height:100%!important}' +
     '@media (max-width:640px){[data-game] [data-cursor]{' +
+      'min-height:clamp(240px,42vh,340px)!important}}' +
+    /* Toutes les toiles de jeu n'ont pas [data-cursor] pour parent : celle du
+       jeu 6 debordait de 37px sur sa propre legende, un parent de 240px pour
+       une toile a 277. `:has(> canvas)` vise le parent direct quel qu'il soit.
+       Regle separee : si le navigateur ignore `:has`, la precedente tient
+       toujours et l'on ne perd rien. */
+    '@media (max-width:640px){[data-game] :has(> canvas){' +
       'min-height:clamp(240px,42vh,340px)!important}}' +
     '@media (max-height:560px) and (orientation:landscape){' +
       '[data-game] [data-cursor]{min-height:220px!important}}' +
