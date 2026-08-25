@@ -11077,13 +11077,64 @@ window.__ditAuDoigt.cache = function(){
        texte de la page. Mesuré : deux lignes à y=-20 et y=36, fond s'arrêtant
        à y=56. Au-dessus de 470px le contenu tient sur une ligne et tout va bien.
        On laisse donc la barre prendre la hauteur de ce qu'elle contient. */
-    '@media (max-width:470px){[data-nav]{height:auto!important;min-height:56px}' +
-      '[data-nav]>[data-wrap]{padding-top:6px!important;padding-bottom:6px!important}}' +
+    /* Le gabarit fait revenir la barre à la ligne sous 470px seulement. Mesuré :
+       à 480px « CONTACT » se pose à x=449 sur 80px de large, soit 49px HORS de
+       l'écran. La version sur une ligne ne tient qu'à partir de ~535px. On
+       étend donc le retour à la ligne jusqu'à 540px.
+       Et sous 540px on garde « SOMMAIRE » plutôt que la liste des six liens
+       dépliée : à 430px celle-ci faisait un troisième rang et un en-tête de
+       175px, en évinçant « SOMMAIRE ». Sur un téléphone, les deux boutons qui
+       comptent sont « SOMMAIRE » et « CONTACT ». */
+    '@media (max-width:540px){[data-nav]{height:auto!important;min-height:56px;' +
+      /* la barre etait a 78% d'opacite : 22% du texte de la page transparaissait
+         sous ses boutons, et elle fait desormais 113px sur telephone, donc bien
+         plus de texte passe dessous. On la rend franchement opaque. */
+      'background:rgba(10,12,14,.97)!important}' +
+      '[data-nav]>[data-wrap]{flex-wrap:wrap!important;row-gap:7px!important;' +
+      'gap:10px!important;padding-top:6px!important;padding-bottom:6px!important}' +
+      '[data-nav-links]{display:none!important}' +
+      '[data-summary]{display:inline-flex!important}' +
+      /* L'horloge est décorative et coûte 60px, mais surtout elle porte une
+         marge automatique de 170px qui poussait les commandes suivantes au rang
+         d'après. Sur un téléphone, l'heure n'a rien à faire dans l'en-tête. */
+      '[data-nav-time]{display:none!important}}' +
+    /* « MOUVEMENT — COMPLET » occupe 165px, plus que le logo. Sur les écrans
+       les plus étroits on resserre son étiquette plutôt que de retirer une
+       commande d'accessibilité. */
+    '@media (max-width:430px){[data-motion]{font-size:9px!important;' +
+      'padding:8px 7px!important;letter-spacing:.05em!important}}' +
     /* L'entrée de l'assistante s'ouvrait au survol. Sans souris, elle restait
        à opacité 0 et pointer-events:none tant qu'on n'avait pas défilé assez
        loin : introuvable là où on la cherche, c'est-à-dire en arrivant. */
     '@media (hover:none),(pointer:coarse){[data-ada-follow]{opacity:1!important;' +
-      'pointer-events:auto!important}}';
+      'pointer-events:auto!important}}' +
+    /* CONTACT SUR TÉLÉPHONE. Une règle le retirait sous 470px :
+         [data-nav] a[data-anchor][data-magnetic]{display:none!important}
+       — c'est exactement le bouton CONTACT, seul ancrage de la barre à porter
+       `data-magnetic`, les six autres liens vivant dans `[data-nav-links]`.
+       Il avait été sacrifié pour tenir sur une ligne. Or la barre accepte
+       désormais deux rangs sans déborder : la place existe. Avec « SOMMAIRE »,
+       c'est le bouton qui compte sur un téléphone. */
+    '@media (max-width:540px){[data-nav] a[data-anchor][data-magnetic]{' +
+      'display:inline-flex!important;align-items:center;justify-content:center}}' +
+    /* SECTION 02 — le bandeau des quatre libellés recouvert par la toile.
+       Le conteneur collant est une colonne flex. Le bloc de la toile y était
+       comprimé de 566 à 392px, mais son contenu garde sa taille intrinsèque :
+       mesuré sur iPhone, la toile finit à y=659 quand son bloc s'arrête à 486,
+       et le bandeau commence à 486. 173px de débordement, 99% du bandeau
+       recouvert, deux couches de texte illisibles. Ce n'était pas un problème
+       de position mais de compression flex : `flex-shrink:0` seul n'y changeait
+       rien, c'est la hauteur minimale qui manquait. Mesuré après : toile
+       337..535, bandeau 552..642, recouvrement 0%.
+       `:has()` est requis — Safari 15.4 et Chrome 105. Sans lui la règle est
+       simplement ignorée, on retombe sur l'état actuel, jamais pire. */
+    '@media (max-width:720px){[data-wrap]:has(canvas[data-s2]){' +
+      'min-height:max-content!important}}' +
+    /* Rien ne doit atterrir sous l'en-tête collant quand on suit une ancre ou
+       qu'un champ prend le focus. La barre monte à ~110px sur téléphone. */
+    '@media (max-width:540px){[id],[data-anchor-target],input,textarea,' +
+      '[data-game] form{scroll-margin-top:132px}}' +
+    '@media (min-width:541px){[id],input,textarea{scroll-margin-top:76px}}';
   doc.head.appendChild(s);
 })();
 
