@@ -959,7 +959,15 @@ if(!RM && !CALM){
         if(pool.length < 6) pool = full.replace(/ /g, '').split('');
       }
       var n = full.length, W = 14;            /* largeur de la fenêtre qui tourne */
-      var head = 0, last = 0;
+      /* L'avancée est calée sur le TEMPS, pas sur les images. Elle valait
+         2,6 lettres par image : sur un téléphone, où le fond 3D et les toiles
+         laissent environ cinq images utiles par seconde à ce paragraphe, les
+         341 caractères mettaient vingt-cinq secondes à se résoudre — mesuré
+         13,6 caractères par seconde. Le visiteur défile bien avant et ne voit
+         que du charabia, d'où « l'affichage de ma conviction ne marche pas ».
+         Ainsi calée, la durée est la même sur tous les appareils. */
+      var DUREE = 1800;
+      var depart = 0, head = 0, last = 0;
       var A = doc.createElement('span'), B = doc.createElement('span'), C = doc.createElement('span');
       A.style.color = '#E4E8EA';
       B.style.color = 'rgba(4,139,154,.85)';
@@ -971,9 +979,10 @@ if(!RM && !CALM){
         /* dépassée par une autre : on pose le texte net, jamais le brouillage */
         if(run !== flapRun){ return; }
         if(!ts) ts = performance.now();
+        if(!depart) depart = ts;
         if(ts - last > 22){
           last = ts;
-          head += 2.6;                         /* la tête avance de deux lettres par image */
+          head = n * ((ts - depart) / DUREE);   /* la tête suit l'horloge, pas les images */
           var h = Math.min(n, Math.round(head));
           /* trois zones : acquis, en cours, à venir en filigrane */
           A.textContent = full.slice(0, Math.max(0, h - W));
@@ -11184,6 +11193,16 @@ window.__ditAuDoigt.cache = function(){
        rectangle (`W = r.width; H = r.height`), il suffit donc de lui donner
        la hauteur qu'il lui faut. */
     '@media (max-width:720px){canvas[data-s2]{min-height:288px!important}}' +
+    /* LES MOTS COMPOSÉS ALLEMANDS. Les lignes de parcours sont une grille à
+       deux colonnes dont la seconde se dimensionne sur son mot le plus long.
+       « Netzwerkadministrator » ne se coupant pas, la colonne montait à 232px
+       dans un conteneur de 265 — mesuré 59px de débordement horizontal de toute
+       la page, en allemand et en suisse allemand seulement, les sept autres
+       langues étant à zéro. `anywhere` — et non `break-word` — parce que seul
+       le premier agit sur la largeur minimale, donc sur la grille.
+       `min-width:0` autorise l'élément de grille à passer sous cette largeur. */
+    '@media (max-width:720px){[data-reveal] > span{min-width:0}' +
+      '[data-reveal] > span > span{overflow-wrap:anywhere}}' +
     /* Rien ne doit atterrir sous l'en-tête collant quand on suit une ancre ou
        qu'un champ prend le focus. La barre monte à ~110px sur téléphone. */
     '@media (max-width:540px){[id],[data-anchor-target],input,textarea,' +
