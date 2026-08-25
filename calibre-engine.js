@@ -11051,10 +11051,24 @@ window.__ditAuDoigt.cache = function(){
 };
 
 (function(){
-  if(!TOUCH) return;
   var s = doc.createElement('style');
   s.setAttribute('data-correctifs-doigt', '1');
   s.textContent =
+    /* LES JEUX — la toile débordait sur ses propres boutons. En cause :
+         @media (max-width:640px){ [data-game] canvas{ min-height:clamp(240px,42vh,340px) !important } }
+       Cette règle impose une taille minimale à la TOILE sans l'imposer à son
+       conteneur, resté à `clamp(200px,30vh,320px)`. La toile est en
+       `position:absolute;inset:0` : elle sort donc par le bas, de 77px sur
+       iPhone (42vh = 277 dans une boîte de 200), 88px sur Pixel, 89px à 360px
+       de large. Ces pixels tombaient pile sur « JOUER » et « CHANGER DE CAMP »,
+       recouverts et injouables au doigt. Vérifié par `elementFromPoint`.
+       On donne au conteneur la même hauteur minimale qu'à sa toile. */
+    'canvas[data-g13]{display:block;height:100%!important}' +
+    '@media (max-width:640px){[data-game] [data-cursor]{' +
+      'min-height:clamp(240px,42vh,340px)!important}}' +
+    '@media (max-height:560px) and (orientation:landscape){' +
+      '[data-game] [data-cursor]{min-height:220px!important}}' +
+    '@media (max-height:460px){[data-jeux-grid] [data-cursor]{min-height:180px!important}}' +
     /* LES DEUX BARRES DU HAUT. `[data-nav]` est fixe et haut de 56px, mais son
        contenu passe en `flex-wrap:wrap` sous ~470px et occupe alors 96px sur
        deux lignes. Centré dans 56px, il débordait de 20px en haut — logo et
@@ -11071,6 +11085,34 @@ window.__ditAuDoigt.cache = function(){
     '@media (hover:none),(pointer:coarse){[data-ada-follow]{opacity:1!important;' +
       'pointer-events:auto!important}}';
   doc.head.appendChild(s);
+})();
+
+/* Le bouton de voix disparaît déjà quand l'appareil n'a pas de synthèse :
+   `VOICE.ok = !!window.speechSynthesis`, et deux endroits font
+   `if(!VOICE.ok) …style.display = 'none'`. C'est le bon test — `getVoices()`
+   est asynchrone, sur iOS elle renvoie une liste vide au démarrage, s'y fier
+   masquerait le bouton à tort sur un iPhone parfaitement équipé.
+
+   Reste le cas intermédiaire : l'API existe mais AUCUNE voix n'est installée —
+   courant sur un Android dépouillé ou un Linux sans paquet vocal. Le bouton
+   s'affichait alors sans pouvoir rien dire. On ne peut pas trancher au
+   chargement, justement parce que la liste arrive tard : on écoute
+   `voiceschanged`, et on retranche une dernière fois après un délai de grâce. */
+(function(){
+  var SS = window.speechSynthesis;
+  if(!SS || !SS.getVoices) return;
+  /* Une seule vérification, différée, qui relit la liste au moment où elle tire.
+     Surtout PAS d'écoute de `voiceschanged` pour masquer : cet événement se
+     déclenche parfois une première fois avec une liste encore vide, et le bouton
+     disparaissait alors sur un appareil parfaitement équipé — mesuré, trois voix
+     présentes et bouton masqué. On ne retranche que sur un silence durable. */
+  setTimeout(function(){
+    var n = 0;
+    try{ n = (SS.getVoices() || []).length; }catch(e){ n = 0; }
+    if(n > 0) return;
+    var b = qs('[data-voice-btn]');
+    if(b) b.style.display = 'none';
+  }, 6000);
 })();
 
 (function(){ /* JEU 07 — COLLECTE DE PAQUETS : la sonde parcourt le réseau */
