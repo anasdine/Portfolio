@@ -246,12 +246,59 @@ Ce ne sont pas 14 bugs. Le vrai travail derrière : poser un `scroll-margin-top`
 que rien n'atterrisse jamais dessous. Et le détecteur devrait ignorer les paires
 dont l'élément du dessus a un fond opaque — il ne sait pas le voir aujourd'hui.
 
+### Responsive et en-tête — 25 août, seconde passe
+
+**CONTACT rendu sur téléphone.** `[data-nav] a[data-anchor][data-magnetic]{display:none!important}`
+sous 470px le retirait — vérifié, c'est exactement le bouton CONTACT, seul
+ancrage de la barre à porter `data-magnetic`. Avec `SOMMAIRE`, c'est le bouton
+qui compte sur un téléphone.
+
+**L'en-tête tenu.** Le retour à la ligne ne s'appliquait que sous 470px, or à
+480px `CONTACT` se posait à x=449 sur 80px de large — **49px hors de l'écran**.
+La version sur une ligne ne tient qu'à partir de ~535px : seuil porté à 540px.
+Sous 540px on garde `SOMMAIRE` plutôt que la liste des six liens dépliée, qui
+faisait un troisième rang et un en-tête de 175px. L'**horloge décorative** est
+retirée — 60px, mais surtout une marge automatique de 170px qui poussait les
+commandes suivantes au rang d'après. « MOUVEMENT — COMPLET » (165px, plus que le
+logo) est resserré sous 430px plutôt que de retirer une commande d'accessibilité.
+
+Mesuré de 320 à 1440px : **barre à 113px au lieu de 163**, `CONTACT` et
+`SOMMAIRE` présents et atteignables partout, rien hors de la barre ni de l'écran.
+Opacité portée de 78 % à 97 % sous 540px — 22 % du texte transparaissait sous les
+boutons, et la barre est deux fois plus haute qu'avant.
+
+**Section 02, deux défauts distincts.**
+
+1. *Le bandeau recouvert à 99 %.* Le conteneur collant est une colonne flex :
+   le bloc de la toile y était comprimé de 566 à 392px, mais son contenu garde sa
+   taille intrinsèque. Pas un problème de position mais de **compression** —
+   `flex-shrink:0` seul n'y changeait rien, c'est la hauteur minimale qui
+   manquait. `:has()` requis (Safari 15.4, Chrome 105) ; sans lui la règle est
+   ignorée, jamais pire.
+2. *Collision de textes dans le dessin.* Les repères verticaux sont calés en
+   pixels fixes (`cy+74`, `cy+90`) alors que le pied utilise `12 * SC()`, et
+   `SC() = clamp(W/400, 1, 2.3)` est une échelle sur la **largeur**. Verrouillée
+   sur son ratio 702/396, la toile ne fait que 198px de haut sur un téléphone,
+   quand la composition en réclame ~280. Le module se remesurant depuis son
+   rectangle, une hauteur minimale de 288px suffit sans toucher au tracé.
+
+Vérifié sur six profils, en ligne : recouvrement **0 %**, aucun débordement.
+
+**Le chat** s'ouvre correctement sur les sept profils mobiles — boîte dans
+l'écran, saisie présente, bouton fermer présent. Sur bureau l'entrée passe par
+`[data-ada]` (le personnage 3D), chemin non testé.
+
 **Trouvé, pas corrigé :**
 
 - Les points jaunes font **22×22**, moitié de la cible tactile minimale. Les
   agrandir risque de leur faire voler la tape des commandes voisines : à traiter
   avec la disposition, pas isolément.
-- **`scroll-margin-top`** sur les ancres et les champs (voir ci-dessus).
+- La section **`jeux` a une gouttière gauche de 35px** quand toutes les autres
+  sont à 20 — sur tous les appareils, bureau compris (90 contre 75).
+- Sur bureau, `manifeste` mesure **75px à gauche et 305 à droite**.
+- Le détecteur devrait ignorer les paires dont l'élément du dessus a un fond
+  opaque. Sans ça, chaque commande de la barre fixe compte comme un
+  chevauchement.
 
 ### Priorité haute
 1. ~~Réparer les profils mobiles de `voir.js`~~ — **fait**, voir § 3.
