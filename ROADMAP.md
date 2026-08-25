@@ -143,20 +143,125 @@ Avec Playwright, le moteur tourne à 60 ips (`palier 0`, `scene: active`) et
 **Confirmé visuellement** : le réseau de neurones s'affiche correctement en
 section 02, nœuds reliés par des arêtes, glyphes courant le long.
 
-**À réparer** : les profils `iphone` et `ipad` échouent (profil WebKit à corriger
-dans `voir.js`). C'est la première chose à faire.
+### Les profils mobiles sont réparés — 25 août
+
+La cause n'était pas le code : **WebKit n'était pas téléchargé**. Playwright 1.62.1
+attend `webkit-2336`, le cache ne contenait que `webkit-2287`. Firefox était absent.
+`npx playwright install webkit firefox` a suffi.
+
+Six profils désormais : `bureau` `firefox` `iphone` `ipad` `android` `petit`,
+plus `tous` pour tout enchaîner. Les arguments de lancement Chromium
+(`--use-gl=angle`…) sont maintenant **par profil** : les passer à WebKit ou Firefox
+fait échouer le lancement.
+
+Deux mesures de l'outil étaient fausses et ont été corrigées :
+
+- « boucle animée » comparait `order` à deux instants au même endroit. `order` est
+  piloté par le **défilement**, pas par le temps : le test annonçait « figé » sur
+  bureau, firefox et ipad alors que tout tournait. Il compare désormais les valeurs
+  prises aux différentes étapes.
+- `palier` lisait `CalibreEngine.tier`, qui n'existe pas. C'est `CalibreEngine.perf.palier`.
+
+Outils voisins ajoutés : `chevauchements.js` (texte sur texte) et `bandeau.js`
+/ `panneau.js` (texte sur toile).
 
 ---
 
 ## 4. Reste à faire
 
 ### Priorité haute
-1. **Réparer les profils mobiles de `voir.js`**, puis vérifier réellement sur
-   iPhone, iPad et Android ce qui a été corrigé à l'aveugle.
-2. **Compatibilité tout navigateur, tout téléphone** — demande explicite du
-   propriétaire. Playwright a Chromium et WebKit en cache ; **Firefox est absent**,
-   à télécharger. Couvrir aussi les petits écrans et les appareils modestes.
-3. ~~Les 13 mini-jeux~~ — **fait**, commit `e1d1f80`. Treize agents ont relu un jeu
+1. ~~Réparer les profils mobiles de `voir.js`~~ — **fait**, voir § 3.
+   Passage sur les six profils : aucune erreur de page, 8 langues, 13 jeux,
+   23 toiles, aucun débordement horizontal, la boucle tourne partout.
+   Vérifié du même coup : la **vidéo LEAP57 remplace bien la 3D** sur les quatre
+   profils tactiles et sur eux seuls ; les **points jaunes sont créés au doigt**
+   (37 contre 36 au bureau).
+
+2. **Le bandeau de la section 02 recouvre la toile sur mobile.** Nouveau défaut,
+   trouvé et mesuré le 25 août. Reproduit sur **WebKit *et* Chromium** — c'est la
+   largeur d'écran, pas le moteur.
+
+   Sur iPhone 14 Pro (393 px) : la toile d'illustration `canvas[data-s2]` occupe
+   `[21, 441, 351×198]`, elle s'arrête donc à **y = 639**. Le bandeau des quatre
+   libellés — un `<ol>` en grille, `position: static`, qui passe de 4 colonnes au
+   bureau à **2 colonnes sur mobile** — démarre à **y = 553**. Soit **87 px de
+   recouvrement, 97 % du bandeau**. « Faire tenir / votre matériel » et
+   « Automatiser / les tâches répétitives » se lisent par-dessus le contenu de la
+   toile ; les deux couches sont illisibles.
+
+   En flux normal, deux blocs `static` de même largeur ne peuvent pas se
+   chevaucher : le bandeau devrait commencer à `y = 640`, le bas de
+   `parent-1`. **Il est remonté de 87 px** — marge négative, transformation, ou
+   grille aux zones superposées. C'est là qu'il faut chercher.
+
+   Aucun chevauchement au bureau : le bandeau y est à `y = 829`, franchement sous
+   le panneau. `chevauchements.js` ne voit rien non plus, et c'est normal — le
+   conflit est entre du **texte HTML et une toile**, pas entre deux textes.
+
+3. **Le fond avançait par blocs.** Signalé par le propriétaire le 25 août :
+   « on dirait que c'est par BLOC et ça apparaît ». **Corrigé, non poussé.**
+
+   Deux défauts se cumulaient dans `pose()` :
+
+   `w1` est saturé dès y≈1426 et `w2` dès y≈3003, tandis que `w3` ne démarre
+   qu'à y≈6067. Entre ces deux bornes, `ph = 1+1+0+0` et **`ord` vaut exactement
+   0,5 sur 3 064 px**. Comme la distance, l'azimut, l'élévation et le regard sont
+   tous interpolés sur ces mêmes `w`, la caméra ne bougeait pas d'un pixel sur
+   toute la traversée du réseau. Décor immobile.
+
+   Au milieu de ce décor immobile, `ecritArchi(Math.floor(u5 * ARCH.length))`
+   faisait basculer l'architecture par **index entier**. Le ressort dont parle le
+   commentaire d'origine ne rattrape que les glyphes (`p2`) : les **nœuds** et
+   **tout le câblage** étaient réécrits d'un coup. La structure visible se
+   téléportait à cinq frontières sèches.
+
+   Le correctif garde l'objection d'origine — on ne fond pas un U dans un
+   escalier de carrés — mais la contourne :
+
+   - `fondArchi(k, b)` interpole les **positions des nœuds** entre l'architecture
+     `k` et la suivante sur le dernier tiers de chaque tranche, et redessine les
+     synapses sur ces nœuds interpolés. Tampon `melN` prélloué : la boucle
+     d'image n'alloue rien. `NMAX` vaut 43, le coût est négligeable.
+   - La **topologie**, elle, ne s'interpole pas : elle bascule d'un coup, mais à
+     mi-fondu, quand les nœuds des deux formes sont au plus près. Le câblage se
+     refait au moment où il se voit le moins.
+   - Un **balayage lent de caméra** en `sin(π·u5)`, nul aux deux bouts pour ne
+     décrocher ni de ce qui précède ni de ce qui suit, rend son souffle à la
+     traversée.
+
+   Mesuré avec `frontiere.js` : texte masqué en `visibility`, captures Playwright,
+   comparaison des images dans la page. L'indicateur qui compte est **le rapport
+   d'un pas à ses deux voisins** — une coupure sèche s'y détache, et il est
+   insensible à la dérive du niveau général, contrairement au rapport
+   max/médiane que j'avais utilisé d'abord et qui variait du simple au double
+   d'un tour à l'autre.
+
+   | frontière | avant | après |
+   |---|---|---|
+   | 1 | 1,92 | **1,07** |
+   | 2 | 1,55 | **1,15** |
+   | 4 | 1,92 | **1,12** |
+
+   Non-régression : six profils, aucune erreur de page, `palier 0`, 23 toiles,
+   13 jeux, 8 langues, aucun débordement.
+
+   ⚠ **Piège de mesure, à ne pas refaire.** Les images par seconde sous Chromium
+   sans tête sont **bimodales** : 60 ips quand le GPU est attaché, 24 quand il ne
+   l'est pas, jamais entre les deux. J'ai cru un moment à une régression de 60 à
+   24 causée par le correctif — c'était deux chemins de rendu différents. En
+   contrôlant le moteur via `WEBGL_debug_renderer_info` et en répétant trois fois
+   (`rendu.js`) : origine 23/25/25, corrigé 24/24/23. **Toujours déclarer le
+   moteur de rendu avant de comparer deux chiffres de performance.**
+
+4. **Compatibilité tout navigateur, tout téléphone** — demande explicite du
+   propriétaire. Chromium, WebKit et Firefox sont maintenant tous les trois
+   installés. Reste à couvrir les appareils modestes.
+
+   ⚠ **Les images par seconde mesurées sous WebKit sans tête ne valent rien** :
+   20 ips sur `iphone` et `ipad` contre 60 sur `android` (Chromium). WebKit sans
+   tête sous Windows rend en logiciel, sans GPU. Ce chiffre ne dit rien du vrai
+   iPhone. Pour juger de la fluidité, il faut un appareil réel.
+5. ~~Les 13 mini-jeux~~ — **fait**, commit `e1d1f80`. Treize agents ont relu un jeu
    chacun, trois contrôleurs adversariaux ont rejeté 81 propositions sur 147, et
    les 66 restantes ont passé la vérification stricte à **66 sur 66**.
    Répartition : 27 bugs, 9 sur la jouabilité au doigt, 9 sur le coût de rendu,
@@ -171,16 +276,22 @@ dans `voir.js`). C'est la première chose à faire.
    remplace une partie pour juger d'une difficulté ou d'un retour.
 
 ### Priorité moyenne
-4. **Animations de chaque section** : tester, corriger, rafraîchir le visuel.
+6. **Animations de chaque section** : tester, corriger, rafraîchir le visuel.
    **Sauf LEAP57.**
-5. Les **166 findings d'audit restants** (`scratchpad/audit-restants.json`),
+7. Les **166 findings d'audit restants** (`scratchpad/audit-restants.json`),
    dont ~30 bloquants non encore traités.
-6. Bascule de langue perçue comme saccadée : `apply.__deferred` corrigé, à
+8. Bascule de langue perçue comme saccadée : `apply.__deferred` corrigé, à
    revérifier à l'œil.
 
 ### À confirmer par le propriétaire
-- La netteté sur iPhone, la fluidité sur iPad, le chat et les boutons jaunes au
-  doigt, la vidéo LEAP57 sur téléphone.
+- ~~La vidéo LEAP57 sur téléphone~~ et ~~les points jaunes au doigt~~ : vérifiés
+  par `voir.js`, présents sur les quatre profils tactiles.
+- **La netteté sur iPhone et la fluidité sur iPad** : hors de portée de l'outil,
+  WebKit sans tête rendant en logiciel. Il faut l'appareil.
+- **Le chat au doigt** : `[data-ada-follow]` est présent mais jamais mesuré
+  visible, y compris au bureau. Le bouton bulle *apparaît* pourtant sur les
+  captures : le point d'entrée réel est donc un autre élément. À identifier avant
+  de conclure quoi que ce soit sur son accessibilité.
 
 ---
 
