@@ -11014,7 +11014,20 @@ var VOICE = (function(){
     if(inText){
       var bg0 = 0;
       try{ bg0 = host.getBoundingClientRect().left; }catch(eP){ bg0 = 99; }
-      placement = bg0 > 28 ? 'left:-25px;top:.34em;' : 'left:0;top:-21px;';
+      /* Faute de gouttière, le repère était posé 21px AU-DESSUS du texte — donc
+         sur la ligne précédente, qu'il écrasait. Vu sur telephone par-dessus
+         « 03 · 2026 · SITES WEB & LOGICIELS EN LIGNE ». On lui creuse plutot sa
+         place : le texte se decale de 26px et le repere s'y loge, sans jamais
+         recouvrir quoi que ce soit. */
+      if(bg0 > 28){
+        placement = 'left:-25px;top:.34em;';
+      }else{
+        placement = 'left:0;top:.34em;';
+        try{
+          var padA = parseFloat(getComputedStyle(host).paddingLeft) || 0;
+          if(padA < 26) host.style.paddingLeft = '26px';
+        }catch(eP){}
+      }
     }else{
       placement = 'top:6px;right:6px;';
     }
@@ -11137,6 +11150,49 @@ window.__ditAuDoigt.cache = function(){
   };
   setTimeout(rendre, 900);
   setTimeout(rendre, 2200);
+})();
+
+/* =============================================================
+   LES CHAÎNES D'ÉTAPES — les empiler plutôt que les couper n'importe où
+   « Les équipements du parc émettent → Leonhard trie → P1 · P2 · P3 → … » est
+   une rangée flex avec les flèches en enfants séparés. Sur téléphone elle se
+   replie au milieu : des flèches se retrouvent seules en fin de ligne et
+   « Voir les projets ↓ » vient s'intercaler entre deux étapes. Une chaîne se
+   lit de haut en bas aussi bien que de gauche à droite : on l'empile, et les
+   flèches horizontales n'ont plus lieu d'être.
+============================================================= */
+(function(){
+  if(!TOUCH) return;
+  function empile(){
+    var large = innerWidth > 560;
+    var vus = [];
+    qsa('span').forEach(function(s){
+      if((s.textContent || '').trim() !== '→') return;
+      var par = s.parentElement;
+      if(!par || vus.indexOf(par) >= 0) return;
+      vus.push(par);
+    });
+    vus.forEach(function(par){
+      if(large){
+        if(par.__empile){ par.style.display = par.__dispAv || ''; par.__empile = 0;
+          [].forEach.call(par.children, function(c){ if(c.__fleche) c.style.display = ''; }); }
+        return;
+      }
+      if(par.__empile) return;
+      par.__empile = 1;
+      par.__dispAv = par.style.display;
+      par.style.display = 'grid';
+      par.style.gridTemplateColumns = '1fr';
+      par.style.rowGap = '7px';
+      par.style.justifyItems = 'start';
+      [].forEach.call(par.children, function(c){
+        if((c.textContent || '').trim() === '→'){ c.__fleche = 1; c.style.display = 'none'; }
+      });
+    });
+  }
+  empile();
+  addEventListener('resize', function(){ askResize(empile); }, { passive: true });
+  setTimeout(empile, 1500);
 })();
 
 /* =============================================================
@@ -11330,7 +11386,10 @@ window.__ditAuDoigt.cache = function(){
       /* la barre etait a 78% d'opacite : 22% du texte de la page transparaissait
          sous ses boutons, et elle fait desormais 113px sur telephone, donc bien
          plus de texte passe dessous. On la rend franchement opaque. */
-      'background:rgba(10,12,14,.97)!important}' +
+      /* franchement opaque, pas 97% : les trois pour cent restants suffisaient
+         a laisser lire le texte clair de la page a travers la barre — verifie
+         en capture, le paragraphe se lisait derriere les boutons */
+      'background:#0A0C0E!important}' +
       '[data-nav]>[data-wrap]{flex-wrap:wrap!important;row-gap:7px!important;' +
       'gap:10px!important;padding-top:6px!important;padding-bottom:6px!important}' +
       '[data-nav-links]{display:none!important}' +
@@ -11400,6 +11459,24 @@ window.__ditAuDoigt.cache = function(){
        déjà ce que dit la nouvelle bulle jaune — et la voix reste un supplément
        de bureau. Rien à détecter, rien à filtrer. */
     '@media (hover:none),(pointer:coarse){[data-voice-btn]{display:none!important}}' +
+    /* LES COMMANDES FLOTTANTES. Photos du proprietaire : la fleche du bas a
+       gauche et le bouton de chat se posent en plein milieu des paragraphes,
+       et comme leur fond est translucide le texte se lit AU TRAVERS — d'ou
+       l'impression d'un texte ecrase. Deux corrections : un fond franchement
+       opaque, pour qu'elles se lisent comme posees au-dessus et non melees ;
+       et les deux dans le MEME coin, en bas a droite, la ou les lignes d'un
+       texte alignea gauche s'arretent le plus souvent. Toute la colonne de
+       gauche redevient libre.
+       Le bouton de chat est place par une transformation reecrite a chaque
+       image : seul un !important peut la neutraliser. */
+    '@media (hover:none),(pointer:coarse){' +
+      '[data-up],[data-ada-follow]{background:rgba(10,12,14,.96)!important;' +
+        'border:1px solid rgba(4,139,154,.55)!important;border-radius:12px!important;' +
+        'box-shadow:0 8px 24px rgba(0,0,0,.55)!important}' +
+      '[data-ada-follow]{position:fixed!important;transform:none!important;' +
+        'right:12px!important;bottom:74px!important;left:auto!important;top:auto!important}' +
+      '[data-up]{position:fixed!important;right:12px!important;bottom:14px!important;' +
+        'left:auto!important;top:auto!important}}' +
     /* LE MENU DE LANGUE. Mesure sur iPhone : la liste deployee occupait
        [-66..113] pour un ecran de 393 — soixante-six pixels HORS de l'ecran
        a gauche, donc la moitie des langues invisibles. Elle est alignee sur
