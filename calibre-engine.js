@@ -11414,6 +11414,14 @@ window.__ditAuDoigt.cache = function(){
        toujours et l'on ne perd rien. */
     '@media (max-width:640px){[data-game] :has(> canvas){' +
       'min-height:clamp(240px,42vh,340px)!important}}' +
+    /* Le boitier LEAP57 etant rendu aux telephones, son conteneur — dimensionne
+       pour la video qu'il remplace — est devenu trop court : la toile debordait
+       de 36px et mordait sur le libelle du dessus. Agrandir le conteneur ne
+       suffisait pas, quelque chose le plafonne a 454px. On contient donc la
+       toile : le module se remesure depuis son rectangle et redessine la scene
+       a la bonne taille, exactement comme les autres. */
+    '@media (max-width:720px){canvas[data-gpu3d]{min-height:0!important;' +
+      'height:100%!important;max-height:100%!important}}' +
     '@media (max-height:560px) and (orientation:landscape){' +
       '[data-game] [data-cursor]{min-height:220px!important}}' +
     '@media (max-height:460px){[data-jeux-grid] [data-cursor]{min-height:180px!important}}' +
