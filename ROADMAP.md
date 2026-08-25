@@ -245,13 +245,38 @@ Outils voisins ajoutés : `chevauchements.js` (texte sur texte) et `bandeau.js`
    Non-régression : six profils, aucune erreur de page, `palier 0`, 23 toiles,
    13 jeux, 8 langues, aucun débordement.
 
-   ⚠ **Piège de mesure, à ne pas refaire.** Les images par seconde sous Chromium
-   sans tête sont **bimodales** : 60 ips quand le GPU est attaché, 24 quand il ne
-   l'est pas, jamais entre les deux. J'ai cru un moment à une régression de 60 à
-   24 causée par le correctif — c'était deux chemins de rendu différents. En
-   contrôlant le moteur via `WEBGL_debug_renderer_info` et en répétant trois fois
-   (`rendu.js`) : origine 23/25/25, corrigé 24/24/23. **Toujours déclarer le
-   moteur de rendu avant de comparer deux chiffres de performance.**
+   **Deuxième passe — le nuage aussi.** Le propriétaire a retesté : « entre chaque
+   problème de la section 02 le fond change radicalement ». La première passe ne
+   fondait que les **43 nœuds et leurs traits**. Or la masse visible, ce sont les
+   **420 glyphes** (170 sur mobile) : eux continuaient à changer de cible d'un coup
+   au milieu du fondu, puis à courir vers elle au ressort — un mouvement propre,
+   décorrélé du défilement.
+
+   Le calcul des cibles est sorti de `ecritArchi` dans `cibles(nds, edg, oP, oV)`,
+   ce qui permet de l'évaluer sur **deux** architectures. `fondArchi` les calcule
+   une fois par tranche dans `glA/glB/gvA/gvB`, puis interpole `aP2` et `aEV` à
+   chaque image. Le nuage se déforme donc **avec le défilement**, il n'a plus de
+   mouvement à lui.
+
+   Fenêtre élargie de `ss(f, .62, .995)` à `ss(f, .40, .99)` : 40 % de la tranche
+   en forme tenue, 60 % en transformation. Vérifié à l'œil qu'à mi-fondu le réseau
+   reste **cohérent, pas de bouillie** — l'objection d'origine tient toujours pour
+   un morphing brutal, pas pour celui-ci. Pic/voisins sur la traversée complète :
+   1,33 → 1,15.
+
+   ⚠ **Piège de mesure, à ne pas refaire — deux fois tombé dedans.** Les images
+   par seconde sous Chromium sans tête sont **bimodales** : 60 ou 24, jamais entre
+   les deux. Ce n'est **pas** le chemin de rendu — `WEBGL_debug_renderer_info`
+   renvoie le même ANGLE/NVIDIA dans les deux états, et l'état lent frappe aussi
+   le **haut de page**, là où le correctif n'exécute rien. C'est une loterie au
+   lancement du navigateur. J'ai cru deux fois à une régression sur cette base.
+
+   **La bonne méthode** : lancer avec `--disable-gpu-vsync --disable-frame-rate-limit`
+   et mesurer la cadence par `requestAnimationFrame`, versions **alternées** pour
+   annuler la dérive machine (`cadence.js`). Résultat : v1 1,9/1,8/1,9/1,7 ms,
+   v2 1,9/1,6/40,6/1,8 ms — médianes égales à 1,9 ms, le 40,6 étant un tour tombé
+   dans l'état bloqué. Le travail réel par image est de **1,8 ms** : le fond n'est
+   pas près d'être limité par le GPU, le plafond à 60 est la synchro verticale.
 
 4. **Compatibilité tout navigateur, tout téléphone** — demande explicite du
    propriétaire. Chromium, WebKit et Firefox sont maintenant tous les trois
