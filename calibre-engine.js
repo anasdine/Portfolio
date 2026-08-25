@@ -1225,7 +1225,7 @@ function navResponsive(){
   /* on repart d'un état complet, puis on dégrade */
   if(links) links.style.display = 'flex';
   if(tm) tm.style.display = 'inline';
-  if(mb){ mb.__srcFr = RM ? 'MOUVEMENT — FIGÉ' : (CALM ? 'MOUVEMENT — CALME' : 'MOUVEMENT — COMPLET'); mb.textContent = tr(mb.__srcFr); }
+  if(mb){ mb.__srcFr = RM ? 'ANIMATION 3D — FIGÉ' : (CALM ? 'ANIMATION 3D — CALME' : 'ANIMATION 3D — COMPLET'); mb.textContent = tr(mb.__srcFr); }
   if(sb) paintSound(pressed);
   var over = function(){ return row.scrollWidth > row.clientWidth + 1; };
   /* on repart d'une barre de sections pleine */
@@ -6644,7 +6644,32 @@ var VOICE = (function(){
   A.dist = baseDist; A.az = V.az; A.el = V.el;
   orbit();
   if(window.ResizeObserver) new ResizeObserver(function(){ askResize(resize); }).observe(cv);
-  if(RM || MOB){ frame(.016, 1); return; }
+  if(RM){ frame(.016, 1); return; }
+  /* Sur téléphone, ce module dessinait UNE image puis s'arrêtait — pas de
+     boucle permanente, pour la batterie. Le glissé changeait donc bien l'angle
+     de vue sans que rien ne soit redessiné : la baie paraissait morte, ce que
+     le propriétaire signalait comme « le déplacement de la baie A ne marche
+     pas sur l'iPhone ». Vérifié : elle tourne à la souris, jamais au doigt.
+     On garde le principe — aucune boucle au repos — mais on réveille le rendu
+     pendant qu'un doigt est posé, et une seconde après l'avoir levé pour que
+     l'amorti se pose. */
+  if(MOB){
+    frame(.016, 1);
+    var tMob = 1, jusqua = 0, enCours = 0;
+    var tourne = function(){
+      tMob += .016; frame(.016, tMob);
+      if(performance.now() < jusqua) requestAnimationFrame(tourne);
+      else enCours = 0;
+    };
+    var reveille = function(){
+      jusqua = performance.now() + 900;
+      if(!enCours){ enCours = 1; requestAnimationFrame(tourne); }
+    };
+    cv.addEventListener('pointerdown', reveille);
+    cv.addEventListener('pointermove', reveille);
+    addEventListener('pointerup', reveille);
+    return;
+  }
   var api = { vis: false };
   api.frame = function(dt, t){ if(!api.vis) return; frame(Math.min(.04, dt), t); };
   PIPES.push(api);
@@ -9561,7 +9586,7 @@ var VOICE = (function(){
        C'est le chemin souris qui gagnait sur telephone — et il ecrit dans une
        bulle masquee sous 720px. D'ou des haut-parleurs jaunes parfaitement
        fonctionnels dont la reponse n'apparaissait nulle part. */
-    if(TOUCH && window.__ditAuDoigt) window.__ditAuDoigt(txt);
+    if(TOUCH && window.__ditAuDoigt) window.__ditAuDoigt(txt, e && e.clientY);
     BUB.owner = null; BUB.until = 0;
     /* pas de VOICE.stop() ici : la lecture prioritaire fait déjà place nette,
        et deux annulations coup sur coup coupaient la phrase suivante */
@@ -9736,17 +9761,22 @@ var VOICE = (function(){
     bot.style.opacity = A.fadeS.toFixed(3);
     /* effacé pour de bon : sinon sa boîte reste posée sur le texte du héros */
     bot.style.visibility = A.fadeS < .04 ? 'hidden' : '';
-    if(followBtn) followBtn.style.opacity = A.fadeS.toFixed(3);
+    /* Le bouton de chat ne suit plus l'effacement du robot. Beaucoup de
+       visiteurs ne devinent pas que le petit robot EST l'assistant : le
+       seul point d'entree explicite doit rester la, en permanence. */
     var sk = (A.sk || 1) * (A.drag ? 1.12 : 1) * (.72 + A.fadeS * .28);
     bot.style.transform = 'translate(' + (A.x - 48).toFixed(1) + 'px,' + (A.y - 54 + bob).toFixed(1) + 'px) rotate(' + tilt.toFixed(1) + 'deg) scale(' + sk.toFixed(3) + ')';
     if(shadow) shadow.setAttribute('opacity', (.28 - Math.abs(bob) * .04).toFixed(2));
     /* placé au-dessus de la tête, hors de la boîte du robot (A.x ± 48, A.y ± 54) */
     if(followBtn){
       /* sous le robot : la bulle occupe le dessus */
-      var talking = bubble && bubble.style.opacity === '1';
+      /* Il se cachait aussi des que la bulle du robot parlait. Couper le son
+         fait justement parler la bulle : le bouton de chat disparaissait alors
+         sans revenir. Desormais il ne s'efface que si le panneau est ouvert,
+         ou il serait redondant. */
       followBtn.style.transition = 'opacity .2s ease';
-      followBtn.style.opacity = (A.open || talking) ? '0' : '1';
-      followBtn.style.pointerEvents = (A.open || talking) ? 'none' : 'auto';
+      followBtn.style.opacity = A.open ? '0' : '1';
+      followBtn.style.pointerEvents = A.open ? 'none' : 'auto';
       var bw = followBtn.offsetWidth || 44, bh = followBtn.offsetHeight || 44;
       followBtn.style.transform = 'translate(' + (innerWidth - 14 - bw).toFixed(1) + 'px,' + Math.max(8, innerHeight - 180 - bh).toFixed(1) + 'px)';
     }
@@ -9954,7 +9984,7 @@ var VOICE = (function(){
       if(!t) return;
       var txt = t.getAttribute('data-explain');
       if(txt && exClaim(txt)){ exEl = t; EX = t; exLast = txt; say(txt, 9500);
-        if(window.__ditAuDoigt) window.__ditAuDoigt(txt); }
+        if(window.__ditAuDoigt) window.__ditAuDoigt(txt, e && e.clientY); }
     }, {passive:true});
   }
   window.__ada = {
@@ -10430,7 +10460,7 @@ var VOICE = (function(){
       var txt = t.getAttribute('data-explain');
       if(!txt || !exClaim(txt)) return;
       exEl = t; EX = t; exT = 0; exLast = txt;
-      if(window.__ditAuDoigt) window.__ditAuDoigt(txt);
+      if(window.__ditAuDoigt) window.__ditAuDoigt(txt, e && e.clientY);
       if(dBub){
         var r = t.getBoundingClientRect();
         D.px = clamp(r.right - 30, 40, innerWidth - 40);
@@ -11063,7 +11093,7 @@ var VOICE = (function(){
    réponse partait dans le vide. C'est la cause de « les boutons jaunes ne
    marchent pas sur téléphone ».
 ============================================================= */
-window.__ditAuDoigt = function(txt){
+window.__ditAuDoigt = function(txt, yDoigt){
   if(!txt) return;
   var b = qs('[data-dit-doigt]');
   if(!b){
@@ -11093,13 +11123,21 @@ window.__ditAuDoigt = function(txt){
     doc.body.appendChild(b);
   }
   b.querySelector('[data-dit-texte]').textContent = txt;
+  /* Elle se posait toujours en bas. Quand le repere touche est lui-meme en bas
+     de l'ecran, elle venait donc couvrir ce qu'on venait de designer. Elle se
+     place desormais a l'oppose du doigt : en haut si l'on a touche le bas,
+     en bas sinon. Elle reste `position:fixed`, donc elle ne suit jamais le
+     defilement — verifie, elle ne bouge pas d'un pixel apres 400px de scroll. */
+  var enBas = !(typeof yDoigt === 'number' && yDoigt > innerHeight * .55);
+  if(enBas){ b.style.top = 'auto'; b.style.bottom = '12px'; }
+  else { b.style.bottom = 'auto'; b.style.top = '12px'; }
   b.style.opacity = '1'; b.style.transform = 'none';
   clearTimeout(window.__ditAuDoigt.__t);
   window.__ditAuDoigt.__t = setTimeout(function(){ window.__ditAuDoigt.cache(); }, 11000);
 };
 window.__ditAuDoigt.cache = function(){
   var b = qs('[data-dit-doigt]');
-  if(b){ b.style.opacity = '0'; b.style.transform = 'translateY(12px)'; }
+  if(b){ b.style.opacity = '0'; b.style.transform = b.style.top === '12px' ? 'translateY(-12px)' : 'translateY(12px)'; }
 };
 
 (function(){
@@ -11150,7 +11188,7 @@ window.__ditAuDoigt.cache = function(){
          marge automatique de 170px qui poussait les commandes suivantes au rang
          d'après. Sur un téléphone, l'heure n'a rien à faire dans l'en-tête. */
       '[data-nav-time]{display:none!important}}' +
-    /* « MOUVEMENT — COMPLET » occupe 165px, plus que le logo. Sur les écrans
+    /* « ANIMATION 3D — COMPLET » occupe 165px, plus que le logo. Sur les écrans
        les plus étroits on resserre son étiquette plutôt que de retirer une
        commande d'accessibilité. */
     '@media (max-width:430px){[data-motion]{font-size:9px!important;' +
@@ -11211,6 +11249,16 @@ window.__ditAuDoigt.cache = function(){
        déjà ce que dit la nouvelle bulle jaune — et la voix reste un supplément
        de bureau. Rien à détecter, rien à filtrer. */
     '@media (hover:none),(pointer:coarse){[data-voice-btn]{display:none!important}}' +
+    /* LE MENU DE LANGUE. Mesure sur iPhone : la liste deployee occupait
+       [-66..113] pour un ecran de 393 — soixante-six pixels HORS de l'ecran
+       a gauche, donc la moitie des langues invisibles. Elle est alignee sur
+       son bouton, qui est trop pres du bord. Sur telephone on cesse de
+       l'accrocher au bouton : elle devient un panneau pose sous la barre,
+       large de bord a bord. Il ne peut plus sortir. */
+    '@media (max-width:540px){[data-lang-wrap] ul{position:fixed!important;' +
+      'left:12px!important;right:12px!important;width:auto!important;' +
+      'max-width:none!important;top:118px!important;bottom:auto!important;' +
+      'max-height:58vh!important;overflow:auto!important;z-index:200!important}}' +
     /* Rien ne doit atterrir sous l'en-tête collant quand on suit une ancre ou
        qu'un champ prend le focus. La barre monte à ~110px sur téléphone. */
     '@media (max-width:540px){[id],[data-anchor-target],input,textarea,' +
