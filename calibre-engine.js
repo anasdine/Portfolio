@@ -13288,25 +13288,320 @@ function buildScene(){
   }
 
   /* --- le réseau : cinq couches, des liens d'une couche à la suivante --- */
-  var NODES = [], EDGES = [];
+  /* --- LE DEFILE DES RESEAUX -------------------------------------------
+     Il n'y avait qu'un seul reseau, anonyme : cinq couches [5,7,8,7,5] qui ne
+     representaient aucune architecture reelle. On en fait defiler CINQ, toutes
+     existantes, choisies pour que deux voisines ne partagent jamais la meme
+     famille de silhouette : le coin plein du perceptron, l'escalier de carres
+     du convolutif, l'anneau de la recurrente, le Z du Transformer, le U de
+     l'U-Net. Ce dernier est vertical et se referme en bas sur deux bras qui
+     convergent : c'est le raccord naturel vers l'helice de la phase suivante.
+     Tout est calcule au demarrage — cinq fois une quarantaine de noeuds, le
+     cout est negligeable — et la bascule ne fait que reecrire deux tampons. */
+  var ARCHIS = [
+    { cle: 'mlp', nom: 'perceptron multicouche', bat: function(){
+      /* --- III · le perceptron multicouche : cinq couches, connexion totale ---
+         Le classifieur dense classique : un vecteur d'entree large, trois couches
+         cachees qui se resserrent, une tete de sortie minuscule — 10-5-4-3-2, soit
+         24 neurones et 88 poids. Aucun raccourci, aucune boucle, aucun partage :
+         chaque neurone d'une couche touche TOUS ceux de la suivante. C'est la seule
+         architecture du defile ou la matrice de poids est pleine, et c'est a cette
+         densite qu'on la reconnait en une seconde.
+         Tout est pose a plat (z = 0), pas horizontal constant, colonnes centrees et
+         symetriques : le schema de manuel, sans volume et sans accident.
+         Verifie dans le cadre : x de -5,60 a +5,00 et y de -3,40 a +3,40, soit
+         |x| < 0,86 et |y| < 0,83 en coordonnees ecran a la pose reseau
+         (camera 13,6 / azimut 0,16 / elevation 0,04 / champ 32 deg), en 16:9
+         comme en 16:10. Rien ne sort du champ, glyphes de noeud compris. */
+      var NODES = [], EDGES = [];
+      (function(){
+        var CNT = [10, 5, 4, 3, 2];                    /* neurones par couche */
+        var HHY = [3.40, 2.70, 2.05, 1.40, .75];       /* demi-hauteurs : l'arete du coin est une droite */
+        var DX = 2.65, CX = -.30;                      /* pas horizontal constant ; CX recadre sous l'azimut camera */
+        var prev = null, off = 0, l, k, a, b;
+        for(l = 0; l < CNT.length; l++){
+          var n = CNT[l], cur = [], x = CX + (l - (CNT.length - 1) / 2) * DX;
+          for(k = 0; k < n; k++){
+            /* colonne reguliere, premier et dernier neurones poses sur l'arete */
+            NODES.push([x, (n > 1 ? (k / (n - 1)) * 2 - 1 : 0) * HHY[l], 0]);
+            cur.push(off++);
+          }
+          /* couche i -> couche i+1, matrice pleine : prev.length x cur.length liens.
+             Ne pas remplacer par un tirage partiel : la totalite EST l'architecture. */
+          if(prev) for(a = 0; a < prev.length; a++)
+            for(b = 0; b < cur.length; b++) EDGES.push([prev[a], cur[b]]);
+          prev = cur;
+        }
+        /* 88 liens pour ~126 glyphes de flux sur mobile : avec le tirage au sort
+           actuel, pres d'un lien sur quatre resterait vide en permanence et la
+           matrice aurait des trous. Si l'on veut le tissage plein jusque sur petit
+           ecran, remplacer dans la boucle de remplissage
+              EDGES[(Math.random() * EDGES.length) | 0]
+           par EDGES[i % EDGES.length] : meme cout, repartition garantie. */
+      })();
+      return { N: NODES, E: EDGES };
+    } },
+    { cle: 'cnn', nom: 'LeNet-5, convolutif', bat: function(){
+      /* --- le réseau : LeNet-5. Cartes de caractéristiques, noyau 5×5, division par
+         deux à chaque sous-échantillonnage, puis l'aplatissement en trois barres.
+         Une carte se dessine comme un carré face à la caméra : son demi-côté suit la
+         taille spatiale réelle (32, 28, 14, 10, 5), elle occupe donc autant en x
+         qu'en y. Tout est calculé ici, une seule fois, au démarrage. --- */
+      var NODES = [], EDGES = [];
+      (function(){
+        function nd(x, y, z){ NODES.push([x, y, z]); return NODES.length - 1; }
+        function li(a, b){ EDGES.push([a, b]); }
+        /* [centre x, demi-côté, z] — le z descend en rampe : le tuyau s'enfonce */
+        var MAP = [ [-4.89, 1.26, 1.15],    /* entrée 32×32×1                   */
+                    [-1.95, 1.12,  .80],    /* C1  6 cartes 28×28, noyau 5×5    */
+                    [  .33,  .66,  .45],    /* S2  6 cartes 14×14, sous-éch. /2 */
+                    [ 2.06,  .53,  .15],    /* C3 16 cartes 10×10, noyau 5×5    */
+                    [ 3.46,  .37, -.15] ];  /* S4 16 cartes  5×5,  sous-éch. /2 */
+        var C = [], K = [], l, e, q, x, h, z;
+        for(l = 0; l < 5; l++){
+          x = MAP[l][0]; h = MAP[l][1]; z = MAP[l][2]; q = [];
+          q.push(nd(x - h, -h, z)); q.push(nd(x + h, -h, z));   /* bas gauche, bas droite   */
+          q.push(nd(x + h,  h, z)); q.push(nd(x - h,  h, z));   /* haut droite, haut gauche */
+          for(e = 0; e < 4; e++) li(q[e], q[(e + 1) % 4]);      /* le contour de la carte   */
+          C.push(q);
+          /* l'unité active au centre, cible des convergences ; l'entrée n'en a pas,
+             sa fenêtre de convolution tient la place */
+          K.push(l ? nd(x, 0, z) : -1);
+        }
+        /* la fenêtre du noyau posée au milieu de l'image, et le cône qui la ramène
+           sur UNE seule unité de C1 : le champ récepteur, dit une fois pour toutes.
+           Légèrement agrandie (≈7/32 au lieu de 5/32) pour rester lisible de loin. */
+        var fx = MAP[0][0], fz = MAP[0][2], f = .29, w = [];
+        w.push(nd(fx - f, -f, fz)); w.push(nd(fx + f, -f, fz));
+        w.push(nd(fx + f,  f, fz)); w.push(nd(fx - f,  f, fz));
+        for(e = 0; e < 4; e++){ li(w[e], w[(e + 1) % 4]); li(w[e], K[1]); }
+        /* d'une carte à la suivante : les deux coins de droite et le centre
+           convergent vers l'unité suivante — voisinage local, jamais du tout-à-tout */
+        for(var t = 1; t < 4; t++){
+          li(C[t][1], K[t + 1]); li(C[t][2], K[t + 1]); li(K[t], K[t + 1]);
+        }
+        /* [x, demi-hauteur, z] — le vecteur aplati, puis le classifieur */
+        var BAR = [ [4.51, 1.62,  -.75],    /* C5 : 120 (conv 5×5 → 1×1) */
+                    [5.35, 1.16, -1.15],    /* F6 :  84                  */
+                    [6.15,  .58, -1.55] ];  /* sortie : 10 classes       */
+        var B = [], v, bx, bh, bz, col;
+        for(v = 0; v < 3; v++){
+          bx = BAR[v][0]; bh = BAR[v][1]; bz = BAR[v][2];
+          col = [ nd(bx, -bh, bz), nd(bx, 0, bz), nd(bx, bh, bz) ];
+          li(col[0], col[1]); li(col[1], col[2]);
+          B.push(col);
+        }
+        /* S4 (5×5×16) se déverse dans le vecteur : l'aplatissement */
+        for(var g = 0; g < 3; g++){ li(C[4][1], B[0][g]); li(C[4][2], B[0][g]); li(K[4], B[0][g]); }
+        /* C5 → F6 → sortie : là, et là seulement, tout-à-tout */
+        for(var i = 0; i < 3; i++) for(var j = 0; j < 3; j++){
+          li(B[0][i], B[1][j]); li(B[1][i], B[2][j]);
+        }
+      })();                                 /* 37 nœuds, 70 liens */
+      return { N: NODES, E: EDGES };
+    } },
+    { cle: 'rnn-lstm', nom: 'LSTM deroulee', bat: function(){
+      /* --- III · le réseau récurrent : une LSTM déroulée dans le temps ----------
+         Cinq pas de temps, cinq fois exactement le même bloc : c'est la répétition
+         qui dit « récurrent ». En haut, le tapis roulant de l'état de cellule c
+         traverse toute l'image d'un seul trait, sans jamais être coupé — la mémoire
+         longue. En bas, le rail de l'état caché h, et sous lui la séquence x1..x5
+         qui arrive un jeton à la fois. Chaque bloc contient les quatre portes de la
+         LSTM : oubli, entrée, candidat, sortie. Le grand arc qui revient de droite
+         à gauche en passant par l'avant est le repliement de la boucle : ce ne sont
+         pas cinq réseaux, c'est un seul, réutilisé cinq fois.
+         43 nœuds, 62 liens. Tout est calculé ici, au démarrage ; le shader ne lit
+         ensuite qu'une position, comme pour les cinq autres cibles.              */
+      var NODES = [], EDGES = [];
+      (function(){
+        var TT = 5, DX = 2.3, XC = -4.6;         /* les cinq pas de temps sur x   */
+        var YC = 3.35, ZC = -.45;                /* rail haut : l'état de cellule */
+        var YH = -.55, ZH = .35;                 /* rail bas  : l'état caché      */
+        var YX = -2.95;                          /* la séquence d'entrée x_t      */
+        var GY = [1.85, 1.85, .85, .85];         /* oubli, entrée, candidat, sortie */
+        var GZ = [-.85, .85, .85, -.85];         /* les 4 portes en carré serré   */
+        var ARC = [[6.3, -2.6, 1.7], [3.4, -3.85, 2.35], [0, -4.2, 2.5],
+                   [-3.4, -3.85, 2.35], [-6.3, -2.6, 1.7]];
+        var g = [0, 0, 0, 0], t, k, x, cNow, xIn, aNow;
+        function nd(px, py, pz){ NODES.push([px, py, pz]); return NODES.length - 1; }
+        function ed(a, b){ EDGES.push([a, b]); }
+
+        var cPrev = nd(XC - 1.45, YC, ZC);       /* c0 : la mémoire au départ     */
+        var bus0  = nd(XC - 1.15, YH, ZH);       /* h0 : l'état caché au départ   */
+        var bus   = bus0;
+
+        for(t = 0; t < TT; t++){
+          x = XC + t * DX;
+          for(k = 0; k < 4; k++) g[k] = nd(x, GY[k], GZ[k]);
+          xIn = nd(x - 1.15, YX, ZH);            /* le jeton du pas t, sous le rail */
+          ed(xIn, bus);                          /* x_t rejoint h_{t-1} : [h,x]     */
+          for(k = 0; k < 4; k++) ed(bus, g[k]);  /* et alimente les quatre portes   */
+          cNow = nd(x, YC, ZC);
+          ed(cPrev, cNow);                       /* le tapis passe tout droit       */
+          ed(g[0], cNow);                        /* l'oubli pince la mémoire        */
+          ed(g[1], cNow); ed(g[2], cNow);        /* l'entrée et le candidat ajoutent*/
+          ed(cNow, g[3]);                        /* la sortie relit la mémoire      */
+          bus = nd(x + 1.15, YH, ZH);
+          ed(g[3], bus);                         /* → h_t, qui repart vers la droite*/
+          cPrev = cNow;
+        }
+        ed(cPrev, nd(XC + (TT - 1) * DX + 1.45, YC, ZC));  /* le tapis sort du cadre */
+
+        for(k = 0; k < 5; k++){                  /* la boucle temporelle, repliée   */
+          aNow = nd(ARC[k][0], ARC[k][1], ARC[k][2]);
+          ed(bus, aNow); bus = aNow;
+        }
+        ed(bus, bus0);                           /* h_T retombe sur le premier bloc */
+      })();
+      return { N: NODES, E: EDGES };
+    } },
+    { cle: 'transformer', nom: 'Transformer', bat: function(){
+      /* ===== TRANSFORMER (Vaswani et al., 2017) ============================
+         Bande HAUTE : l'encodeur, 3 jetons source.
+         Bande BASSE : le decodeur, 4 jetons cible (les longueurs different :
+         c'est un seq2seq). Les deux bandes sont decalees en x, un faisceau
+         oblique les relie : c'est l'attention croisee.
+         Liens HORIZONTAUX (i -> i) = le flux residuel, qui traverse chaque
+         bloc sans le toucher. Liens OBLIQUES = l'attention.
+         34 noeuds, 72 liens. Tout est calcule ici, une seule fois. */
+      var NODES = [], EDGES = [];
+      (function(){
+        var h, i, j;
+        var SY = [3.90, 2.75, 1.60];                     /* 3 jetons source, bande haute */
+        var TY = [-0.75, -1.90, -3.05, -4.20];           /* 4 jetons cible, bande basse  */
+        var NS = SY.length, NT = TY.length;
+
+        function col(x, ys, z, wig){                     /* une colonne de jetons */
+          var base = NODES.length, n;
+          for(n = 0; n < ys.length; n++)
+            NODES.push([x, ys[n], z + (wig ? Math.sin(n * 1.9) * 0.42 : 0)]);
+          return base;                                   /* wig : clin d'oeil au codage positionnel */
+        }
+        function full(a, na, b, nb){                     /* tous-vers-tous : l'attention */
+          var p, q;
+          for(p = 0; p < na; p++) for(q = 0; q < nb; q++) EDGES.push([a + p, b + q]);
+        }
+        function rail(a, b, n){                          /* i -> i : le rail residuel */
+          var p; for(p = 0; p < n; p++) EDGES.push([a + p, b + p]);
+        }
+
+        /* --- encodeur : bande haute -------------------------------------- */
+        var E0 = col(-6.10, SY, 0, 1);                   /* plongements + position */
+        var HD = [];                                     /* 3 tetes : 3 nappes en profondeur */
+        for(h = 0; h < 3; h++) HD.push(col(-4.30 + (h - 1) * 0.44, SY, (h - 1) * 2.00, 0));
+        var E2 = col(-2.40, SY, 0, 0);                   /* concat + W_O, Add & Norm */
+        var E3 = col( 0.30, SY, 0, 0);                   /* FFN point-par-point + Add & Norm */
+
+        for(h = 0; h < 3; h++) full(E0, NS, HD[h], NS);  /* 27 : auto-attention, 3 tetes */
+        for(h = 0; h < 3; h++) rail(HD[h], E2, NS);      /*  9 : concat des tetes         */
+        rail(E0, E2, NS);                                /*  3 : residuel, saute le bloc  */
+        rail(E2, E3, NS);                                /*  3 : FFN, zero melange        */
+
+        /* --- decodeur : bande basse -------------------------------------- */
+        var D0 = col(-2.80, TY, 0, 1);                   /* cible decalee a droite */
+        var D1 = col( 0.60, TY, 0, 0);                   /* attention masquee + Add & Norm */
+        var D2 = col( 3.60, TY, 0, 0);                   /* attention croisee + Add & Norm */
+        var D3 = col( 5.95, TY, 0, 0);                   /* lineaire + softmax */
+
+        for(i = 0; i < NT; i++)                          /* 10 : masque causal, j <= i */
+          for(j = 0; j <= i; j++) EDGES.push([D0 + j, D1 + i]);
+        rail(D1, D2, NT);                                /*  4 : les requetes + le residuel */
+        full(E3, NS, D2, NT);                            /* 12 : le pont encodeur -> decodeur */
+        rail(D2, D3, NT);                                /*  4 : FFN + projection */
+      })();
+      return { N: NODES, E: EDGES };
+    } },
+    { cle: 'unet', nom: 'U-Net', bat: function(){
+      /* --- U-Net : le U. L'encodeur descend à gauche, le décodeur remonte à
+         droite, et quatre passerelles horizontales traversent le vide central --- */
+      var NODES = [], EDGES = [];
+      (function(){
+        /* un étage = [ y du niveau, écart du bras à l'axe, taille spatiale de la
+           carte (elle fond en descendant), demi-hauteur, demi-épaisseur en z
+           (les canaux doublent à chaque étage : le bloc s'épaissit) ] */
+        var LEV = [
+          [  3.50, 5.40, 5, .80,  .35 ],
+          [  1.85, 4.90, 4, .62,  .62 ],
+          [   .10, 4.00, 3, .46,  .92 ],
+          [ -1.70, 2.60, 2, .32, 1.25 ]
+        ];
+        var enc = [], dec = [], bas = [], ch = [];
+        var l, k, m, L, n, y, z, ce, cd;
+        function pousse(px, py, pz){ NODES.push([px, py, pz]); return NODES.length - 1; }
+        /* les deux bras du U : mêmes hauteurs, mêmes profondeurs, x opposés */
+        for(l = 0; l < 4; l++){
+          L = LEV[l]; n = L[2]; ce = []; cd = [];
+          for(k = 0; k < n; k++){
+            y = L[0] + ((k + .5) / n - .5) * 2 * L[3];
+            z = (k % 2 ? 1 : -1) * L[4];
+            ce.push(pousse(-L[1], y, z));
+            cd.push(pousse( L[1], y, z));
+          }
+          enc.push(ce); dec.push(cd);
+        }
+        /* le fond du U : le goulot, la carte la plus petite et la plus épaisse */
+        for(k = 0; k < 3; k++) bas.push(pousse((k - 1) * 1.15, -3.65, (k - 1) * 1.35));
+        /* max-pool en descente, up-conv en montée : deux entrées par sortie,
+           jamais du tout-à-tout — un U-Net est local, pas dense */
+        function relie(a, b){
+          var i2, s1, s2, f = a.length / b.length;
+          for(i2 = 0; i2 < b.length; i2++){
+            s1 = Math.floor(i2 * f); if(s1 > a.length - 1) s1 = a.length - 1;
+            s2 = s1 + 1; if(s2 > a.length - 1) s2 = s1 - 1;
+            EDGES.push([a[s1], b[i2]]);
+            if(s2 >= 0 && s2 !== s1) EDGES.push([a[s2], b[i2]]);
+          }
+        }
+        relie(enc[0], enc[1]); relie(enc[1], enc[2]); relie(enc[2], enc[3]);
+        relie(enc[3], bas);    relie(bas, dec[3]);
+        relie(dec[3], dec[2]); relie(dec[2], dec[1]); relie(dec[1], dec[0]);
+        /* la signature : quatre passerelles rigoureusement horizontales, de plus
+           en plus courtes vers le bas. Chacune est coupée en quatre tronçons —
+           un lien de onze unités reçoit trop peu de glyphes pour se lire. */
+        for(l = 0; l < 4; l++){
+          L = LEV[l]; n = L[2]; k = n >> 1;
+          y = L[0] + ((k + .5) / n - .5) * 2 * L[3];
+          z = (k % 2 ? 1 : -1) * L[4];
+          ch = [ enc[l][k] ];
+          for(m = 1; m < 4; m++) ch.push(pousse(-L[1] + L[1] * m * .5, y, z));
+          ch.push(dec[l][k]);
+          for(m = 0; m < 4; m++) EDGES.push([ch[m], ch[m + 1]]);
+        }
+      })();
+      return { N: NODES, E: EDGES };
+    } }
+  ];
+  var ARCH = [], NMAX = 0, EMAX = 0;
   (function(){
-    var cnt = [5, 7, 8, 7, 5], off = 0, prev = [];
-    for(var l = 0; l < 5; l++){
-      var cur = [];
-      for(var k = 0; k < cnt[l]; k++){
-        NODES.push([
-          (l / 4 - .5) * 12.2,
-          ((k + .5) / cnt[l] - .5) * (4.6 + Math.sin(l * 1.7) * .6),
-          Math.sin(k * 2.1 + l * 1.35) * 2.4
-        ]);
-        cur.push(off++);
+    for(var a = 0; a < ARCHIS.length; a++){
+      var r;
+      try{ r = ARCHIS[a].bat(); }
+      catch(e){ console.warn('[fond] architecture', ARCHIS[a].cle, e && e.message); continue; }
+      if(!r || !r.N || !r.N.length || !r.E || !r.E.length) continue;
+      ARCH.push({ cle: ARCHIS[a].cle, N: r.N, E: r.E });
+      if(r.N.length > NMAX) NMAX = r.N.length;
+      if(r.E.length > EMAX) EMAX = r.E.length;
+    }
+    /* filet : si aucune ne se construit, on garde un reseau minimal plutot
+       que de laisser la phase III vide */
+    if(!ARCH.length){
+      var N0 = [], E0 = [], o0 = 0, pv0 = [];
+      for(var l0 = 0; l0 < 5; l0++){
+        var cu0 = [], c0 = [5, 7, 8, 7, 5][l0];
+        for(var k0 = 0; k0 < c0; k0++){
+          N0.push([(l0 / 4 - .5) * 12.2, ((k0 + .5) / c0 - .5) * 4.6, Math.sin(k0 * 2.1 + l0 * 1.35) * 2.4]);
+          cu0.push(o0++);
+        }
+        if(pv0.length) for(var a0 = 0; a0 < pv0.length; a0++)
+          for(var n0 = 0; n0 < 2; n0++) E0.push([pv0[a0], cu0[(a0 * 2 + n0 * 3 + l0) % cu0.length]]);
+        pv0 = cu0;
       }
-      if(prev.length) for(var a = 0; a < prev.length; a++){
-        for(var n = 0; n < 2; n++) EDGES.push([prev[a], cur[(a * 2 + n * 3 + l) % cur.length]]);
-      }
-      prev = cur;
+      ARCH.push({ cle: 'repli', N: N0, E: E0 });
+      NMAX = N0.length; EMAX = E0.length;
     }
   })();
+  var iArch = 0;
+  var NODES = ARCH[0].N, EDGES = ARCH[0].E;
 
   /* --- la silhouette d'une machine, échantillonnée point par point --- */
   var BANDS = [
@@ -13549,18 +13844,25 @@ function buildScene(){
   flux.frustumCulled = false;
   scene.add(flux);
 
-  /* --- les nœuds : ils respirent, chacun à son rythme --- */
-  var nN = NODES.length;
+  /* --- les nœuds : ils respirent, chacun à son rythme ---
+     Le tampon est taillé pour la PLUS GRANDE des cinq architectures, une fois
+     pour toutes : changer d'architecture ne réalloue rien, on réécrit dans
+     la place déjà prise et on ajuste le nombre d'instances dessinées. */
+  var nN = NMAX;
   var nPos = new Float32Array(nN * 3), nSeed = new Float32Array(nN * 2);
   for(var n2 = 0; n2 < nN; n2++){
-    nPos[n2 * 3] = NODES[n2][0]; nPos[n2 * 3 + 1] = NODES[n2][1]; nPos[n2 * 3 + 2] = NODES[n2][2];
+    var nd0 = NODES[n2] || NODES[NODES.length - 1];
+    nPos[n2 * 3] = nd0[0]; nPos[n2 * 3 + 1] = nd0[1]; nPos[n2 * 3 + 2] = nd0[2];
+    /* les graines de respiration ne changent PAS d'une architecture à l'autre :
+       ce sont elles qui donnent au réseau son rythme propre, et le voir se
+       resynchroniser à chaque bascule trahirait le procédé */
     nSeed[n2 * 2] = Math.random(); nSeed[n2 * 2 + 1] = .7 + Math.random() * .8;
   }
   var nGeo = new T.InstancedBufferGeometry();
   nGeo.index = base.index;
   nGeo.attributes.position = base.attributes.position;
   nGeo.attributes.uv = base.attributes.uv;
-  nGeo.instanceCount = nN;
+  nGeo.instanceCount = NODES.length;
   nGeo.setAttribute('aN', new T.InstancedBufferAttribute(nPos, 3));
   nGeo.setAttribute('aS', new T.InstancedBufferAttribute(nSeed, 2));
   var nU = { uT: { value: 0 }, uNet: { value: 0 }, uCol: { value: new T.Color(0x048B9A) } };
@@ -13594,22 +13896,36 @@ function buildScene(){
   nodes.frustumCulled = false;
   scene.add(nodes);
 
-  /* --- les synapses : un signal court le long du lien --- */
-  var SUB = 5, sv = EDGES.length * SUB * 2;
+  /* --- les synapses : un signal court le long du lien ---
+     Taille elle aussi pour la plus fournie des cinq architectures. Ce qui
+     dépasse du compte courant n'est pas efface mais simplement PAS DESSINE,
+     par la plage de tirage : rien a nettoyer, rien a reallouer. */
+  var SUB = 5, sv = EMAX * SUB * 2;
   var sPos = new Float32Array(sv * 3), sE = new Float32Array(sv), sSd = new Float32Array(sv);
-  var vi = 0;
-  for(var q2 = 0; q2 < EDGES.length; q2++){
-    var A2 = NODES[EDGES[q2][0]], B2 = NODES[EDGES[q2][1]], sd = Math.random();
-    for(var s2 = 0; s2 < SUB; s2++){
-      for(var h = 0; h < 2; h++){
-        var u2 = (s2 + h) / SUB;
-        sPos[vi * 3] = A2[0] + (B2[0] - A2[0]) * u2;
-        sPos[vi * 3 + 1] = A2[1] + (B2[1] - A2[1]) * u2;
-        sPos[vi * 3 + 2] = A2[2] + (B2[2] - A2[2]) * u2;
-        sE[vi] = u2; sSd[vi] = sd; vi++;
+  /* la graine de chaque lien fixe l'instant ou son signal passe. Comme les
+     graines de respiration, elle survit aux bascules : le reseau garde son
+     pouls quand sa forme change. */
+  var sSeed = new Float32Array(EMAX);
+  for(var sg = 0; sg < EMAX; sg++) sSeed[sg] = Math.random();
+  function ecritSynapses(N, E){
+    var vi = 0;
+    for(var q2 = 0; q2 < E.length; q2++){
+      var A2 = N[E[q2][0]], B2 = N[E[q2][1]];
+      if(!A2 || !B2) continue;
+      var sd = sSeed[q2];
+      for(var s2 = 0; s2 < SUB; s2++){
+        for(var h = 0; h < 2; h++){
+          var u2 = (s2 + h) / SUB;
+          sPos[vi * 3] = A2[0] + (B2[0] - A2[0]) * u2;
+          sPos[vi * 3 + 1] = A2[1] + (B2[1] - A2[1]) * u2;
+          sPos[vi * 3 + 2] = A2[2] + (B2[2] - A2[2]) * u2;
+          sE[vi] = u2; sSd[vi] = sd; vi++;
+        }
       }
     }
+    return vi;
   }
+  var svUtiles = ecritSynapses(NODES, EDGES);
   var sGeo = new T.BufferGeometry();
   sGeo.setAttribute('position', new T.BufferAttribute(sPos, 3));
   sGeo.setAttribute('aE', new T.BufferAttribute(sE, 1));
@@ -13638,7 +13954,61 @@ function buildScene(){
     ].join('\n')
   }));
   syn.frustumCulled = false;
+  sGeo.setDrawRange(0, svUtiles);
   scene.add(syn);
+
+  /* --- LA BASCULE D'ARCHITECTURE -----------------------------------------
+     Rien n'est realloue : on reecrit les tampons deja en place et on ajuste
+     ce qui est dessine. Un passage coute une quarantaine de noeuds et moins
+     de cent aretes a recopier, soit une fraction de milliseconde, une fois
+     par architecture — a comparer aux seize millisecondes d'une image. */
+  function ecritArchi(k){
+    if(k === iArch || k < 0 || k >= ARCH.length) return;
+    iArch = k;
+    var nds = ARCH[k].N, edg = ARCH[k].E, i, j;
+    NODES = nds; EDGES = edg;
+    /* les noeuds qui respirent */
+    for(i = 0; i < NMAX; i++){
+      var nd = nds[i] || nds[nds.length - 1];
+      nPos[i * 3] = nd[0]; nPos[i * 3 + 1] = nd[1]; nPos[i * 3 + 2] = nd[2];
+    }
+    nGeo.instanceCount = nds.length;
+    nGeo.attributes.aN.needsUpdate = true;
+    /* les synapses */
+    var utiles = ecritSynapses(nds, edg);
+    sGeo.setDrawRange(0, utiles);
+    sGeo.attributes.position.needsUpdate = true;
+    sGeo.attributes.aE.needsUpdate = true;
+    sGeo.attributes.aSd.needsUpdate = true;
+    /* et les glyphes du flux, qui suivent les aretes. Chaque glyphe garde SON
+       rang d'une architecture a l'autre : c'est ce qui fait que le nuage se
+       RECOMPOSE au lieu de se retirer puis de revenir. Le tirage au sort
+       d'origine est remplace par un parcours regulier — a moins de cent
+       aretes pour quelques centaines de glyphes, le hasard laissait une arete
+       sur quatre vide en permanence, et la matrice avait des trous. */
+    for(i = 0; i < N; i++){
+      j = i * 3;
+      if(i % 4 === 3){                        /* un sur quatre se pose sur un noeud */
+        var nn = nds[i % nds.length];
+        p2[j] = nn[0] + (aR[j] - .5) * .42;
+        p2[j + 1] = nn[1] + (aR[j + 1] - .5) * .42;
+        p2[j + 2] = nn[2] + (aR[j + 2] - .5) * .42;
+        pv[j] = pv[j + 1] = pv[j + 2] = 0;
+      }else{                                  /* les autres courent le long d'une arete */
+        var ed = edg[i % edg.length], Aa = nds[ed[0]], Bb = nds[ed[1]];
+        if(!Aa || !Bb) continue;
+        p2[j] = Aa[0] + (aR[j] - .5) * .1;
+        p2[j + 1] = Aa[1] + (aR[j + 1] - .5) * .1;
+        p2[j + 2] = Aa[2] + (aR[j + 2] - .5) * .1;
+        pv[j] = Bb[0] - Aa[0]; pv[j + 1] = Bb[1] - Aa[1]; pv[j + 2] = Bb[2] - Aa[2];
+      }
+    }
+    geo.attributes.aP2.needsUpdate = true;
+    geo.attributes.aEV.needsUpdate = true;
+  }
+  /* la premiere architecture est deja en place : on force la repartition
+     reguliere des glyphes, que le remplissage initial tirait au sort */
+  (function(){ var g = iArch; iArch = -1; ecritArchi(g); })();
 
   var GLo = { renderer: renderer, usePost: false, postOk: false, uGrain: O.grain * 1.4,
               introT0: 0, lowDpr: false, ftAcc: 0, ftN: 0, static: false, lastOp: 0 };
@@ -13691,6 +14061,18 @@ function buildScene(){
     /* le réseau tient longtemps : il naît avec la colonne et ne se défait
        qu'au moment où les machines prennent sa place */
     var net = Math.min(1, w2 * 1.05) * (1 - w3 * .5) * (1 - w4 * .95);
+    /* LE DEFILE. La plage ou le reseau est forme — du moment ou la colonne a
+       fini de se nouer jusqu a l entree dans l helice — est decoupee en autant
+       de tranches qu il y a d architectures. On ne fond PAS l une dans l autre :
+       un morphing entre un U et un escalier de carres ne donne ni un U ni un
+       escalier, seulement une bouillie. Chaque glyphe garde son rang et rejoint
+       sa nouvelle place par le meme ressort qui porte deja tout le fond : la
+       forme se RECOMPOSE sous les yeux au lieu de disparaitre puis de revenir. */
+    if(ARCH.length > 1 && net > .02){
+      var dep = A + (B - A) * .26;
+      var u5 = clamp((y - dep) / Math.max(1, B - dep), 0, .9999);
+      ecritArchi(Math.floor(u5 * ARCH.length));
+    }
     nU.uT.value = t; nU.uNet.value = net;
     sU.uT.value = t; sU.uNet.value = net;
     nodes.visible = syn.visible = net > .012;
