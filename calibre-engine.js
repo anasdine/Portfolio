@@ -11203,6 +11203,14 @@ window.__ditAuDoigt.cache = function(){
        `min-width:0` autorise l'élément de grille à passer sous cette largeur. */
     '@media (max-width:720px){[data-reveal] > span{min-width:0}' +
       '[data-reveal] > span > span{overflow-wrap:anywhere}}' +
+    /* LE BOUTON DE VOIX SUR TÉLÉPHONE. Le propriétaire l'a vu affiché alors
+       qu'aucun son ne sortait : sur iOS la synthèse passe par le canal média,
+       donc l'interrupteur silencieux la coupe, et elle exige en plus un geste
+       direct. Un bouton qui promet du son sans pouvoir le tenir vaut moins que
+       pas de bouton. Sur un appareil tactile, le texte EST le canal — c'est
+       déjà ce que dit la nouvelle bulle jaune — et la voix reste un supplément
+       de bureau. Rien à détecter, rien à filtrer. */
+    '@media (hover:none),(pointer:coarse){[data-voice-btn]{display:none!important}}' +
     /* Rien ne doit atterrir sous l'en-tête collant quand on suit une ancre ou
        qu'un champ prend le focus. La barre monte à ~110px sur téléphone. */
     '@media (max-width:540px){[id],[data-anchor-target],input,textarea,' +
