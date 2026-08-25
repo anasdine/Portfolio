@@ -14510,6 +14510,42 @@ function buildScene(){
     geo.attributes.aP2.needsUpdate = true;
     geo.attributes.aEV.needsUpdate = true;
   }
+  /* LE FONDU. ecritArchi teleporte : il ecrit d un coup les noeuds et tout le
+     cablage. Le ressort ne rattrape que les glyphes ; la structure visible, elle,
+     sautait a chacune des cinq frontieres, et entre deux sauts plus rien ne
+     bougeait — d ou l impression d avancer par blocs.
+     Ici les noeuds passent d une architecture a l autre en continu. La topologie,
+     elle, ne peut pas s interpoler : elle bascule d un coup, mais a mi-fondu,
+     quand les noeuds des deux formes sont au plus pres. Le cablage se refait donc
+     au moment ou il se voit le moins, et non en pleine forme etablie.
+     Tampon prealloue : la boucle d image n alloue rien. */
+  var melN = (function(){ var a = [], i; for(i = 0; i < NMAX; i++) a.push([0, 0, 0]); return a; })();
+  function fondArchi(k, b){
+    var k2 = k + 1;
+    if(!(b > .001) || k2 >= ARCH.length){ ecritArchi(k); return; }
+    /* la bascule seche — glyphes compris — se joue au creux du fondu */
+    var kt = b < .5 ? k : k2;
+    if(kt !== iArch) ecritArchi(kt);
+    var Na = ARCH[k].N, Nb = ARCH[k2].N;
+    var e = b * b * (3 - 2 * b), i, a1, b1, nn = Na.length > Nb.length ? Na.length : Nb.length;
+    for(i = 0; i < NMAX; i++){
+      a1 = Na[i] || Na[Na.length - 1]; b1 = Nb[i] || Nb[Nb.length - 1];
+      nPos[i * 3] = a1[0] + (b1[0] - a1[0]) * e;
+      nPos[i * 3 + 1] = a1[1] + (b1[1] - a1[1]) * e;
+      nPos[i * 3 + 2] = a1[2] + (b1[2] - a1[2]) * e;
+      if(i < nn){ melN[i][0] = nPos[i * 3]; melN[i][1] = nPos[i * 3 + 1]; melN[i][2] = nPos[i * 3 + 2]; }
+    }
+    nGeo.instanceCount = nn;
+    nGeo.attributes.aN.needsUpdate = true;
+    /* les traits suivent les memes noeuds interpoles. Pas de troncature du
+       tampon : ecritSynapses n indexe que par les aretes, dont les rangs
+       restent sous le nombre de noeuds de l architecture en cours. */
+    var utiles = ecritSynapses(melN, ARCH[kt].E);
+    sGeo.setDrawRange(0, utiles);
+    sGeo.attributes.position.needsUpdate = true;
+    sGeo.attributes.aE.needsUpdate = true;
+    sGeo.attributes.aSd.needsUpdate = true;
+  }
   /* la premiere architecture est deja en place : on force la repartition
      reguliere des glyphes, que le remplissage initial tirait au sort */
   (function(){ var g = iArch; iArch = -1; ecritArchi(g); })();
@@ -14572,13 +14608,18 @@ function buildScene(){
        escalier, seulement une bouillie. Chaque glyphe garde son rang et rejoint
        sa nouvelle place par le meme ressort qui porte deja tout le fond : la
        forme se RECOMPOSE sous les yeux au lieu de disparaitre puis de revenir. */
+    var dep = A + (B - A) * .26;
+    var u5 = ARCH.length > 1 ? clamp((y - dep) / Math.max(1, B - dep), 0, .9999) : 0;
     if(ARCH.length > 1 && net > .02){
-      var dep = A + (B - A) * .26;
-      var u5 = clamp((y - dep) / Math.max(1, B - dep), 0, .9999);
+      /* le rang entier designe l architecture, la partie fractionnaire pilote le
+         fondu vers la suivante — sur le dernier tiers de la tranche seulement,
+         pour que chaque forme ait le temps d exister avant de se defaire */
+      var q5 = u5 * ARCH.length, k5 = Math.floor(q5);
+      var b5 = ss(q5 - k5, .62, .995);
       /* une bascule qui echouerait ne doit pas emporter la boucle d image :
          le fond garderait alors la derniere forme valide, ce qui se voit a
          peine, la ou une exception arreterait tout le rendu de la page */
-      try{ ecritArchi(Math.floor(u5 * ARCH.length)); }
+      try{ fondArchi(k5, b5); }
       catch(eA){ if(!ecritArchi.__prevenu){ ecritArchi.__prevenu = 1; console.warn('[fond] bascule', eA && eA.message); } }
     }
     nU.uT.value = t; nU.uNet.value = net;
@@ -14591,6 +14632,15 @@ function buildScene(){
     var ly = L(0, 0, w1); ly = L(ly, .1, w2); ly = L(ly, -.2, w3); ly = L(ly, -1.5, w4);
     az += fin(S.mxS, 0) * .2 + Math.sin(t * .07) * .04 * (1 - ord * .7);
     el -= fin(S.myS, 0) * .12;
+    /* Sur toute la traversee du reseau, w1 et w2 sont satures et w3, w4 pas
+       encore nes : distance, azimut, elevation et regard tiennent la meme valeur
+       sur pres de trois mille pixels. Le decor etait litteralement immobile entre
+       deux architectures. Un balayage lent, nul aux deux bouts pour ne pas
+       decrocher de ce qui precede ni de ce qui suit, lui rend son souffle. */
+    if(u5 > 0){
+      var sw5 = Math.sin(Math.PI * u5);
+      az += sw5 * .085; el += sw5 * .022; d *= 1 + sw5 * .04;
+    }
     camD = damp(camD, d * (MOBW ? 1.3 : 1), 3, dt);
     camA = damp(camA, az, 3, dt);
     camE = damp(camE, el, 3, dt);
