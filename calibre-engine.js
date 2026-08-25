@@ -13603,29 +13603,126 @@ function buildScene(){
   var iArch = 0;
   var NODES = ARCH[0].N, EDGES = ARCH[0].E;
 
-  /* --- la silhouette d'une machine, échantillonnée point par point --- */
+  /* --- L'ATELIER : cinq machines depareillees, chacune un outil au poing ---
+     Il n'y avait qu'une silhouette, repetee trois fois, bras ballants et
+     garde-a-vous. Une bande vaut [poids, xMin, xMax, yMin, yMax, forme] ;
+     la forme 0 est un rectangle, 1 un disque, 2 et 3 des barres obliques —
+     et ce sont les obliques qui rendent une pose possible : sans elles, on
+     ne sait dessiner qu'un bonhomme au garde-a-vous.
+     Rien n'est symetrique : jambe d'appui droite, jambe libre ecartee, un
+     bras leve qui tient l'outil a hauteur de visage, l'autre replie. */
+  var EPB = .15, EPO = .09;        /* épaisseur d'une barre oblique : corps, outil */
   var BANDS = [
-    [.13, -.42, .42, 1.94, 2.78, 1],   /* tête (disque) */
-    [.05, -.30, .30, 2.28, 2.46, 0],   /* visière */
-    [.29, -.52, .52, .95, 2.00, 0],    /* torse */
-    [.08, -.84, .84, 1.80, 2.10, 1],   /* épaules */
-    [.13, -.88, .88, .85, 1.86, 0],    /* bras */
-    [.06, -.42, .42, .70, .96, 0],     /* bassin */
-    [.20, -.44, .44, .04, .72, 0],     /* jambes */
-    [.06, -.50, .50, 0, .11, 0]        /* pieds */
+    [.022,  .13,  .29, 3.14, 3.52, 0],   /*  0 antenne, décalée d'un côté */
+    [.095, -.40,  .40, 2.64, 3.14, 0],   /*  1 tête */
+    [.040, -.32,  .32, 2.82, 2.96, 0],   /*  2 visière (surdensité dans la tête) */
+    [.085, -.68,  .68, 2.14, 2.42, 0],   /*  3 épaules — 1,7× la tête, et les bras dépassent */
+    [.145, -.52,  .52, 1.62, 2.16, 0],   /*  4 torse */
+    [.031, -.30,  .30, 1.80, 2.06, 0],   /*  5 plastron (surdensité dans le torse) */
+    [.032, -.30,  .30, 1.44, 1.62, 0],   /*  6 taille pincée */
+    [.054, -.48,  .48, 1.16, 1.46, 0],   /*  7 bassin */
+    [.092,  .14,  .36,  .16, 1.20, 0],   /*  8 jambe d'appui, verticale */
+    [.092, -.56, -.16,  .16, 1.20, 2],   /*  9 jambe libre, écartée */
+    [.028,  .04,  .48,  0,    .16, 0],   /* 10 pied d'appui */
+    [.028, -.76, -.32,  0,    .15, 0],   /* 11 pied libre */
+    [.054,  .60, 1.10, 1.86, 2.34, 3],   /* 12 bras levé : épaule -> coude sorti */
+    [.054,  .78, 1.10, 1.88, 2.62, 3],   /* 13 avant-bras levé : coude -> main */
+    [.026,  .68,  .90, 2.54, 2.72, 0],   /* 14 poing haut — l'outil s'accroche là */
+    [.048,-1.06, -.62, 1.80, 2.34, 2],   /* 15 bras bas : épaule -> coude sorti */
+    [.048,-1.06, -.76, 1.10, 1.80, 3],   /* 16 avant-bras bas : coude -> poignet */
+    [.026, -.95, -.73, 1.02, 1.20, 0]    /* 17 poing bas — l'outil s'accroche là */
   ];
-  function robotPt(r1, r2, r3, out){
-    var acc = 0, b = BANDS[0];
-    for(var i = 0; i < BANDS.length; i++){ acc += BANDS[i][0]; if(r1 <= acc){ b = BANDS[i]; break; } }
-    var x = b[1] + (b[2] - b[1]) * r2, y = b[3] + (b[4] - b[3]) * r3;
-    if(b[5]){                                   /* disque : on rejette les coins */
+  /* les deux mains, au bout exact des avant-bras 13 et 16 : si l'un bouge,
+     l'autre suit, sinon l'outil décroche du bras */
+  var HANDS = [[.79, 2.63], [-.84, 1.11]];
+
+  /* --- les outils : mêmes bandes, origine du repère sur la poigne ---
+     TOOLG[t] = [décalage x, décalage y, angle, échelle, main]
+     main 0 = poing haut (outil brandi à hauteur de visage)
+     main 1 = poing bas  (outil porté à la hanche ; décrit vers les x négatifs,
+                          du côté où pend ce bras) */
+  var TOOLG = [
+    [ .00,  .04,  .14, 1.00, 0],   /* 0 tournevis */
+    [ .02,  .06, -.12, 1.00, 0],   /* 1 clé */
+    [ .04, -.04,  .00,  .95, 0],   /* 2 ordinateur portable */
+    [-.02, -.06,  .00,  .86, 1],   /* 3 touret de câble */
+    [ .02,  .04,  .20,  .95, 0],   /* 4 fer à souder */
+    [-.02, -.04,  .00,  .90, 1]    /* 5 testeur réseau */
+  ];
+  var TOOLS = [
+    /* 0 — TOURNEVIS : gros manche dans le poing, tige fine, panne plate en l'air */
+    [ [.40, -.12,  .12, -.22,  .16, 0],   /* manche */
+      [.10, -.05,  .05,  .16,  .24, 0],   /* collerette */
+      [.34, -.035, .035, .24,  .72, 0],   /* tige */
+      [.16, -.07,  .07,  .72,  .82, 0] ], /* panne plate */
+    /* 1 — CLÉ : long manche, tête massive décalée, corne au-dessus.
+       C'est le décalage de la masse qui la distingue du tournevis. */
+    [ [.42, -.055, .055,-.26,  .44, 0],   /* manche */
+      [.12, -.04,  .14,  .44,  .56, 0],   /* col, qui part de côté */
+      [.30,  .02,  .30,  .56,  .78, 0],   /* mâchoire */
+      [.16,  .20,  .34,  .78,  .90, 0] ], /* corne */
+    /* 2 — ORDINATEUR PORTABLE ouvert : socle horizontal + écran incliné, un L franc */
+    [ [.32, -.02,  .62,  0,    .11, 0],   /* socle / clavier */
+      [.08, -.10,  .04,  .02,  .16, 0],   /* charnière */
+      [.40,  .04,  .40,  .16,  .86, 2],   /* montant d'écran */
+      [.20,  .16,  .52,  .14,  .84, 2] ], /* dalle parallèle : l'écran fait masse */
+    /* 3 — TOURET DE CÂBLE : grand disque porté bas, câble qui file jusqu'au sol */
+    [ [.14, -.24,  .02, -.44,  .02, 2],   /* anse, du poing au moyeu */
+      [.50, -.58,  .10,-1.06, -.38, 1],   /* flasque (disque) */
+      [.12, -.32, -.16, -.80, -.64, 0],   /* moyeu */
+      [.16, -.84, -.58,-1.22, -.92, 2],   /* câble qui descend */
+      [.08, -.92, -.78,-1.30,-1.20, 0] ], /* câble au sol */
+    /* 4 — FER À SOUDER : manche, panne effilée, deux volutes de fumée en S.
+       La fumée est ce qui le rend lisible : sans elle, c'est un tournevis. */
+    [ [.28, -.10,  .10, -.24,  .18, 0],   /* manche */
+      [.10, -.06,  .06,  .18,  .34, 0],   /* virole */
+      [.22,  0,    .22,  .34,  .62, 2],   /* panne */
+      [.10,  .16,  .28,  .60,  .70, 0],   /* pointe chaude */
+      [.16,  .10,  .28,  .76,  .98, 3],   /* fumée, première volute */
+      [.14,  .04,  .20, 1.06, 1.30, 2] ], /* fumée, seconde volute */
+    /* 5 — TESTEUR RÉSEAU : boîtier porté bas, cordon et prise RJ45 qui pendent */
+    [ [.40, -.52, -.08, -.74, -.08, 0],   /* boîtier */
+      [.14, -.44, -.16, -.32, -.16, 0],   /* écran (surdensité) */
+      [.10, -.44, -.16, -.62, -.54, 0],   /* rampe de diodes */
+      [.14, -.44, -.22,-1.00, -.76, 2],   /* cordon, sortie */
+      [.12, -.78, -.46,-1.14, -.98, 3],   /* cordon, courbe */
+      [.10, -.90, -.76,-1.06, -.94, 0] ]  /* prise RJ45 */
+  ];
+
+  /* --- l'atelier : cinq machines, chacune son outil, sa taille, sa pose ---
+     [x, y du sol, z, échelle, miroir, inclinaison, outil]
+     Les petites sont au fond : sol plus haut, z négatif. Le brouillard du
+     nuanceur les éteint déjà de 25 % à z = -2.6, la profondeur se lit sans
+     rien ajouter. Miroirs alternés, inclinaisons toutes différentes : aucune
+     des cinq n'a la même assiette. C'est le seul endroit à toucher pour en
+     ajouter, en retirer ou en réordonner — la boucle lit ROBOTS.length. */
+  var ROBOTS = [
+    [-4.94, -2.70, -2.3,  .95,  1,  .06, 3],   /* touret de câble, fond gauche */
+    [-2.47, -3.95,  1.5, 1.20, -1, -.05, 2],   /* ordinateur portable, premier plan */
+    [  .19, -3.20, -1.1, 1.06,  1,  .05, 0],   /* tournevis, milieu */
+    [ 2.51, -4.10,  1.7, 1.18, -1, -.06, 5],   /* testeur réseau, premier plan */
+    [ 5.55, -2.60, -2.4,  .92,  1,  .08, 4]    /* fer à souder, fond droite */
+  ];
+  /* en phase V la caméra recule de 1,3× sur petit écran : cinq machines n'y
+     tiennent pas. On garde les trois du milieu, resserrées et remontées. */
+  var RSEL = MOBW ? [1, 2, 3] : [0, 1, 2, 3, 4];
+  var RXK = MOBW ? .74 : 1, RSK = MOBW ? .82 : 1, RYO = MOBW ? .70 : 0;
+  var PTOOL = .17;                 /* part des glyphes qui va à l'outil */
+
+  function bandPt(tab, ep, r1, r2, r3, out){
+    var acc = 0, b = tab[0], n;
+    for(n = 0; n < tab.length; n++){ acc += tab[n][0]; if(r1 <= acc){ b = tab[n]; break; } }
+    var f = b[5], x, y;
+    if(f === 1){                                /* disque : on rejette les coins */
       var cx = (b[1] + b[2]) / 2, cy = (b[3] + b[4]) / 2, rr = (b[4] - b[3]) / 2;
       var a2 = r2 * 6.2832, rd = Math.sqrt(r3) * rr;
       x = cx + Math.cos(a2) * rd; y = cy + Math.sin(a2) * rd;
-    }else if(b === BANDS[4]){                   /* bras : deux colonnes, pas un bloc */
-      x = (r2 < .5 ? -.86 + r2 * .5 : .61 + (r2 - .5) * .5);
-    }else if(b === BANDS[6]){                   /* jambes : deux fûts */
-      x = (r2 < .5 ? -.42 + r2 * .58 : .13 + (r2 - .5) * .58);
+    }else if(f > 1){                            /* barre oblique, épaisse de ep */
+      var e2 = (r3 - .5) * ep;
+      x = b[1] + (b[2] - b[1]) * r2 + e2;
+      y = (f === 2 ? b[3] + (b[4] - b[3]) * r2 : b[4] - (b[4] - b[3]) * r2) - e2 * .5;
+    }else{
+      x = b[1] + (b[2] - b[1]) * r2; y = b[3] + (b[4] - b[3]) * r3;
     }
     out[0] = x; out[1] = y;
   }
@@ -13717,13 +13814,39 @@ function buildScene(){
       p3[j] = ax3 + (bx3 - ax3) * t3 + ox3; p3[j + 1] = y3; p3[j + 2] = az3 + (bz3 - az3) * t3;
     }
     aH4[i] = h3;
-    /* V — la sortie : neuf machines alignées, faites des mêmes chiffres */
-    var k4 = i % 3;
-    robotPt(Math.random(), Math.random(), Math.random(), tmp);
-    p4[j] = (k4 - 1) * 4.6 + tmp[0] * 2.4;
-    p4[j + 1] = -3.4 + tmp[1] * 2.4;
-    p4[j + 2] = ((k4 % 3) - 1) * .8 + (Math.random() - .5) * .12;
-    aR[j] = Math.random(); aR[j + 2] = Math.random();
+    /* V — L'ATELIER. Chaque machine recoit sa part de glyphes, repartis au
+       pas regulier selon le poids des bandes plutot que tires au sort : a une
+       quarantaine de glyphes par corps, le hasard laissait une bande sur trois
+       vide — une machine sans poing, une autre sans pied. */
+    var sl4 = i % RSEL.length, R4 = ROBOTS[RSEL[sl4]];
+    var rk4 = (i / RSEL.length) | 0;
+    var nk4 = Math.ceil((N - sl4) / RSEL.length);
+    var nt4 = Math.round(nk4 * PTOOL); if(nt4 < 1) nt4 = 1;
+    var nb4 = nk4 - nt4, lx4, ly4, ou4 = 0;
+    if(rk4 < nb4){
+      bandPt(BANDS, EPB, (rk4 + .5) / nb4, Math.random(), Math.random(), tmp);
+      lx4 = tmp[0]; ly4 = tmp[1];
+    }else{                                    /* l'outil, pose dans le poing */
+      ou4 = 1;
+      var g4 = TOOLG[R4[6]], h4 = HANDS[g4[4]];
+      bandPt(TOOLS[R4[6]], EPO, (rk4 - nb4 + .5) / nt4, Math.random(), Math.random(), tmp);
+      var cg4 = Math.cos(g4[2]), sg4 = Math.sin(g4[2]);
+      lx4 = h4[0] + g4[0] + (tmp[0] * cg4 - tmp[1] * sg4) * g4[3];
+      ly4 = h4[1] + g4[1] + (tmp[0] * sg4 + tmp[1] * cg4) * g4[3];
+    }
+    lx4 *= R4[4];                             /* miroir : la machine se retourne */
+    var cr4 = Math.cos(R4[5]), sr4 = Math.sin(R4[5]);
+    /* elle penche depuis ses chevilles, sinon les pieds decollent du sol */
+    var dy4 = ly4 - .15, sc4 = R4[3] * RSK;
+    p4[j] = R4[0] * RXK + (lx4 * cr4 - dy4 * sr4) * sc4;
+    p4[j + 1] = R4[1] + RYO + (lx4 * sr4 + dy4 * cr4 + .15) * sc4;
+    p4[j + 2] = R4[2] + (Math.random() - .5) * .34;
+    /* L'outil se distingue par la TEINTE, canal aR.x — et par lui seul :
+       aR.y et le choix du glyphe appartiennent deja a l'helice, qui s'en sert
+       pour separer ses squelettes de ses barreaux. Deux phases, deux canaux,
+       aucun tampon supplementaire. */
+    aR[j] = ou4 ? Math.random() * .26 : Math.random();
+    aR[j + 2] = Math.random();
     /* aR.y pilote déjà la taille et l'opacité dans le nuanceur : on s'en sert
        pour hiérarchiser l'hélice — squelettes gros et lumineux, barreaux fins.
        Sa moyenne reste à .50, celle du tirage uniforme qu'il remplace, donc la
