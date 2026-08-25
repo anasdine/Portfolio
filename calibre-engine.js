@@ -11122,6 +11122,158 @@ window.__ditAuDoigt.cache = function(){
   if(b){ b.style.opacity = '0'; b.style.transform = b.style.top === '12px' ? 'translateY(-12px)' : 'translateY(12px)'; }
 };
 
+/* =============================================================
+   JAUGE DE LA SECTION 02 — savoir où l'on en est
+   Le bandeau des quatre libellés marque déjà l'étape en cours : opacité 1 pour
+   celle qu'on lit, 0,55 pour les passées, 0,3 pour les suivantes. Mais sur
+   téléphone il se pose vers y=750-900 dans une fenêtre de 660 — mesuré — donc
+   hors de l'écran pendant presque toute la traversée. On ne le voit qu'à la fin,
+   et un visiteur qui arrive ne comprend pas que ça avance.
+   On ne réinvente rien : on LIT ce bandeau et on le reflète dans une jauge fine
+   posée sous la barre. Elle ne peut donc pas diverger de l'état réel.
+============================================================= */
+(function(){
+  if(!TOUCH) return;
+  var ol = qs('ol[data-s2-nav]'); if(!ol || !ol.children.length) return;
+  var sec = ol; while(sec && sec.tagName !== 'SECTION') sec = sec.parentElement;
+  if(!sec) return;
+
+  var n = ol.children.length;
+  var jauge = doc.createElement('div');
+  jauge.setAttribute('data-jauge-s2', '1');
+  jauge.setAttribute('aria-hidden', 'true');
+  jauge.style.cssText = 'position:fixed;left:12px;right:12px;z-index:95;' +
+    'display:grid;grid-template-columns:repeat(' + n + ',1fr);gap:5px;' +
+    'opacity:0;transition:opacity .25s ease;pointer-events:none';
+  var segs = [];
+  for(var i = 0; i < n; i++){
+    var g = doc.createElement('span');
+    g.style.cssText = 'height:3px;border-radius:2px;background:rgba(228,232,234,.16);' +
+      'transition:background .3s ease,transform .3s ease;transform-origin:left center';
+    jauge.appendChild(g); segs.push(g);
+  }
+  var etiq = doc.createElement('span');
+  etiq.style.cssText = 'grid-column:1/-1;font:600 9.5px/1.4 "IBM Plex Mono",ui-monospace,monospace;' +
+    'letter-spacing:.14em;color:#8FE4EE;text-transform:uppercase;padding-top:5px';
+  jauge.appendChild(etiq);
+  doc.body.appendChild(jauge);
+
+  var attente = 0, dernier = -1;
+  function pose(){
+    attente = 0;
+    var nav = qs('[data-nav]');
+    jauge.style.top = ((nav ? nav.getBoundingClientRect().height : 56) + 6) + 'px';
+    var r = sec.getBoundingClientRect();
+    /* visible seulement pendant la traversée de la section */
+    var dedans = r.top < innerHeight * .5 && r.bottom > innerHeight * .5;
+    jauge.style.opacity = dedans ? '1' : '0';
+    if(!dedans) return;
+    var actif = -1, meilleur = 0;
+    for(var k = 0; k < n; k++){
+      var op = parseFloat(getComputedStyle(ol.children[k]).opacity) || 0;
+      if(op > meilleur){ meilleur = op; actif = k; }
+    }
+    if(actif < 0 || meilleur < .8) return;
+    if(actif === dernier) return;
+    dernier = actif;
+    for(var j = 0; j < n; j++){
+      segs[j].style.background = j < actif ? 'rgba(143,228,238,.45)'
+        : (j === actif ? '#8FE4EE' : 'rgba(228,232,234,.16)');
+      segs[j].style.transform = j === actif ? 'scaleY(1.9)' : 'scaleY(1)';
+    }
+    /* le libelle tient sur deux lignes — un titre et sa precision — et les
+       concatener donnait « Faire tenirvotre materiel ». La jauge est etroite :
+       on ne garde que le titre. */
+    var li = ol.children[actif];
+    /* Le titre et sa precision sont rendus en blocs : lire le textContent du
+       <li> les colle — « Faire tenirvotre materiel ». Le titre n'est pas un
+       element mais un simple noeud de texte, la precision est dans un <span> :
+       on prend donc le PREMIER noeud de texte non vide. */
+    var tete = '';
+    try{
+      var mar = doc.createTreeWalker(li, NodeFilter.SHOW_TEXT, null);
+      var nd;
+      while((nd = mar.nextNode())){
+        var v = (nd.nodeValue || '').trim();
+        if(v){ tete = v; break; }
+      }
+    }catch(eT){ tete = li.textContent; }
+    if(!tete) tete = li.textContent;
+    etiq.textContent = (actif + 1) + ' / ' + n + '  ·  ' +
+      (tete || '').trim().replace(/\s+/g, ' ').slice(0, 32);
+  }
+  function demande(){ if(!attente){ attente = 1; requestAnimationFrame(pose); } }
+  addEventListener('scroll', demande, { passive: true });
+  addEventListener('resize', demande, { passive: true });
+  setTimeout(pose, 1200);
+  demande();
+})();
+
+/* =============================================================
+   LA FLÈCHE D'EN BAS À GAUCHE — une liste de sections
+   Elle ne faisait que remonter en haut de page. Sur téléphone, où la liste des
+   six liens est repliée derrière « SOMMAIRE », c'est le seul repère permanent :
+   elle ouvre désormais le choix des sections, « Haut de page » compris.
+   Les entrées sont construites à partir des ancres existantes : mêmes cibles,
+   mêmes libellés, donc mêmes traductions, sans table à maintenir.
+============================================================= */
+(function(){
+  if(!TOUCH) return;
+  var up = qs('[data-up]'); if(!up) return;
+  var liens = qsa('[data-nav-links] a[data-anchor]');
+  if(!liens.length) return;
+
+  var pan = doc.createElement('nav');
+  pan.setAttribute('data-choix-section', '1');
+  pan.setAttribute('aria-label', 'Sections');
+  pan.style.cssText = 'position:fixed;left:12px;right:12px;bottom:70px;z-index:130;' +
+    'background:rgba(10,12,14,.97);border:1px solid rgba(4,139,154,.5);border-radius:14px;' +
+    'padding:6px;display:none;box-shadow:0 14px 40px rgba(0,0,0,.6);' +
+    'max-height:62vh;overflow:auto;-webkit-overflow-scrolling:touch';
+
+  function entree(txt, aller){
+    var b = doc.createElement('button');
+    b.type = 'button';
+    b.textContent = txt;
+    b.style.cssText = 'display:block;width:100%;text-align:left;background:none;border:0;' +
+      'border-bottom:1px solid rgba(228,232,234,.07);color:#E4E8EA;' +
+      'font:600 12px/1.2 "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.1em;' +
+      'text-transform:uppercase;padding:14px 12px;min-height:48px;cursor:pointer';
+    b.addEventListener('click', function(e){ e.preventDefault(); ferme(); aller(); });
+    return b;
+  }
+  pan.appendChild(entree('↑  ' + (typeof tr === 'function' ? tr('Haut de page') : 'Haut de page'),
+    function(){ scrollTo({ top: 0, behavior: 'smooth' }); }));
+  liens.forEach(function(a){
+    var t = (a.textContent || '').trim().replace(/\s+/g, ' ');
+    if(!t) return;
+    pan.appendChild(entree(t, function(){
+      var h = a.getAttribute('href') || '';
+      var c = h.charAt(0) === '#' ? doc.getElementById(h.slice(1)) : null;
+      if(c) c.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      else a.click();
+    }));
+  });
+  doc.body.appendChild(pan);
+
+  var ouvert = false;
+  function ouvre(){ ouvert = true; pan.style.display = 'block'; up.setAttribute('aria-expanded', 'true'); }
+  function ferme(){ ouvert = false; pan.style.display = 'none'; up.setAttribute('aria-expanded', 'false'); }
+  up.setAttribute('aria-haspopup', 'true');
+  up.setAttribute('aria-expanded', 'false');
+  /* on prend la main avant le comportement d'origine, sans le supprimer :
+     l'entrée « Haut de page » le rend toujours accessible */
+  up.addEventListener('click', function(e){
+    e.preventDefault(); e.stopPropagation();
+    ouvert ? ferme() : ouvre();
+  }, true);
+  doc.addEventListener('pointerdown', function(e){
+    if(!ouvert) return;
+    if(pan.contains(e.target) || up.contains(e.target)) return;
+    ferme();
+  }, true);
+})();
+
 (function(){
   var s = doc.createElement('style');
   s.setAttribute('data-correctifs-doigt', '1');
