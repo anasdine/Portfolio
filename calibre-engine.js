@@ -5974,7 +5974,17 @@ var VOICE = (function(){
      n'est pas touchee, seule sa maniere d'etre montree change. */
   var sansGL = (typeof SANS_GPU === 'boolean' && SANS_GPU) ||
                (typeof BOOT_TIER === 'number' && BOOT_TIER >= 2);
-  if(TOUCH || sansGL || !window.THREE){
+  /* LE TELEPHONE RECUPERE LA SCENE. La video avait ete choisie pour tout le
+     tactile parce qu'une TABLETTE tombait a une quinzaine d'images par seconde.
+     Le cout suit le nombre de pixels, et une tablette en demande bien plus qu'un
+     telephone : mesure a la taille d'un telephone, cette scene coute 1,90 ms par
+     image — 526 images par seconde possibles — contre 6,00 ms sur une tablette,
+     pour 2,3 fois plus de pixels. Le boitier est ce qu'il y a de plus parlant a
+     manipuler : on le rend aux telephones, et la tablette garde la video.
+     `Math.min` couvre les deux orientations : un telephone couche reste un
+     telephone. Un appareil declare faible (`sansGL`) garde la video lui aussi. */
+  var petitEcran = Math.min(innerWidth, innerHeight) <= 560;
+  if((TOUCH && !petitEcran) || sansGL || !window.THREE){
     try{ videoLeap(); }catch(eV){ console.warn('[leap57] video', eV && eV.message); }
     return;
   }
@@ -6222,9 +6232,32 @@ var VOICE = (function(){
     }
     resize();
     if(window.ResizeObserver) new ResizeObserver(function(){ askResize(resize); }).observe(cv);
-    if(RM || MOB){
+    if(RM){ frame(.016, 1.2); return; }
+    if(MOB){
+      /* Aucune boucle au repos — c'est ce qui rend la scene abordable sur un
+         telephone. Mais elle ne se redessinait qu'au `pointerdown` : le glisse
+         changeait l'angle sans que rien ne suive, exactement le defaut releve
+         sur la baie. On reveille le rendu pendant que le doigt est pose, et
+         neuf dixiemes de seconde apres l'avoir leve pour que l'amorti se pose. */
       frame(.016, 1.2);
-      if(MOB) cv.addEventListener('pointerdown', function(){ frame(.016, performance.now() / 1000); });
+      var tL = 1.2, jusquaL = 0, enCoursL = 0;
+      var tourneL = function(){
+        tL += .016; frame(.016, tL);
+        if(performance.now() < jusquaL) requestAnimationFrame(tourneL);
+        else enCoursL = 0;
+      };
+      var reveilleL = function(){
+        jusquaL = performance.now() + 900;
+        if(!enCoursL){ enCoursL = 1; requestAnimationFrame(tourneL); }
+      };
+      cv.addEventListener('pointerdown', reveilleL);
+      cv.addEventListener('pointermove', reveilleL);
+      addEventListener('pointerup', reveilleL);
+      /* les boutons de manipulation redessinent aussi */
+      ['[data-leap-side]', '[data-leap-zin]', '[data-leap-zout]', '[data-leap-fit]',
+       '[data-leap-ecl]', '[data-leap-anim]'].forEach(function(sel){
+        var el = qs(sel); if(el) el.addEventListener('click', reveilleL);
+      });
       return;
     }
     var api = { vis: false, warm: 0 };
