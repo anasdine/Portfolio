@@ -1788,34 +1788,33 @@ if(langBtn && langMenu && window.I18N){
       }
       /* la voix se tait pendant la bascule : plus de phrase coupée en deux langues */
       VOICE.stop();
-      /* le voile doit être PEINT avant que la réécriture ne bloque le fil.
-         Avec la transition, il n'arrivait qu'une fois le gel passé : on
-         voyait exactement ce qu'il était censé masquer. */
+      /* RECHARGEMENT PLUTOT QUE REECRITURE EN PLACE.
+         La bascule remplaçait les textes nœud par nœud dans un document déjà
+         monté. Tout ce qui avait été composé par du code — le manifeste
+         recomposé morceau par morceau, les libellés dessinés sur les toiles, les
+         chaînes fusionnées qui ne sont plus des clés — ne repassait pas par la
+         table : on se retrouvait avec du français et du japonais mêlés dans la
+         même page, et il fallait recharger à la main pour retrouver un état
+         propre. Le propriétaire l'a signalé, et il a raison : autant recharger.
+         La langue est déjà mémorisée dans localStorage par I18N.set et relue au
+         démarrage par detect(), donc le rechargement la conserve. Le navigateur
+         restitue aussi la position de défilement : on revient là où l'on était.
+         Le voile reste posé jusqu'au remplacement du document, pour qu'on ne
+         voie pas la page d'origine clignoter. */
+      /* net et tout de suite : avec sa transition de 200ms le voile n'aurait
+         ete qu'a moitie pose au moment du rechargement */
       veil.style.transition = 'none';
-      veil.style.opacity = '.42';
+      veil.style.opacity = '1';
       void veil.offsetWidth;
-      var leverVoile = function(){
-        veil.style.transition = 'opacity .25s ease';
-        veil.style.opacity = '0';
-      };
-      /* filet : si la bascule n'aboutit pas, le voile ne reste pas posé */
-      var secours = setTimeout(leverVoile, 2500);
-      /* deux images : la première fait le calcul de style, la seconde
-         garantit que le voile est à l'écran avant le blocage */
-      requestAnimationFrame(function(){
-        requestAnimationFrame(function(){
-          window.I18N.set(code, function(){
-            clearTimeout(secours);
-            /* les libellés traduits n'ont pas la longueur des français : les
-               repères de section et les épingles sont faux tant qu'on n'a pas
-               remesuré. Une seule fois, et derrière le voile. */
-            try{ measure(); }catch(e){}
-            try{ if(lenis && lenis.resize) lenis.resize(); }catch(e){}
-            try{ if(window.ScrollTrigger) window.ScrollTrigger.refresh(); }catch(e){}
-            leverVoile();
-          });
-        });
-      });
+      try{ localStorage.setItem('ad2026.lang', code); }catch(e){}
+      /* Recharger renvoie en haut de page : on perdrait sa place au milieu du
+         site, ce que la bascule en place, elle, conservait. On note la position
+         pour la rendre apres le rechargement. */
+      try{ sessionStorage.setItem('ad2026.retour', String(Math.round(window.pageYOffset || 0))); }catch(e){}
+      /* la langue du document tout de suite : le navigateur peut choisir sa
+         césure et sa police avant même le rechargement */
+      try{ doc.documentElement.lang = code; }catch(e){}
+      setTimeout(function(){ location.reload(); }, 90);
     };
     li.addEventListener('click', pick);
     li.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); pick(); } });
@@ -11121,6 +11120,24 @@ window.__ditAuDoigt.cache = function(){
   var b = qs('[data-dit-doigt]');
   if(b){ b.style.opacity = '0'; b.style.transform = b.style.top === '12px' ? 'translateY(-12px)' : 'translateY(12px)'; }
 };
+
+/* Retour a la position quittee lors d'un changement de langue. On attend que la
+   mise en page soit posee — polices, hauteur de la barre, ancrages — sinon la
+   cible ne veut plus rien dire. Le repere est consomme tout de suite : un
+   rechargement ordinaire ne doit pas etre deplace. */
+(function(){
+  var y = null;
+  try{ y = sessionStorage.getItem('ad2026.retour'); sessionStorage.removeItem('ad2026.retour'); }catch(e){}
+  if(!y) return;
+  y = parseInt(y, 10);
+  if(!(y > 200)) return;
+  var rendre = function(){
+    try{ window.scrollTo(0, y); }catch(e){}
+    try{ if(lenis && lenis.scrollTo) lenis.scrollTo(y, { immediate: true }); }catch(e){}
+  };
+  setTimeout(rendre, 900);
+  setTimeout(rendre, 2200);
+})();
 
 /* =============================================================
    JAUGE DE LA SECTION 02 — savoir où l'on en est
