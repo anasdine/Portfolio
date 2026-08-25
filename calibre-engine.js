@@ -11130,6 +11130,17 @@ window.__ditAuDoigt.cache = function(){
        simplement ignorée, on retombe sur l'état actuel, jamais pire. */
     '@media (max-width:720px){[data-wrap]:has(canvas[data-s2]){' +
       'min-height:max-content!important}}' +
+    /* La composition de la section 02 cale ses reperes verticaux en pixels
+       fixes — les utilisateurs a cy+74, leur libelle a cy+90 — alors que le
+       pied de page utilise `12 * SC()`, et que SC() = clamp(W/400, 1, 2.3)
+       est une echelle sur la LARGEUR. Verrouillee sur son ratio 702/396, la
+       toile ne fait que 198px de haut sur un telephone de 351px de large,
+       quand la composition en reclame ~280 : « 3 personnes a l'arret » (y=189)
+       tombait sur les indicateurs de pied (y=172 et 184), et le cycle de
+       sauvegarde par-dessus ceux de droite. Le module se remesure depuis son
+       rectangle (`W = r.width; H = r.height`), il suffit donc de lui donner
+       la hauteur qu'il lui faut. */
+    '@media (max-width:720px){canvas[data-s2]{min-height:288px!important}}' +
     /* Rien ne doit atterrir sous l'en-tête collant quand on suit une ancre ou
        qu'un champ prend le focus. La barre monte à ~110px sur téléphone. */
     '@media (max-width:540px){[id],[data-anchor-target],input,textarea,' +
