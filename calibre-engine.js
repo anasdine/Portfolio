@@ -14071,7 +14071,11 @@ function buildScene(){
     if(ARCH.length > 1 && net > .02){
       var dep = A + (B - A) * .26;
       var u5 = clamp((y - dep) / Math.max(1, B - dep), 0, .9999);
-      ecritArchi(Math.floor(u5 * ARCH.length));
+      /* une bascule qui echouerait ne doit pas emporter la boucle d image :
+         le fond garderait alors la derniere forme valide, ce qui se voit a
+         peine, la ou une exception arreterait tout le rendu de la page */
+      try{ ecritArchi(Math.floor(u5 * ARCH.length)); }
+      catch(eA){ if(!ecritArchi.__prevenu){ ecritArchi.__prevenu = 1; console.warn('[fond] bascule', eA && eA.message); } }
     }
     nU.uT.value = t; nU.uNet.value = net;
     sU.uT.value = t; sU.uNet.value = net;
