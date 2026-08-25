@@ -154,7 +154,11 @@ function CDPR(){
      effondrement à une quinzaine d'images par seconde. On borne donc par un
      BUDGET DE SURFACE, et seulement sur les appareils tactiles : un ordinateur
      de bureau a le processeur graphique qui va avec son écran. */
-  var max = t >= 2 ? 1 : (t === 1 ? 1.35 : 2);
+  /* Le palier ne fixe plus qu'un plafond grossier : c'est le budget de surface
+     ci-dessous qui tranche vraiment, et il connait la taille reelle de l'ecran
+     la ou le palier ne fait que la deviner. Un telephone de gamme moyenne y
+     gagne sa nettete sans que la tablette y perde sa fluidite. */
+  var max = t >= 2 ? 1 : (t === 1 ? 1.75 : 2);
   if(TOUCH){
     var cap = Math.sqrt(1900000 / Math.max(1, innerWidth * innerHeight));
     if(cap < max) max = Math.max(1, cap);
@@ -14314,8 +14318,14 @@ function probeTier(){
   if(cores <= 2) score += 3; else if(cores <= 4) score += 2; else if(cores <= 6) score += 1;
   if(mem && mem <= 2) score += 3; else if(mem && mem <= 4) score += 2;
   if(px > 4200000) score += 1;
-  if(TOUCH) score += 1;
-  if(innerWidth < 560) score += 1;
+  /* Le tactile et l'ecran etroit disaient LA MEME CHOSE — « c'est un
+     telephone » — et se cumulaient. Or en 2026 un telephone recent depasse
+     bien des ordinateurs portables : ces deux points, ajoutes a la penalite
+     de coeurs que Safari declenche en plafonnant hardwareConcurrency,
+     suffisaient a classer un iPhone en machine faible. Il y perdait deux
+     images sur trois et la moitie de sa definition, sans raison mesuree.
+     Un seul point desormais, et pour le format, pas pour la technique. */
+  if(TOUCH || innerWidth < 560) score += 1;
   /* le nom du pilote trahit les puces intégrées les plus faibles */
   try{
     var pc = doc.createElement('canvas');
