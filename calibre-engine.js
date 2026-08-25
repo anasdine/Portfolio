@@ -14466,6 +14466,29 @@ function buildScene(){
      ce qui est dessine. Un passage coute une quarantaine de noeuds et moins
      de cent aretes a recopier, soit une fraction de milliseconde, une fois
      par architecture — a comparer aux seize millisecondes d'une image. */
+  /* Ou se posent les glyphes pour une architecture donnee. Sorti de ecritArchi
+     pour pouvoir etre calcule sur DEUX architectures a la fois et fondu de
+     l une a l autre : le nuage est la vraie masse visible du fond, bien plus
+     que les quarante-trois noeuds. */
+  function cibles(nds, edg, oP, oV){
+    for(var i = 0, j; i < N; i++){
+      j = i * 3;
+      if(i % 4 === 3){                        /* un sur quatre se pose sur un noeud */
+        var nn = nds[i % nds.length];
+        oP[j] = nn[0] + (aR[j] - .5) * .42;
+        oP[j + 1] = nn[1] + (aR[j + 1] - .5) * .42;
+        oP[j + 2] = nn[2] + (aR[j + 2] - .5) * .42;
+        oV[j] = oV[j + 1] = oV[j + 2] = 0;
+      }else{                                  /* les autres courent le long d'une arete */
+        var ed = edg[i % edg.length], Aa = nds[ed[0]], Bb = nds[ed[1]];
+        if(!Aa || !Bb) continue;
+        oP[j] = Aa[0] + (aR[j] - .5) * .1;
+        oP[j + 1] = Aa[1] + (aR[j + 1] - .5) * .1;
+        oP[j + 2] = Aa[2] + (aR[j + 2] - .5) * .1;
+        oV[j] = Bb[0] - Aa[0]; oV[j + 1] = Bb[1] - Aa[1]; oV[j + 2] = Bb[2] - Aa[2];
+      }
+    }
+  }
   function ecritArchi(k){
     if(k === iArch || k < 0 || k >= ARCH.length) return;
     iArch = k;
@@ -14490,23 +14513,7 @@ function buildScene(){
        d'origine est remplace par un parcours regulier — a moins de cent
        aretes pour quelques centaines de glyphes, le hasard laissait une arete
        sur quatre vide en permanence, et la matrice avait des trous. */
-    for(i = 0; i < N; i++){
-      j = i * 3;
-      if(i % 4 === 3){                        /* un sur quatre se pose sur un noeud */
-        var nn = nds[i % nds.length];
-        p2[j] = nn[0] + (aR[j] - .5) * .42;
-        p2[j + 1] = nn[1] + (aR[j + 1] - .5) * .42;
-        p2[j + 2] = nn[2] + (aR[j + 2] - .5) * .42;
-        pv[j] = pv[j + 1] = pv[j + 2] = 0;
-      }else{                                  /* les autres courent le long d'une arete */
-        var ed = edg[i % edg.length], Aa = nds[ed[0]], Bb = nds[ed[1]];
-        if(!Aa || !Bb) continue;
-        p2[j] = Aa[0] + (aR[j] - .5) * .1;
-        p2[j + 1] = Aa[1] + (aR[j + 1] - .5) * .1;
-        p2[j + 2] = Aa[2] + (aR[j + 2] - .5) * .1;
-        pv[j] = Bb[0] - Aa[0]; pv[j + 1] = Bb[1] - Aa[1]; pv[j + 2] = Bb[2] - Aa[2];
-      }
-    }
+    cibles(nds, edg, p2, pv);
     geo.attributes.aP2.needsUpdate = true;
     geo.attributes.aEV.needsUpdate = true;
   }
@@ -14520,12 +14527,21 @@ function buildScene(){
      au moment ou il se voit le moins, et non en pleine forme etablie.
      Tampon prealloue : la boucle d image n alloue rien. */
   var melN = (function(){ var a = [], i; for(i = 0; i < NMAX; i++) a.push([0, 0, 0]); return a; })();
+  /* cibles des glyphes pour l architecture de depart et celle d arrivee. On les
+     calcule une fois par tranche, pas une fois par image. */
+  var glA = new Float32Array(N * 3), glB = new Float32Array(N * 3),
+      gvA = new Float32Array(N * 3), gvB = new Float32Array(N * 3), glPaire = -1;
   function fondArchi(k, b){
     var k2 = k + 1;
     if(!(b > .001) || k2 >= ARCH.length){ ecritArchi(k); return; }
-    /* la bascule seche — glyphes compris — se joue au creux du fondu */
+    /* la topologie bascule au creux du fondu ; le nuage, lui, ne bascule plus */
     var kt = b < .5 ? k : k2;
     if(kt !== iArch) ecritArchi(kt);
+    if(glPaire !== k){
+      cibles(ARCH[k].N, ARCH[k].E, glA, gvA);
+      cibles(ARCH[k2].N, ARCH[k2].E, glB, gvB);
+      glPaire = k;
+    }
     var Na = ARCH[k].N, Nb = ARCH[k2].N;
     var e = b * b * (3 - 2 * b), i, a1, b1, nn = Na.length > Nb.length ? Na.length : Nb.length;
     for(i = 0; i < NMAX; i++){
@@ -14545,6 +14561,17 @@ function buildScene(){
     sGeo.attributes.position.needsUpdate = true;
     sGeo.attributes.aE.needsUpdate = true;
     sGeo.attributes.aSd.needsUpdate = true;
+    /* et le nuage, qui est la vraie masse a l ecran : chaque glyphe glisse de sa
+       place dans l architecture de depart vers sa place dans la suivante. Il ne
+       change plus de cible d un coup pour y courir ensuite — il suit le
+       defilement. 420 glyphes au bureau, 170 sur mobile : le cout est nul. */
+    var m = N * 3;
+    for(i = 0; i < m; i++){
+      p2[i] = glA[i] + (glB[i] - glA[i]) * e;
+      pv[i] = gvA[i] + (gvB[i] - gvA[i]) * e;
+    }
+    geo.attributes.aP2.needsUpdate = true;
+    geo.attributes.aEV.needsUpdate = true;
   }
   /* la premiere architecture est deja en place : on force la repartition
      reguliere des glyphes, que le remplissage initial tirait au sort */
@@ -14612,10 +14639,11 @@ function buildScene(){
     var u5 = ARCH.length > 1 ? clamp((y - dep) / Math.max(1, B - dep), 0, .9999) : 0;
     if(ARCH.length > 1 && net > .02){
       /* le rang entier designe l architecture, la partie fractionnaire pilote le
-         fondu vers la suivante — sur le dernier tiers de la tranche seulement,
-         pour que chaque forme ait le temps d exister avant de se defaire */
+         fondu vers la suivante. La forme tient sur les quatre premiers dixiemes
+         de sa tranche, puis se transforme sans interruption jusqu a la suivante :
+         a aucun moment le fond ne « change », il se deplace avec le defilement. */
       var q5 = u5 * ARCH.length, k5 = Math.floor(q5);
-      var b5 = ss(q5 - k5, .62, .995);
+      var b5 = ss(q5 - k5, .40, .99);
       /* une bascule qui echouerait ne doit pas emporter la boucle d image :
          le fond garderait alors la derniere forme valide, ce qui se voit a
          peine, la ou une exception arreterait tout le rendu de la page */
