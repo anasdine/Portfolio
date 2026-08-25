@@ -156,11 +156,19 @@ dans `voir.js`). C'est la première chose à faire.
 2. **Compatibilité tout navigateur, tout téléphone** — demande explicite du
    propriétaire. Playwright a Chromium et WebKit en cache ; **Firefox est absent**,
    à télécharger. Couvrir aussi les petits écrans et les appareils modestes.
-3. **Les 13 mini-jeux** — une flotte de 16 agents a tourné
-   (`wf_53b977af-53d`, 13/16 rendus). Récupérer ses correctifs dans
-   `tasks/wriwxgooi.output` et les appliquer avec le script de vérification
-   stricte `scratchpad/appliquer-patchs.js` (fragment présent, **unique**, syntaxe
-   revalidée après chaque patch — 90/99 retenus la dernière fois).
+3. ~~Les 13 mini-jeux~~ — **fait**, commit `e1d1f80`. Treize agents ont relu un jeu
+   chacun, trois contrôleurs adversariaux ont rejeté 81 propositions sur 147, et
+   les 66 restantes ont passé la vérification stricte à **66 sur 66**.
+   Répartition : 27 bugs, 9 sur la jouabilité au doigt, 9 sur le coût de rendu,
+   8 sur la lisibilité de la règle, 7 sur le retour au joueur, 6 sur la difficulté.
+   Les plus graves : un trophée conditionné à la présence de l'assistante, donc
+   jamais décerné sur un écran sans 3D ; une série et un record qui traversaient
+   les parties ; ADA qui répondait à la place du joueur au bout de vingt-quatre
+   secondes de manche ; et le verdict après chaque réponse — la ligne la plus lue
+   du jeu — qui restait en français, sa clé étant collée au libellé avant d'être
+   cherchée.
+   **Reste à faire** : y jouer réellement, jeu par jeu, avec `voir.js`. Rien ne
+   remplace une partie pour juger d'une difficulté ou d'un retour.
 
 ### Priorité moyenne
 4. **Animations de chaque section** : tester, corriger, rafraîchir le visuel.
