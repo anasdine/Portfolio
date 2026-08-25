@@ -340,13 +340,31 @@ function bootLater(fn){
   BOOTQ.push(fn);
   if(bootRun) return;
   bootRun = true;
+  /* On avance d'un module par image pour ne pas figer la page. Mais
+     requestAnimationFrame est SUSPENDU dès que l'onglet passe en arrière-plan,
+     et changer d'application pendant le chargement est un réflexe courant au
+     téléphone : la file restait alors en plan, et les modules non atteints ne
+     s'affichaient jamais, même au retour. On repasse donc par un minuteur dès
+     que le document est caché — il continue de tourner, plus lentement, et la
+     file finit toujours par se vider. */
   var pump = function(){
     var job = BOOTQ.shift();
     if(job){ try{ job(); }catch(e){ console.warn('[init]', e && e.message); } }
-    if(BOOTQ.length) requestAnimationFrame(pump);
-    else bootRun = false;
+    if(!BOOTQ.length){ bootRun = false; return; }
+    if(doc.hidden) setTimeout(pump, 32); else requestAnimationFrame(pump);
   };
-  requestAnimationFrame(pump);
+  /* et si l'on revient au premier plan, on reprend le rythme rapide.
+     L'écouteur n'est posé qu'une fois : bootLater est appelée par chaque
+     module, et un écouteur par appel aurait fait tourner plusieurs pompes
+     sur la même file. */
+  bootLater.__pompe = pump;
+  if(!bootLater.__veille){
+    bootLater.__veille = 1;
+    doc.addEventListener('visibilitychange', function(){
+      if(!doc.hidden && bootRun && BOOTQ.length) requestAnimationFrame(bootLater.__pompe);
+    });
+  }
+  if(doc.hidden) setTimeout(pump, 32); else requestAnimationFrame(pump);
 }
 
 /* --- placement des bulles : une seule à la fois, jamais sur le texte.
