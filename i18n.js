@@ -862,7 +862,7 @@ var T = {
 'selon le besoin du client': ['depending on the client\'s need', 'je nach Kundenbedarf', 'secondo l\'esigenza del cliente', '依客户需求而定', 'حسب حاجة العميل', '顧客のニーズに応じて', 'je nach Kundenbedarf'],
 '# secondes pour classer': ['# seconds to sort', '# Sekunden zum Sortieren', '# secondi per smistare', '# 秒完成分类', '# ثانية للفرز', '# 秒で仕分け', '# Sekunden zum Sortieren'],
 'vol #D · flèches et espace': ['#D flight · arrows and space', '#D-Flug · Pfeile und Leertaste', 'volo #D · frecce e spazio', '#D 飞行 · 方向键和空格', 'طيران #D · الأسهم والمسافة', '#D飛行 · 矢印キーとスペース', '#D-Flug · Pfeile und Leertaste'],
-'ADA · cliquez un haut-parleur jaune': ['ADA · click a yellow speaker', 'ADA · gelben Lautsprecher anklicken', 'ADA · clicca un altoparlante giallo', 'ADA · 点击黄色的扬声器', 'ADA · انقر مكبّر صوت أصفر', 'ADA · 黄色いスピーカーをクリック', 'ADA · gelben Lautsprecher anklicken'],
+'ADA · cliquez une bulle jaune': ['ADA · click a yellow bubble', 'ADA · gelbe Sprechblase anklicken', 'ADA · clicca una nuvoletta gialla', 'ADA · 点击黄色气泡', 'ADA · انقر فقاعة صفراء', 'ADA · 黄色い吹き出しをクリック', 'ADA · gelbe Sprechblase anklicken'],
 'ADA · une question ? cliquez-moi': ['ADA · a question? click me', 'ADA · eine Frage? Klicken Sie mich an', 'ADA · una domanda? cliccami', 'ADA · 有问题？点击我', 'ADA · سؤال؟ انقر عليّ', 'ADA · 質問があればクリック', 'ADA · eine Frage? Klicken Sie mich'],
 'CE QU\'ON ME DEMANDE': ['WHAT I\'M ASKED FOR', 'WAS MAN VON MIR WILL', 'CIÒ CHE MI VIENE CHIESTO', '别人对我的要求', 'ما يُطلب مني', '私に求められること', 'WAS VON MIR VERLANGT WIRD'],
 'CŒUR RÉSEAU': ['NETWORK CORE', 'NETZWERKKERN', 'CUORE DI RETE', '网络核心', 'قلب الشبكة', 'ネットワークコア', 'NETZWERKKERN'],

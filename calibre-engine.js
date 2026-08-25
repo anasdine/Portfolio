@@ -539,7 +539,7 @@ window.setTR = setTR;
   /* tous les libellés dessinés sur les toiles du site : on les demande dès
      le changement de langue, pour qu'une animation atteinte en défilant
      soit déjà écrite dans la bonne langue au lieu de basculer sous les yeux */
-  var PRE = ["# ALERTES BRUTES","# cartes · # équipements","ADA · cliquez un haut-parleur jaune","ADA · je suis là pour vous guider","ADA · une question ? cliquez-moi","BAIE","BRUIT","CE QU'ON ME DEMANDE","CŒUR RÉSEAU","DISPONIBILITÉ","LES TÂCHES S'EXÉCUTENT","LES DONNÉES RESTENT ICI","HYPERVISEUR","LE MATÉRIEL TIENT","LE SOCLE QUE JE RÉUTILISE","ONDULEUR","PARE-FEU","RÉPARÉS","SAUVEGARDE","STOCKAGE","TICKETS OUVERTS","TOUT EST LISIBLE","TROIS AGENTS AU TRAVAIL — CLIQUEZ POUR PRIORISER","assemble","aucune panne — tout tourne","cause + action","force brute","hameçonnage","injection","je valide","le filtre corrèle, écarte, et ne garde que ce qui compte","longueur","ordre de remise en service","pare-feu","rançongiciel","scan de ports","temps de réaction sur alerte","À POSER"];
+  var PRE = ["# ALERTES BRUTES","# cartes · # équipements","ADA · cliquez une bulle jaune","ADA · je suis là pour vous guider","ADA · une question ? cliquez-moi","BAIE","BRUIT","CE QU'ON ME DEMANDE","CŒUR RÉSEAU","DISPONIBILITÉ","LES TÂCHES S'EXÉCUTENT","LES DONNÉES RESTENT ICI","HYPERVISEUR","LE MATÉRIEL TIENT","LE SOCLE QUE JE RÉUTILISE","ONDULEUR","PARE-FEU","RÉPARÉS","SAUVEGARDE","STOCKAGE","TICKETS OUVERTS","TOUT EST LISIBLE","TROIS AGENTS AU TRAVAIL — CLIQUEZ POUR PRIORISER","assemble","aucune panne — tout tourne","cause + action","force brute","hameçonnage","injection","je valide","le filtre corrèle, écarte, et ne garde que ce qui compte","longueur","ordre de remise en service","pare-feu","rançongiciel","scan de ports","temps de réaction sur alerte","À POSER"];
   var preFor = null;
   function prewarm(){
     var l = lang();
@@ -2958,15 +2958,12 @@ function buildParc(cv){
   }
   cv.addEventListener('pointerdown', function(e){
     var r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
-    /* le rond de filtrage : trois crans, du plus large au plus strict */
-    var gd = Math.hypot(x - G.gate.x, y - G.gate.y);
-    if(gd < G.gate.r * 2.4){
-      GM = (GM + 1) % MODES.length;
-      gmFlash = 1; gateFlash = 1;
-      for(var d2 = 0; d2 < 12; d2++) dust.push({ x: G.gate.x, y: G.gate.y,
-        vx: (Math.random() - .5) * 3.4, vy: (Math.random() - .5) * 3.4, a: 1 });
-      return;
-    }
+    /* Ici se trouvait un bloc « rond de filtrage » recopié du module voisin. Il
+       appelait G, GM, MODES, dust, gmFlash et gateFlash — dont AUCUNE n'existe
+       dans buildParc(), qui ne déclare que RK, alert, U et NAMES. Chaque appui
+       sur le mur de baies levait donc « ReferenceError: Can't find variable: G »
+       avant d'atteindre la sélection, et le rack était inerte. Le parc n'a pas
+       de rond de filtrage : le bloc est retiré, pas rafistolé. */
     for(var i = 0; i < RK.length; i++){
       var R2 = RK[i];
       if(x < R2.x - 3 || x > R2.x + R2.w + 3) continue;
@@ -10019,7 +10016,7 @@ var VOICE = (function(){
   var dSay = { t: 0, txt: '' }, dAcc = 0;
   /* le rappel : il tourne, pour qu'on finisse par le lire */
   var TAGS = [
-    'ADA · cliquez un haut-parleur jaune',
+    'ADA · cliquez une bulle jaune',
     'ADA · une question ? cliquez-moi',
     'ADA · je suis là pour vous guider'
   ];
@@ -10942,19 +10939,31 @@ var VOICE = (function(){
      sinon le point tombe au milieu d'une ligne et se lit comme une coquille */
   var TEXTY = { H1:1, H2:1, H3:1, H4:1, P:1, SPAN:1, LI:1, STRONG:1, EM:1, A:1 };
   list.forEach(function(el){
-    var host = el.tagName === 'CANVAS' ? (el.parentElement || el) : el;
+    /* Un élément remplacé ne rend pas ses enfants : un repère posé dans un
+       <video> ou une <img> existe dans le DOM mais mesure 0×0 et ne peut pas
+       être touché. Le cas était traité pour <canvas> seulement — d'où le repère
+       muet de la vidéo LEAP57. On loge le repère chez le parent. */
+    var REMPLACE = { CANVAS: 1, VIDEO: 1, IMG: 1, IFRAME: 1, SVG: 1 };
+    var host = REMPLACE[el.tagName] ? (el.parentElement || el) : el;
     var cs = getComputedStyle(host);
     if(cs.position === 'static') host.style.position = 'relative';
     var inText = !!TEXTY[el.tagName];
     var d = doc.createElement('span');
     d.setAttribute('aria-hidden', 'true');
+    /* UNE BULLE, PAS UN HAUT-PARLEUR. Le pictogramme promettait du son, et le
+       son ne sort pas toujours : sur iPhone la synthèse exige un geste direct,
+       et le téléphone peut être en silencieux. Le repère annonce désormais ce
+       qu'il tient dans tous les cas — une explication écrite — la lecture à voix
+       haute n'étant qu'un supplément quand l'appareil sait la produire. Plus
+       rien à filtrer selon les appareils. */
     d.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" style="display:block">' +
       '<circle cx="12" cy="12" r="11.4" fill="#FFC53D"/>' +
-      /* le pavillon : un bloc et son cône, bien lisibles à petite taille */
-      '<path d="M6.6 9.9h2.3L12.6 7v10L8.9 14.1H6.6z" fill="#0A0C0E"/>' +
-      /* deux ondes qui sortent : le son se voit */
-      '<path d="M15 9.6a3.6 3.6 0 0 1 0 4.8" stroke="#0A0C0E" stroke-width="1.7" fill="none" stroke-linecap="round"/>' +
-      '<path d="M17.4 7.6a7 7 0 0 1 0 8.8" stroke="#0A0C0E" stroke-width="1.5" fill="none" stroke-linecap="round" opacity=".72"/>' +
+      /* la bulle et sa pointe, pleines : à 18px seul un aplat reste lisible */
+      '<path d="M6.1 6.6h11.8c1 0 1.8.8 1.8 1.8v5.4c0 1-.8 1.8-1.8 1.8h-5.3L8.6 18.4v-2.8H6.1c-1 0-1.8-.8-1.8-1.8V8.4c0-1 .8-1.8 1.8-1.8z" fill="#0A0C0E"/>' +
+      /* trois points : on lit « il y a quelque chose à dire » d'un coup d'œil */
+      '<circle cx="8.4" cy="11.1" r="1.15" fill="#FFC53D"/>' +
+      '<circle cx="12" cy="11.1" r="1.15" fill="#FFC53D"/>' +
+      '<circle cx="15.6" cy="11.1" r="1.15" fill="#FFC53D"/>' +
       '</svg>';
     d.setAttribute('data-explain-dot', '1');
     /* le repère d'un texte se pose dans la gouttière de gauche. Sur un écran
@@ -10997,7 +11006,41 @@ var VOICE = (function(){
       d.style.animation = 'calBlink 2.6s steps(1,end) infinite';
     });
   });
-  /* aucune annonce spontanée : le haut-parleur jaune se comprend seul, et
+  /* Un repère posé au coin haut-droit d'un bloc situé tout en haut de la page
+     tombe SOUS l'en-tête fixe — mesuré à y=62 pour une barre haute de 113px sur
+     téléphone. Comme le bloc est dans le héros, il n'y a aucune position de
+     défilement où le repère se dégage : il était inatteignable en permanence.
+     On le redescend juste sous la barre, et on refait le calcul au redimension-
+     nement, la hauteur de l'en-tête changeant avec la largeur. */
+  function degageEntete(){
+    /* On ne MESURE pas la barre : pendant le chargement des polices elle passe
+       par 56, puis 83, puis 113px, et toute passe déclenchée sur un état
+       intermédiaire laissait le repère à mi-chemin — mesuré, il restait à y=91
+       sous une barre de 113. Les seuils sont les nôtres, on les prend tels
+       quels : la valeur ne dépend plus de l'instant où la passe tourne. */
+    var hb = innerWidth <= 540 ? 124 : 76;
+    qsa('[data-explain-dot]').forEach(function(d){
+      /* `__inText` est posé sur l'élément expliqué, pas sur le repère ; et un
+         repère de texte porte un `top` en em, que parseFloat corromprait. */
+      if(d.__src && d.__src.__inText) return;
+      if(!/px$/.test(d.style.top || '')) return;
+      if(d.__decale === undefined) d.__decale = parseFloat(d.style.top) || 0;
+      d.style.top = d.__decale + 'px';
+      var t = d.getBoundingClientRect().top;
+      if(t < hb + 8) d.style.top = (d.__decale + (hb + 8 - t)) + 'px';
+    });
+  }
+  /* Cette passe tourne à la création des repères, or la feuille qui porte la
+     barre à 113px sur téléphone est injectée plus loin dans ce fichier, et la
+     barre traverse plusieurs hauteurs pendant le chargement des polices — j'ai
+     mesuré 56, puis 83, puis 113. Des minuteurs fixes attrapaient un état
+     intermédiaire et le repère restait sous la barre. On observe donc la barre
+     elle-même : chaque fois que sa hauteur change, on refait le calcul. */
+  degageEntete();
+  if(doc.fonts && doc.fonts.ready) doc.fonts.ready.then(degageEntete);
+  addEventListener('load', degageEntete);
+  addEventListener('resize', function(){ askResize(degageEntete); }, { passive: true });
+  /* aucune annonce spontanée : le repère jaune se comprend seul, et
      rien ne doit interrompre la lecture */
 })();
 
