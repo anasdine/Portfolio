@@ -3488,9 +3488,13 @@ var VOICE = (function(){
   function stop(){
     run = false; clearInterval(iv); iv = null;
     clearInterval(coach); coach = null;
+    /* le trophée était accroché à l'assistante : sans elle — écran sans 3D,
+       balise absente, exception plus haut — la manche gagnée ne comptait pas,
+       alors que la page promet une formation contre trois épreuves. Les douze
+       autres jeux l'accordent sans condition. */
+    if(score >= 14) try{ TROPHY.win('g1'); }catch(err){}
     if(ADA.ready){
       ADA.release(alertEl);
-      if(score >= 14) TROPHY.win('g1');
       ADA.say(score >= 14 ? 'Tri juste. C\'est exactement ce que Leonhard automatise.'
                           : 'Le tri prend du temps, et il se fait à chaud. D\'où l\'outil.', 5000);
     }
@@ -3507,6 +3511,12 @@ var VOICE = (function(){
   }
   function answer(k){
     if(!run || !cur) return;
+    /* les deux horloges d'assistance ne repartaient jamais de zéro : au clavier
+       rien ne les touchait, et celle du relais montait pendant toute la manche.
+       ADA soufflait la réponse, puis jouait à la place d'un joueur qui n'avait
+       pas bloqué une seconde. Répondre les remet à zéro, quel que soit le
+       moyen — doigt, souris ou touche. */
+    idle = 0; helped = 0;
     var ok = k === cur[1];
     /* la série : trois bonnes réponses d'affilée et les points doublent —
        c'est le rythme du tri qui compte, pas le coup de chance */
@@ -3518,13 +3528,28 @@ var VOICE = (function(){
     scoreEl.textContent = score + (mult > 1 ? ' ×' + mult : '');
     /* la raison, toujours : c'est elle qui apprend quelque chose */
     var pourquoi = cur[3] ? ' · ' + TR(cur[3]) : '';
-    verdict.textContent = (ok ? '✓ ' + LBL[cur[1]] : '✗ c\'était ' + LBL[cur[1]]) + pourquoi;
+    /* « ✗ c'était » est dans la table, mais collé au libellé avant d'être écrit
+       il n'était jamais cherché : la ligne la plus lue du jeu restait en
+       français dans les sept autres langues */
+    verdict.textContent = (ok ? '✓ ' + LBL[cur[1]] : TR('✗ c\'était') + ' ' + LBL[cur[1]]) + pourquoi;
     verdict.style.color = ok ? '#048B9A' : '#FF5C4D';
     var btn = keys[k];
     if(btn && !RM) g.fromTo(btn, { scale: .94 }, { scale: 1, duration: .3, ease: 'back.out(3)' });
+    /* la ligne de verdict est en corps dix et l'alerte suivante a déjà pris la
+       place : au téléphone, personne ne lit quelle touche il fallait presser.
+       Elle se signale donc elle-même quand on s'est trompé. */
+    var vrai = keys[cur[1]];
+    if(!ok && vrai && !RM) g.fromTo(vrai, { scale: 1.14 }, { scale: 1, duration: .5, ease: 'back.out(3)' });
     pick();
   }
-  keys.forEach(function(b){ b.addEventListener('click', function(){ idle = 0; answer(parseInt(b.getAttribute('data-g1-key'), 10)); }); });
+  /* sur iOS deux tapes rapprochées valent un agrandissement : dans une manche
+     de quarante secondes on tape vite, et la carte partait en zoom au lieu de
+     trier. La propriété se pose sur les quatre touches, le gabarit de la page
+     n'est pas touché. */
+  keys.forEach(function(b){
+    b.style.touchAction = 'manipulation';
+    b.addEventListener('click', function(){ idle = 0; answer(parseInt(b.getAttribute('data-g1-key'), 10)); });
+  });
   /* elle regarde par-dessus votre épaule : un indice si vous bloquez,
      et elle prend un tour toutes les huit secondes pour vous soulager */
   function tick1(){
@@ -3536,7 +3561,11 @@ var VOICE = (function(){
         : cur[1] === 1 ? 'Personne n\'est bloqué, mais ça va empirer. P2.'
         : cur[1] === 2 ? 'Une personne gênée, rien d\'urgent. P3.'
         : 'Aucune action attendue : c\'est du bruit.';
-      ADA.say('Indice — ' + hintTxt, 3600);
+      /* les quatre indices sont rangés tels quels dans la table ; le préfixe
+         collé devant les rendait introuvables, et l'indice sortait en français
+         partout ailleurs qu'en France. Seule, la phrase est retrouvée et son
+         numéro de priorité remis en place. */
+      ADA.say(hintTxt, 3600);
       return;
     }
     /* elle ne prend un tour que si vous restez vraiment bloqué : c'est vous
@@ -3544,7 +3573,10 @@ var VOICE = (function(){
     if(helped > 24 && Math.random() < .06 && cur){
       helped = 0;
       var k = cur[1];
-      ADA.say('J\'en prends une : ' + LBL[k] + '. À vous.', 3200);
+      /* même assemblage que l'indice, même conséquence : les deux moitiés sont
+         dans la table, la phrase entière non — le libellé de priorité tombe au
+         milieu. On traduit chaque moitié avant de coller. */
+      ADA.say(TR('J\'en prends une :') + ' ' + LBL[k] + '. ' + TR('À vous.'), 3200);
       answer(k);
       return;
     }
@@ -3556,10 +3588,16 @@ var VOICE = (function(){
     if(m[e.key] !== undefined){ e.preventDefault(); answer(m[e.key]); }
   });
   startBtn.addEventListener('click', function(){
-    score = 0; left = 40; run = true; pool = [];
+    /* la série et son record traversaient la partie : on repartait avec le
+       multiplicateur gagné à la manche d'avant, et le bilan annonçait un
+       record qui n'appartenait pas à celle qu'on venait de jouer */
+    score = 0; left = 40; run = true; pool = []; serie = 0; meilleure = 0;
     scoreEl.textContent = '0'; timeEl.textContent = '40 s';
     startBtn.textContent = TR('EN COURS');
-    verdict.textContent = TR('Priorité 1 = production arrêtée · Bruit = aucune action attendue.');
+    /* la table range cette consigne avec un « # » à la place du chiffre : le
+       « 1 » écrit en clair ne trouvait aucune clé, et la seule phrase qui
+       explique la règle partait en traduction automatique */
+    verdict.textContent = TR('Priorité # = production arrêtée · Bruit = aucune action attendue.').replace('#', '1');
     verdict.style.color = '#56606A';
     pick();
     idle = 0; helped = 0;
@@ -3573,6 +3611,9 @@ var VOICE = (function(){
     clearInterval(coach);
     coach = setInterval(tick1, 500);
     iv = setInterval(function(){
+      /* l'onglet passé à l'arrière-plan brûlait la manche : on revenait sur un
+         « Terminé » qu'on n'avait pas joué. Le sablier attend le retour. */
+      if(doc.hidden) return;
       left--; timeEl.textContent = left + ' s';
       if(left <= 0) stop();
     }, 1000);
@@ -3582,6 +3623,10 @@ var VOICE = (function(){
 (function(){ /* JEU 02 — PARE-FEU */
   var cv = qs('[data-g2]'); if(!cv) return;
   var c2 = cv.getContext('2d'); if(!c2) return;
+  /* seule toile de jeu sans touch-action : sur iPhone, taper vite sur la grille
+     déclenchait le zoom du double-tap au lieu de bloquer un paquet.
+     « manipulation » suffit ici — la page continue de défiler sous le doigt. */
+  cv.style.touchAction = 'manipulation';
   var scoreEl = qs('[data-g2-score]'), timeEl = qs('[data-g2-time]'), startBtn = qs('[data-g2-start]'), hint = qs('[data-g2-hint]');
   var PORTS = ['22','80','443','445','3389','53','25','8080','1433','161','389','5900'];
   var DPR2 = CDPR(), W = 0, H = 0, COLS = 4, ROWS = 3, cells = [];
@@ -3596,10 +3641,15 @@ var VOICE = (function(){
     c2.textBaseline = 'middle';
     var pad = 12, gx = 7;
     var cw = (W - pad * 2 - gx * (COLS - 1)) / COLS, ch = (H - pad * 2 - gx * (ROWS - 1)) / ROWS;
-    cells = [];
+    /* la barre d'adresse d'un téléphone se replie au défilement : la toile est
+       remesurée en pleine partie. Reconstruire les cases effaçait les paquets
+       en vol — on ne fait que les replacer. */
+    var n = 0;
     for(var r2 = 0; r2 < ROWS; r2++) for(var c = 0; c < COLS; c++){
-      cells.push({ x: pad + c * (cw + gx), y: pad + r2 * (ch + gx), w: cw, h: ch,
-        port: PORTS[(r2 * COLS + c) % PORTS.length], state: 0, life: 0, flash: 0 });
+      var b0 = cells[n];
+      if(!b0){ b0 = { port: PORTS[n % PORTS.length], state: 0, life: 0, flash: 0 }; cells.push(b0); }
+      b0.x = pad + c * (cw + gx); b0.y = pad + r2 * (ch + gx); b0.w = cw; b0.h = ch;
+      n++;
     }
   }
   function draw(t){
@@ -3647,7 +3697,11 @@ var VOICE = (function(){
       if(!b.state) continue;
       b.life -= dt / (b.state === 2 ? 1.25 : 1.6);
       if(b.life <= 0){
-        if(b.state === 2){ leaks++; b.flash = 1; b.ok = false; if(hint) hint.textContent = leaks + ' fuite' + (leaks > 1 ? 's' : '') + ' — un paquet hostile est passé'; }
+        /* phrase assemblée à la main : aucune clé ne pouvait lui correspondre et
+           elle restait française partout ailleurs. Et une fuite silencieuse
+           passe inaperçue quand on surveille l'autre moitié du mur. */
+        if(b.state === 2){ leaks++; b.flash = 1; b.ok = false; SFX.bad();
+          if(hint) hint.textContent = TR(leaks > 1 ? '# fuites — un paquet hostile est passé' : '# fuite — un paquet hostile est passé').replace('#', leaks); }
         b.state = 0;
       }
     }
@@ -3691,9 +3745,11 @@ var VOICE = (function(){
     for(var i = 0; i < cells.length; i++){
       var b = cells[i];
       if(x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h){
-        if(b.state === 2){ score++; b.flash = 1; b.ok = true; if(hint) hint.textContent = TR('bloqué sur :') + b.port; if(ADA.ready && score === 5) ADA.say('Bon rythme. Je continue sur la droite.', 3000); }
-        else if(b.state === 1){ score--; b.flash = 1; b.ok = false; if(hint) hint.textContent = TR('faux positif — vous avez coupé du trafic légitime'); }
-        else { score--; b.flash = .6; b.ok = false; if(hint) hint.textContent = TR('port fermé pour rien'); }
+        if(b.state === 2){ score++; b.flash = 1; b.ok = true; SFX.ok(); if(hint) hint.textContent = TR('bloqué sur :') + b.port; if(ADA.ready && score === 5) ADA.say('Bon rythme. Je continue sur la droite.', 3000); }
+        else if(b.state === 1){ score = Math.max(0, score - 1); b.flash = 1; b.ok = false; SFX.bad(); if(hint) hint.textContent = TR('faux positif — vous avez coupé du trafic légitime'); }
+        /* au doigt, le paquet s'éteint souvent pendant que la main descend :
+           sanctionner la case vide faisait passer le jeu pour cassé */
+        else { b.flash = .6; b.ok = false; SFX.clic(); if(hint) hint.textContent = TR('port fermé pour rien'); }
         b.state = 0;
         scoreEl.textContent = score;
         return;
@@ -3701,11 +3757,14 @@ var VOICE = (function(){
     }
   });
   startBtn.addEventListener('click', function(){
+    /* le bouton reste sous le doigt pendant toute la partie : une deuxième
+       tape remettait le score à zéro sans prévenir */
+    if(run) return;
     run = true; score = 0; leaks = 0; left = 40; spawnT = .2;
-    cells.forEach(function(b){ b.state = 0; b.flash = 0; });
+    cells.forEach(function(b){ b.state = 0; b.flash = 0; b.life = 0; b.ok = false; b.byAda = 0; });
     scoreEl.textContent = '0'; timeEl.textContent = '40 s';
     startBtn.textContent = TR('EN COURS');
-    if(hint) hint.textContent = TR('rouge = à bloquer · cyan = à laisser passer');
+    if(hint){ hint.style.color = '#39424A'; hint.textContent = TR('rouge = à bloquer · cyan = à laisser passer'); }
     aCell = -1; aLock = 0; said = 0; aT = 0;
     if(ADA.ready){ ADA.focus(cv); ADA.say('On se partage le mur : vous à gauche, moi à droite.', 4600); }
     clearInterval(iv);
@@ -3715,10 +3774,20 @@ var VOICE = (function(){
         if(ADA.ready){ ADA.release(cv); ADA.say(leaks ? 'Trois secondes de retard et ça passe. C\'est pour ça qu\'on automatise.' : 'Mur tenu. À deux, c\'est plus simple.', 4600); }
         clearInterval(iv); iv = null; run = false;
         setTR(startBtn, 'REJOUER');
+        /* les paquets encore en vol continuaient de vieillir après la fin : une
+           fuite s'ajoutait au récapitulatif une seconde après son écriture */
+        for(var ci = 0; ci < cells.length; ci++){ cells[ci].state = 0; cells[ci].life = 0; }
+        aCell = -1;
+        var tenu = score >= 12 && leaks <= 5;
         /* gabarit à trou : les deux nombres reprennent leur place après la
            traduction, la phrase entière devient une clé possible */
-        if(hint) hint.textContent = TR('# bloqués, # fuites — c\'est exactement ce que le filtre automatise')
-          .replace('#', score).replace('#', leaks);
+        if(hint){
+          /* la couleur dit ce que les deux nombres ne disaient pas : tenu, ou non */
+          hint.style.color = tenu ? '#048B9A' : '#F5A524';
+          hint.textContent = TR('# bloqués, # fuites — c\'est exactement ce que le filtre automatise')
+            .replace('#', score).replace('#', leaks);
+        }
+        if(tenu) TROPHY.win('g2');
       }
     }, 1000);
   });
@@ -3726,7 +3795,9 @@ var VOICE = (function(){
   if(window.ResizeObserver) new ResizeObserver(function(){ askResize(layout); }).observe(cv);
   if(RM){ draw(0); return; }
   var api = { vis: false };
-  api.frame = function(dt, t){ if(!api.vis && !run) return; step(dt); draw(t); };
+  /* hors écran, la partie continue de compter — le temps ne s'arrête pas — mais
+     la peinture ne sert à personne : douze cases repeintes par image pour rien */
+  api.frame = function(dt, t){ if(!api.vis && !run) return; step(dt); if(api.vis) draw(t); };
   PIPES.push(api);
   if(window.IntersectionObserver){
     new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; }, { rootMargin: '80px' }).observe(cv);
@@ -3737,10 +3808,17 @@ var VOICE = (function(){
   var cv = qs('[data-g3]'); if(!cv) return;
   var c2 = cv.getContext('2d'); if(!c2) return;
   var newBtn = qs('[data-g3-new]'), mvEl = qs('[data-g3-moves]'), stEl = qs('[data-g3-state]'), lvEl = qs('[data-g3-level]');
-  var DPR2 = 1, W = 0, H = 0;
+  /* la toile était la seule du moteur rendue à 1× : sur un écran à deux points
+     par pixel, les montants d'un pixel et les étiquettes de 7 px sortaient
+     floues. CDPR borne déjà la surface sur tablette, on lui laisse la mesure. */
+  var DPR2 = CDPR(), W = 0, H = 0;
   var CY = '#048B9A', RD = '#FF5C4D', AM = '#F5A524', IV = '#E4E8EA', DM = '#39424A', GRN = '#50C878', BL = '#4169E1';
   var U = 14, level = 1, placed = 0, done = false, drag = null, flash = 0, msg = '', score = 0;
-  var pwrCap = 3200, coolCap = 100, hint = -1, hintT = 0, shake = 0;
+  /* la baie complete dissipe 102 : avec une capacite de 100, le montage juste
+     declenchait « la ventilation sature », coutait 30 points et privait du
+     bonus, alors qu aucun autre placement n est accepte. La capacite couvre le
+     nominal, la jauge se lit a 85 %. */
+  var pwrCap = 3200, coolCap = 120, hint = -1, hintT = 0, shake = 0;
   /* ADA au montage : elle conseille l'ordre, et pose une unité si ça traîne */
   var aIdle = 0, aCoach = null, aDone = 0;
 
@@ -3779,14 +3857,13 @@ var VOICE = (function(){
   /* ADA au montage : poser une unité comme le ferait le visiteur */
   function autoPlace(it){
     if(!it || it.ok) return false;
+    /* jamais la derniere : le bilan, le bonus et le niveau suivant sont câblés
+       sur le dépôt du visiteur. Une baie terminée par ADA restait figée sur un
+       écran de victoire sans bonus, sans suite et sans rendre la main. */
+    if(placed >= LIB.length - 1) return false;
     it.ok = true; seat(it);
-    placed++; flash = 1; score += 100; msg = 'ADA : ' + it.def.why;
+    placed++; flash = 1; if(!it.paid){ it.paid = 1; score += 100; } msg = 'ADA : ' + it.def.why;
     if(mvEl) mvEl.textContent = placed + ' / ' + LIB.length;
-    if(placed === LIB.length){
-      done = true;
-      clearInterval(aCoach); aCoach = null;
-      if(stEl){ stEl.textContent = TR('baie complète'); stEl.style.color = '#50C878'; }
-    }
     return true;
   }
   function seat(it){
@@ -3833,14 +3910,19 @@ var VOICE = (function(){
   }
   /* --- bilans en direct --- */
   function tally(){
-    var w = 0, p = 0, c = 0, top = 0, n = 0;
+    var w = 0, p = 0, c = 0, mom = 0, n = 0;
     items.forEach(function(it){
       if(!it.ok) return;
       n++; w += it.def.w; p += it.def.p; c += it.def.c;
-      /* poids installé au-dessus de la moitié haute : pénalise la stabilité */
-      if(it.def.u < U * .45) top += it.def.w;
+      /* moment du poids : U01 est en haut de la baie, plus l appareil est bas
+         dans les montants, plus il fait descendre le centre de gravite */
+      mom += it.def.w * (it.def.u + it.def.h * .5);
     });
-    return { w: w, p: p, c: c, top: top, n: n, stab: w ? 1 - top / w : 1 };
+    /* l ancienne mesure comptait le poids « en haut » et plafonnait a 59 % :
+       la baie montee exactement comme demandé s affichait en ROUGE et perdait
+       81 points de bonus. On rapporte le centre de gravité au milieu de la
+       baie, un montage juste atteint le plafond. */
+    return { w: w, p: p, c: c, mom: mom, n: n, stab: w ? clamp(mom / w / (U * .55), 0, 1) : 1 };
   }
   function slotAt(y){ return clamp(Math.floor((y - G.ry) / G.u), 0, U - 1); }
   function freeAt(u, h, self){
@@ -3854,6 +3936,10 @@ var VOICE = (function(){
   }
 
   function draw(t){
+    /* les fondus étaient décomptés par image : à quinze images par seconde sur
+       tablette une secousse durait quatre fois plus longtemps qu'au bureau, et
+       moitié moins sur un écran à 120 Hz. On décompte sur le baromètre. */
+    var d = clamp(PERF.avg, .008, .05);
     if(!G.u) layout();
     c2.fillStyle = '#0B0E11'; c2.fillRect(0, 0, W, H);
     var T2 = tally();
@@ -3943,7 +4029,7 @@ var VOICE = (function(){
       while(c2.measureText(mm).width > W - 20 && mm.length > 4) mm = mm.slice(0, -1);
       c2.fillText(mm, 10, H - 12);
     }
-    flash = Math.max(0, flash - .02);
+    flash = Math.max(0, flash - d * 1.2);
     if(done){
       c2.fillStyle = 'rgba(92,225,166,.1)'; c2.fillRect(0, 0, W, H);
       c2.font = '600 11px "IBM Plex Mono", ui-monospace, monospace';
@@ -4014,8 +4100,13 @@ var VOICE = (function(){
       msg = 'retiré : ' + it.def.n;
       return;
     }
-    drag = it; it.ox = x - it.x; it.oy = y - it.y;
+    drag = it;
     it.w = G.rw - 2; it.h = G.u * it.def.h - 2;
+    /* la réserve est bien plus large que la baie : la prise doit être ramenée
+       dans la nouvelle taille, sinon l'appareil saisi par sa droite s'affiche
+       entièrement à côté du doigt et n'atteint plus jamais les montants */
+    it.ox = clamp(x - it.x, 6, Math.max(6, it.w - 6));
+    it.oy = clamp(y - it.y, 3, Math.max(3, it.h - 3));
     hint = LIB.indexOf(it.def); hintT = 1.1;
     if(cv.setPointerCapture) try{ cv.setPointerCapture(e.pointerId); }catch(err){}
   });
@@ -4032,6 +4123,12 @@ var VOICE = (function(){
     drag.y = e.clientY - r.top - drag.oy;
   });
   cv.addEventListener('pointerleave', function(){ if(!drag) cv.style.cursor = 'default'; });
+  /* un geste système, un appel, un défilement : le pointeur est annulé sans
+     « up ». L'appareil restait collé et suivait le contact suivant. */
+  cv.addEventListener('pointercancel', function(){
+    if(!drag) return;
+    var it = drag; drag = null; park(it); cv.style.cursor = 'default';
+  });
   cv.addEventListener('pointerup', function(){
     cv.style.cursor = 'default';
     if(!drag) return;
@@ -4047,7 +4144,9 @@ var VOICE = (function(){
     }
     it.ok = true; seat(it);
     aIdle = 0;
-    placed++; flash = 1; score += 100; msg = it.def.why;
+    /* les points ne sont dus qu a la premiere pose : reprendre une unite posée
+       puis la reposer permettait de gonfler le score autant qu on voulait */
+    placed++; flash = 1; if(!it.paid){ it.paid = 1; score += 100; } msg = it.def.why;
     if(mvEl) mvEl.textContent = placed + ' / ' + LIB.length;
     var T2 = tally();
     if(T2.p > pwrCap){ msg = 'attention : ' + T2.p + ' W pour ' + pwrCap + ' W disponibles'; score -= 30; }
@@ -4070,10 +4169,18 @@ var VOICE = (function(){
       }, 2600);
     }
   });
-  if(newBtn) newBtn.addEventListener('click', function(){ reset(); });
+  if(newBtn) newBtn.addEventListener('click', function(){ reset(); draw(0); });
   reset(); draw(0);
   if(window.ResizeObserver) new ResizeObserver(function(){ layout(); draw(0); }).observe(cv);
-  if(RM) return;
+  if(RM){
+    /* mouvement réduit : aucune boucle ne tourne, la toile ne se repeignait
+       donc jamais pendant le glissé et le jeu paraissait mort. On repeint sur
+       le geste — cela ne rajoute aucune animation. */
+    ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'].forEach(function(ev){
+      cv.addEventListener(ev, function(){ draw(0); });
+    });
+    return;
+  }
   var api = { vis: true };
   api.frame = function(dt, t){ if(!api.vis) return; draw(t); };
   PIPES.push(api);
@@ -4092,7 +4199,7 @@ var VOICE = (function(){
   var LOW = BOOT_TIER >= 2;
   var CY = 0x048B9A, RD = 0xFF5C4D, AM = 0xF5A524, IV = 0xE4E8EA, VI = 0x4169E1;
   var R = 3.5;                       /* rayon du corridor */
-  var built = false, run = false, over = false, api = null;
+  var built = false, run = false, over = false, paused = false, api = null;
   var rnd, scene, cam, ship, hull3, tunnel = [], stars, dust;
   var foes = [], loot = [], shots = [], deb = [], rings = [];
   var keys = {}, aim = null, aimY = null, firing = false, touch = null;
@@ -4251,11 +4358,15 @@ var VOICE = (function(){
 
   function build(){
     if(built) return true;
+    /* la scène se monte après le démarrage : le palier est enfin connu */
+    LOW = (typeof BOOT_TIER === 'number' ? BOOT_TIER : 0) >= 2;
     try{
       rnd = keepGL(new T.WebGLRenderer({ canvas: cv, antialias: !LOW, alpha: false, powerPreference: LOW ? 'low-power' : 'high-performance' }));
     }catch(e){ return false; }
     if(!rnd.getContext()) return false;
-    rnd.setPixelRatio(Math.min(LOW ? 1 : 2, devicePixelRatio || 1));
+    /* la densité commune borne la surface sur tablette, ce que le calcul local
+       ne faisait pas : d'où l'effondrement de la cadence sur iPad */
+    rnd.setPixelRatio(CDPR());
     rnd.toneMapping = T.ACESFilmicToneMapping;
     rnd.toneMappingExposure = 1.15;
     if('outputEncoding' in rnd && T.sRGBEncoding !== undefined) rnd.outputEncoding = T.sRGBEncoding;
@@ -4339,16 +4450,21 @@ var VOICE = (function(){
     if(!built) return;
     var r = cv.getBoundingClientRect();
     if(r.width < 2 || r.height < 2) return;
-    rnd.setPixelRatio(Math.min(LOW ? 1 : 2, devicePixelRatio || 1));
+    rnd.setPixelRatio(CDPR());
     rnd.setSize(r.width, r.height, false);
     cam.aspect = r.width / r.height; cam.updateProjectionMatrix();
   }
 
   function reset(){
-    run = true; over = false;
+    run = true; over = false; paused = false;
     score = 0; hull = 100; wave = 1; waveT = 0; speed = 26; combo = 0; comboT = 0;
     setMap(0);
     P.x = 0; P.y = 0; P.vx = 0; P.vy = 0; P.cool = 0; P.hit = 0; P.boost = 0;
+    /* le roulis, la visée et les touches survivaient à la partie précédente :
+       la sonde repartait inclinée et filait vers le dernier point pointé */
+    P.roll = 0; P.pitch = 0;
+    aim = null; aimY = null; firing = false; touch = null;
+    keys.left = keys.right = keys.up = keys.down = keys.fire = 0;
     shake = 0; camZ = 0;
     foes.forEach(function(f){ f.live = 0; f.m.visible = false; });
     loot.forEach(function(l){ l.live = 0; l.m.visible = false; });
@@ -4360,7 +4476,9 @@ var VOICE = (function(){
     if(hint) hint.textContent = TR('flèches ou souris · espace pour tirer · évitez les rouges');
   }
   function hud(){
-    if(scoreEl) scoreEl.textContent = score + (combo > 1 ? ' ×' + combo : '');
+    /* le gain est plafonné à six : afficher davantage promettait des points
+       que le score ne donnait pas */
+    if(scoreEl) scoreEl.textContent = score + (combo > 1 ? ' ×' + Math.min(6, combo) : '');
     if(hullEl){
       hullEl.textContent = mot('coque') + ' ' + Math.max(0, Math.round(hull)) + ' %';
       hullEl.style.color = hull > 55 ? '#048B9A' : hull > 28 ? '#F5A524' : '#FF5C4D';
@@ -4550,12 +4668,16 @@ var VOICE = (function(){
     for(var b = 0; b < shots.length; b++){
       var s2 = shots[b];
       if(!s2.live) continue;
+      /* le tir avance de plus de six unités par image quand la cadence tombe et
+         la fenêtre de contact n'en faisait que trois : le canon cessait de
+         toucher sur les machines lentes. On teste le segment parcouru. */
+      var sz0 = s2.m.position.z;
       s2.m.position.z -= (96 + speed) * dt;
       if(s2.m.position.z < -140){ s2.live = 0; s2.m.visible = false; continue; }
       for(var q = 0; q < foes.length; q++){
         var fo = foes[q];
         if(!fo.live) continue;
-        if(Math.abs(fo.z - s2.m.position.z) > 1.6) continue;
+        if(fo.z > sz0 + .8 || fo.z < s2.m.position.z - .8) continue;
         if(Math.hypot(fo.x - s2.m.position.x, fo.y - s2.m.position.y) > .85) continue;
         s2.live = 0; s2.m.visible = false;
         fo.hp--;
@@ -4576,13 +4698,16 @@ var VOICE = (function(){
       var fo2 = foes[e];
       if(!fo2.live) continue;
       fo2.ph += dt * 2.2;
+      /* la fenêtre de choc était plus étroite que le pas d'une image à pleine
+         vitesse : passé la vague six, les intrus traversaient sans dégât */
+      var fz0 = fo2.z;
       fo2.z += (speed + fo2.sp) * dt;
       /* ils dérivent vers le joueur */
       fo2.x += (P.x - fo2.x) * dt * .55 + Math.sin(fo2.ph) * dt * 1.6;
       fo2.y += (P.y - fo2.y) * dt * .4 + Math.cos(fo2.ph * .8) * dt * 1.2;
       fo2.m.position.set(fo2.x, fo2.y, fo2.z);
       fo2.m.rotation.x += dt * 1.8; fo2.m.rotation.y += dt * 2.4;
-      if(fo2.z > -1.1 && fo2.z < 1.6 && Math.hypot(fo2.x - P.x, fo2.y - P.y) < .95){
+      if(fo2.z > -1.1 && fz0 < 1.6 && Math.hypot(fo2.x - P.x, fo2.y - P.y) < .95){
         burst(fo2.x, fo2.y, fo2.z, true, LOW ? 6 : 14);
         fo2.live = 0; fo2.m.visible = false;
         damage(17);
@@ -4695,7 +4820,9 @@ var VOICE = (function(){
   cv.addEventListener('pointerleave', function(){ if(!touch) aim = null; });
   cv.addEventListener('pointerdown', function(e){
     e.preventDefault();
-    if(!run){ startBtn.click(); return; }
+    /* le doigt qui lance la partie reste posé : sans reprendre la visée ici, la
+       sonde ne répondait qu'au second appui */
+    if(!run){ startBtn.click(); if(!run) return; }
     var r = cv.getBoundingClientRect();
     aim = clamp((e.clientX - r.left) / r.width * 2 - 1, -1, 1);
     aimY = clamp(-((e.clientY - r.top) / r.height * 2 - 1), -1, 1);
@@ -4773,9 +4900,20 @@ var VOICE = (function(){
     P.y = 0; P.vy = 0; P.jumps = 0; P.coyote = 0;
     startBtn.textContent = TR('EN COURS');
     if(hint) hint.textContent = TR('espace, clic ou doigt pour sauter · deux fois pour un saut long');
+    /* la salle restait vide une dizaine de secondes après le départ : on pose
+       la première caisse à portée de vue, elle dit à elle seule quoi faire */
+    obs.push({ x: Math.min(W * .95, 460) * mult, w: 16, h: 22, k: 0 });
+  }
+  /* sortir la section de l'écran met la partie en pause : le bouton annonce
+     REPRENDRE, il doit donc rendre la partie où elle s'est arrêtée et non la
+     recommencer à zéro */
+  function go(){
+    layout();
+    if(!run && !dead && dist > 0){ run = true; startBtn.textContent = TR('EN COURS'); return; }
+    reset();
   }
   function jump(){
-    if(!run){ layout(); reset(); return; }
+    if(!run){ go(); return; }
     if(P.jumps >= 2 && P.coyote <= 0) return;
     SFX.saut();
     if(P.jumps === 0 || P.coyote > 0){ P.vy = -395; P.jumps = 1; P.coyote = 0; }
@@ -4812,6 +4950,10 @@ var VOICE = (function(){
       else { P.y = 0; P.vy = 0; P.jumps = 0; P.coyote = .12; }
     }
     P.coyote = Math.max(0, P.coyote - dt);
+    /* tombé dans une trappe sans avoir sauté : passé le délai de grâce, le
+       saut du sol est perdu, sinon on remontait du trou plusieurs secondes
+       après y être entré */
+    if(P.jumps === 0 && P.coyote <= 0 && P.y !== 0) P.jumps = 1;
     P.run += dt * spd * .06;
     for(var o = obs.length - 1; o >= 0; o--){
       var ob = obs[o];
@@ -4829,7 +4971,9 @@ var VOICE = (function(){
       gaps.length ? gaps[gaps.length - 1].x + gaps[gaps.length - 1].w : 0
     );
     if(lastX < W + 40){
-      var space = 260 + Math.random() * 200 - Math.min(60, dist * .07);
+      /* l'écart doit suivre la vitesse : à ×3 les caisses se présentaient
+         toutes les quatre dixièmes de seconde, moins que la durée d'un saut */
+      var space = (260 + Math.random() * 200 - Math.min(60, dist * .07)) * mult;
       if(Math.random() < .34) gaps.push({ x: W + space, w: 40 + Math.random() * 26 });
       else obs.push({ x: W + space, w: 12 + Math.random() * 18, h: 14 + Math.random() * 26, k: (Math.random() * 3) | 0 });
     }
@@ -4903,6 +5047,13 @@ var VOICE = (function(){
     });
     c2.strokeStyle = 'rgba(4,139,154,.35)'; c2.lineWidth = 1;
     segs.forEach(function(sg){ c2.beginPath(); c2.moveTo(sg[0], GY + .5); c2.lineTo(sg[1], GY + .5); c2.stroke(); });
+    /* dans une salle noire, un trou ne se distingue pas du sol : on marque ses
+       deux lèvres, sans quoi le saut ne peut pas être anticipé */
+    c2.fillStyle = 'rgba(245,165,36,.6)';
+    for(var gk = 0; gk < gaps.length; gk++){
+      c2.fillRect(gaps[gk].x - 3, GY - 5, 3, 6);
+      c2.fillRect(gaps[gk].x + gaps[gk].w, GY - 5, 3, 6);
+    }
     /* obstacles */
     obs.forEach(function(ob){
       c2.fillStyle = '#020304';
@@ -5017,13 +5168,26 @@ var VOICE = (function(){
       if(hint) hint.textContent = mult > 1 ? TR('vitesse ×# — les distances comptent double').replace('#', String(mult).replace('.', ',')) : TR('vitesse normale');
     });
   }
-  startBtn.addEventListener('click', function(){ layout(); api.vis = true; reset(); });
+  startBtn.addEventListener('click', function(){ api.vis = true; go(); });
   layout(); draw(0);
+  /* rotation du téléphone, barre d'adresse qui se replie : sans nouvelle mise
+     en page la toile reste peinte à l'ancienne taille, donc floue et décalée.
+     On ne repasse que si la taille a vraiment changé. */
+  addEventListener('resize', function(){
+    var rr = cv.getBoundingClientRect();
+    if(Math.abs(rr.width - W) < 1 && Math.abs(rr.height - H) < 1) return;
+    layout();
+    if(!api.frame) draw(0);
+  }, { passive: true });
   if(RM) return;
   api.always = true;
   api.frame = function(dt, t){
     if(!api.vis){ if(run){ run = false; startBtn.textContent = TR('REPRENDRE'); } return; }
-    step(Math.min(.033, dt)); draw(t);
+    /* sur une machine lente à ×2 ou ×3, le décor avance de plus de vingt
+       pixels par image : une caisse mince traversait le robot sans le toucher */
+    var d = Math.min(.033, dt), n = (run && spd * d > 12) ? 3 : 1, s;
+    for(s = 0; s < n; s++){ step(d / n); if(!run) break; }
+    draw(t);
   };
   PIPES.push(api);
   if(window.IntersectionObserver){
@@ -5044,7 +5208,16 @@ var VOICE = (function(){
     var raw = localStorage.getItem(KEY);
     if(raw){
       var o = JSON.parse(raw);
-      if(o && typeof o.xp === 'number') M = o;
+      /* une seule clé était vérifiée, et l'objet du disque adopté entier :
+         un enregistrement partiel faisait entrer un NaN dans la première
+         soustraction, et il gagnait ensuite les quatre jauges, l'âge et la
+         bouche du modèle. Plus rien ne bougeait jusqu'à REPARTIR DE ZÉRO. */
+      var nb = function(v, d){ v = +v; return isFinite(v) ? v : d; };
+      if(o && typeof o.xp === 'number') M = {
+        data: clamp(nb(o.data, 60), 0, 100), temp: clamp(nb(o.temp, 38), 30, 100),
+        trust: clamp(nb(o.trust, 70), 0, 100), xp: clamp(nb(o.xp, 0), 0, 9999),
+        born: nb(o.born, Date.now()), seen: nb(o.seen, Date.now())
+      };
       /* il vit hors de la page : on rejoue le temps écoulé */
       var away = Math.min(72 * 3600, (Date.now() - (M.seen || Date.now())) / 1000);
       M.data = clamp(M.data - away * .0022, 0, 100);
@@ -5090,7 +5263,13 @@ var VOICE = (function(){
       if(k === 'trust') el.style.background = M.trust < 28 ? '#FF5C4D' : '#4169E1';
       if(k === 'data') el.style.background = M.data < 16 ? '#FF5C4D' : '#048B9A';
     });
-    if(sizeEl) sizeEl.textContent = t[1];
+    /* la puce ne disait que la taille du moment : la barre d'entraînement
+       montait vers rien, on ignorait qu'un palier existait et lequel */
+    if(sizeEl){
+      var suiv = '';
+      for(var it = 0; it < TIERS.length; it++) if(M.xp < TIERS[it][0]){ suiv = TIERS[it][1]; break; }
+      sizeEl.textContent = suiv ? t[1] + ' → ' + suiv : t[1];
+    }
     if(ageEl) ageEl.textContent = TR('âge # j').replace('#', Math.max(0, Math.floor((Date.now() - M.born) / 86400000)));
     var mo = mood();
     if(stateEl){ stateEl.textContent = TR(LBL[mo]); stateEl.style.color = mo === 'heureux' ? '#048B9A' : (mo === 'nominal' ? '#7C8791' : '#FF5C4D'); }
@@ -5126,7 +5305,18 @@ var VOICE = (function(){
     M = { data: 60, temp: 38, trust: 70, xp: 0, born: Date.now(), seen: Date.now() };
     lastMood = ''; save(); paint();
   });
-  cv.addEventListener('pointerdown', function(){ poke = 1; M.trust = clamp(M.trust + 1.5, 0, 100); save(); paint(); });
+  /* La caresse ne doit pas remplacer ALIGNER : sans cadence, tapoter la
+     toile alignait gratuitement et le bouton ne servait plus à rien. Et
+     l'écriture locale part maintenant avec le tour périodique — sur un
+     téléphone, un défilement qui commence sur la toile déclenche ce même
+     événement, et l'écriture bloquait le fil pendant le geste. */
+  var caresse = 0;
+  cv.addEventListener('pointerdown', function(){
+    poke = 1;
+    var now = Date.now();
+    if(now - caresse < 1500) return;
+    caresse = now; M.trust = clamp(M.trust + 1.5, 0, 100); paint();
+  });
 
   function layout(){
     var r = cv.getBoundingClientRect();
@@ -5248,9 +5438,18 @@ var VOICE = (function(){
   };
   PIPES.push(api);
   if(window.IntersectionObserver){
-    new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; }, { threshold: .2 }).observe(cv);
+    new IntersectionObserver(function(en){
+      var v = en[0].isIntersecting;
+      /* on quitte la vue : on fige l'état une dernière fois, l'écriture
+         périodique s'arrêtant tant que la fiche n'est pas à l'écran */
+      if(api.vis && !v) save();
+      api.vis = v;
+    }, { threshold: .2 }).observe(cv);
   }else{ api.vis = true; }
+  /* iOS ne déclenche pas toujours beforeunload : sans pagehide, l'horodatage
+     du dernier passage restait vieux et le modèle revenait sur-dégradé */
   addEventListener('beforeunload', save);
+  addEventListener('pagehide', save);
 })();
 
 /* =============================================================
@@ -10854,9 +11053,13 @@ var VOICE = (function(){
   function draw(t){
     c2.fillStyle = '#0A0D10'; c2.fillRect(0, 0, W, H);
     /* la trame du réseau */
+    /* trente-deux traits de même style : un seul chemin, un seul stroke. Le
+       rendu est identique, les trente et un appels en trop ne le sont pas */
     c2.strokeStyle = 'rgba(228,232,234,.045)'; c2.lineWidth = 1;
-    for(var x = 0; x <= CW; x++){ c2.beginPath(); c2.moveTo(ox + x * cell, oy); c2.lineTo(ox + x * cell, oy + CH * cell); c2.stroke(); }
-    for(var y = 0; y <= CH; y++){ c2.beginPath(); c2.moveTo(ox, oy + y * cell); c2.lineTo(ox + CW * cell, oy + y * cell); c2.stroke(); }
+    c2.beginPath();
+    for(var x = 0; x <= CW; x++){ c2.moveTo(ox + x * cell, oy); c2.lineTo(ox + x * cell, oy + CH * cell); }
+    for(var y = 0; y <= CH; y++){ c2.moveTo(ox, oy + y * cell); c2.lineTo(ox + CW * cell, oy + y * cell); }
+    c2.stroke();
     c2.strokeStyle = 'rgba(4,139,154,.35)';
     c2.strokeRect(ox, oy, CW * cell, CH * cell);
     /* le paquet à récupérer */
@@ -10896,13 +11099,26 @@ var VOICE = (function(){
   });
   var sw = null;
   cv.addEventListener('pointerdown', function(e){ sw = [e.clientX, e.clientY]; });
-  cv.addEventListener('pointerup', function(e){
-    if(!sw) return;
+  /* le virage se prend pendant le geste : attendu au relâchement, il arrivait
+     une à deux cases trop tard et la sonde était déjà dans le mur. Le repère
+     est replacé à chaque virage, un seul glissé peut donc en enchaîner deux. */
+  cv.addEventListener('pointermove', function(e){
+    if(!sw || !run) return;
+    /* souris relâchée hors de la toile : le repère survivait au bouton */
+    if(window.PointerEvent && e.pointerType === 'mouse' && e.buttons === 0){ sw = null; return; }
     var dx = e.clientX - sw[0], dy = e.clientY - sw[1];
-    sw = null;
-    if(Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
+    if(Math.abs(dx) < 14 && Math.abs(dy) < 14) return;
     if(Math.abs(dx) > Math.abs(dy)) turn(dx > 0 ? 1 : -1, 0);
     else turn(0, dy > 0 ? 1 : -1);
+    sw = [e.clientX, e.clientY];
+  });
+  cv.addEventListener('pointercancel', function(){ sw = null; });
+  cv.addEventListener('pointerup', function(e){
+    var court = sw && Math.abs(e.clientX - sw[0]) < 14 && Math.abs(e.clientY - sw[1]) < 14;
+    sw = null;
+    /* partie finie : toute la grille relance — sur un téléphone, le bouton est
+       sous le cadre, hors du chemin du pouce */
+    if(court && over){ layout(); reset(); }
   });
   startBtn.addEventListener('click', function(){ layout(); reset(); });
   layout(); snake = [[3, 6], [2, 6], [1, 6]]; place(); draw(0);
@@ -10927,6 +11143,7 @@ var VOICE = (function(){
   var startBtn = qs('[data-g8-start]'), hint = qs('[data-g8-hint]');
   var DPR2 = CDPR(), W = 0, H = 0;
   var run = false, score = 0, lives = 3, bricks = [], keys = {};
+  var hold = 0, hurt = 0, dirty = 1;
   var pad = { x: 0, w: 74 }, ball = { x: 0, y: 0, vx: 0, vy: 0, r: 4.6 };
   var LBL = ['scan de ports', 'force brute', 'hameçonnage', 'injection', 'rançongiciel'];
   function layout(){
@@ -10950,6 +11167,10 @@ var VOICE = (function(){
   }
   function reset(){
     run = true; score = 0; lives = 3;
+    /* une flèche restée enfoncée à la fin de la partie précédente faisait
+       dériver la raquette dès le coup d'envoi suivant */
+    keys.left = 0; keys.right = 0;
+    hurt = 0; hold = .7;
     build();
     pad.x = W * .5;
     ball.x = W * .5; ball.y = H - 42; ball.vx = 150; ball.vy = -190;
@@ -10968,6 +11189,9 @@ var VOICE = (function(){
       run = false;
       setTR(startBtn, 'REJOUER');
       if(hint) hint.textContent = TR('pare-feu percé — # points').replace('#', score);
+      /* le paquet finissait sa course hors du cadre et la toile restait vide :
+         on le repose sur la raquette, prêt pour la partie suivante */
+      ball.x = pad.x; ball.y = H - 42;
       return;
     }
     ball.x = pad.x; ball.y = H - 42; ball.vx = 150 * (Math.random() < .5 ? -1 : 1); ball.vy = -190;
@@ -10977,6 +11201,11 @@ var VOICE = (function(){
     if(keys.left) pad.x -= 420 * dt;
     if(keys.right) pad.x += 420 * dt;
     pad.x = clamp(pad.x, pad.w * .5, W - pad.w * .5);
+    if(hurt > 0) hurt = Math.max(0, hurt - dt * 1.6);
+    /* temps mort au coup d'envoi et après une vie perdue : le paquet reste
+       posé sur la raquette, on choisit d'où il part au lieu de le subir */
+    if(hold > 0){ hold -= dt; ball.x = pad.x; ball.y = H - 42; return; }
+    var y0 = ball.y;
     ball.x += ball.vx * dt; ball.y += ball.vy * dt;
     if(ball.x < ball.r){ ball.x = ball.r; ball.vx = Math.abs(ball.vx); }
     if(ball.x > W - ball.r){ ball.x = W - ball.r; ball.vx = -Math.abs(ball.vx); }
@@ -10996,10 +11225,23 @@ var VOICE = (function(){
       if(ball.x > b.x - ball.r && ball.x < b.x + b.w + ball.r &&
          ball.y > b.y - ball.r && ball.y < b.y + b.h + ball.r){
         b.hp--;
-        if(b.hp <= 0) b.live = 0;
+        if(b.hp <= 0){ b.live = 0; b.fade = 1; }
         score += 15;
         if(scoreEl) scoreEl.textContent = score;
-        ball.vy = -ball.vy;
+        /* on renversait la seule vitesse verticale sans jamais ressortir le
+           paquet du bloc : une tentative à deux points de vie était retouchée à
+           l'image suivante, les deux renversements s'annulaient et le paquet la
+           traversait sans rebondir. On ressort donc le paquet par la face qu'il
+           vient de franchir — celle qu'il a mis le moins de temps à passer. */
+        var px = Math.min(ball.x + ball.r - b.x, b.x + b.w + ball.r - ball.x);
+        var py = Math.min(ball.y + ball.r - b.y, b.y + b.h + ball.r - ball.y);
+        if(py / (Math.abs(ball.vy) || .001) <= px / (Math.abs(ball.vx) || .001)){
+          ball.vy = ball.y < b.y + b.h * .5 ? -Math.abs(ball.vy) : Math.abs(ball.vy);
+          ball.y += ball.vy > 0 ? py : -py;
+        }else{
+          ball.vx = ball.x < b.x + b.w * .5 ? -Math.abs(ball.vx) : Math.abs(ball.vx);
+          ball.x += ball.vx > 0 ? px : -px;
+        }
         ball.vx *= 1.02; ball.vy *= 1.02;
         break;
       }
@@ -11048,10 +11290,21 @@ var VOICE = (function(){
     c2.strokeStyle = 'rgba(95,211,227,.5)';
     c2.beginPath(); c2.arc(ball.x, ball.y, ball.r + 3, 0, 6.2832); c2.stroke();
   }
-  cv.addEventListener('pointermove', function(e){
+  /* Au doigt, « pointermove » ne parle qu'après un appui et se tait dès que le
+     doigt sort de la toile : la raquette restait alors plantée en pleine
+     course. On la place au premier contact et on capture le pointeur pour
+     suivre le glissé jusqu'au bord de l'écran. */
+  function vise(e){
     var r = cv.getBoundingClientRect();
-    pad.x = clamp(e.clientX - r.left, pad.w * .5, W - pad.w * .5);
+    if(!r.width) return;
+    pad.x = clamp((e.clientX - r.left) * (W / r.width), pad.w * .5, W - pad.w * .5);
+    if(!run){ ball.x = pad.x; dirty = 1; }
+  }
+  cv.addEventListener('pointerdown', function(e){
+    vise(e);
+    if(cv.setPointerCapture && e.pointerId != null) try{ cv.setPointerCapture(e.pointerId); }catch(err){}
   }, {passive:true});
+  cv.addEventListener('pointermove', vise, {passive:true});
   addEventListener('keydown', function(e){
     if(!run) return;
     var r = cv.getBoundingClientRect();
@@ -11308,16 +11561,20 @@ var VOICE = (function(){
       var a = cards[open[0]], b = cards[open[1]];
       if(a.v === b.v){
         a.done = b.done = 1;
+        /* la paire trouvée et la paire ratée n'avaient que le clic pour toute
+           réponse : deux timbres distincts disent le résultat sans rien lire */
+        SFX.ok();
         pairs++;
         if(pairsEl) pairsEl.textContent = pairs + ' / 8';
         open = [];
         if(pairs === 8){
           run = false;
+          SFX.gagne();
           setTR(startBtn, 'REJOUER');
           if(hint) hint.textContent = TR('inventaire complet en # coups').replace('#', moves);
-      TROPHY.win('g10');
+          TROPHY.win('g10');
         }
-      }else lock = .85;
+      }else{ SFX.bad(); lock = .85; }
     }
   }
   function draw(t, dt){
@@ -11650,11 +11907,30 @@ var VOICE = (function(){
     c2.setTransform(DPR2, 0, 0, DPR2, 0, 0);
     c2.textBaseline = 'middle';
   }
+  /* L'alerte partait du décompte tenu par la boucle de rendu. Cette boucle
+     n'existe pas quand le visiteur a demandé « aucun mouvement » : la manche
+     restait bloquée sur « attendez », le voyant ne passait jamais au rouge et
+     rien ne pouvait se terminer. Le passage au rouge a donc son propre point
+     d'entrée, appelé soit par la boucle, soit par un minuteur. */
+  var lent = false, armAt = 0, armT = null;
+  function stopT(){ if(armT){ clearTimeout(armT); armT = null; } }
+  function alerte(){
+    stopT();
+    state = 'go'; t0 = performance.now();
+    if(hint) hint.textContent = TR('coupez !');
+    draw();
+  }
   function arm(){
-    state = 'wait'; wait = .9 + Math.random() * 2.6;
+    stopT();
+    state = 'wait'; lent = false; wait = .9 + Math.random() * 2.6;
+    armAt = performance.now();
     if(hint) hint.textContent = TR('attendez le rouge…');
     if(msEl) msEl.textContent = '— ms';
-    startBtn.textContent = TR('EN COURS');
+    if(startBtn) startBtn.textContent = TR('EN COURS');
+    /* la remise en page vient d'effacer la toile et seule la boucle la
+       repeignait : entre les deux le cadre restait vide */
+    draw();
+    if(RM) armT = setTimeout(alerte, wait * 1000);
   }
   function fire(){
     if(state === 'wait'){
@@ -11696,13 +11972,15 @@ var VOICE = (function(){
     var col = red ? '#FF5C4D' : bad ? '#F5A524' : (state === 'done' ? '#50C878' : 'rgba(124,135,145,.5)');
     c2.strokeStyle = col; c2.lineWidth = red ? 3 : 2;
     c2.beginPath(); c2.moveTo(cx - 86, cy); c2.lineTo(cx + 86, cy); c2.stroke();
-    [-86, 86].forEach(function(dx){
+    /* un tableau et une fermeture alloués à chaque image, pour deux nœuds */
+    for(var nd = 0; nd < 2; nd++){
+      var dx = nd ? 86 : -86;
       c2.fillStyle = 'rgba(11,14,17,.95)';
       c2.strokeStyle = col; c2.lineWidth = 1.6;
       c2.beginPath(); c2.arc(cx + dx, cy, 15, 0, 6.2832); c2.fill(); c2.stroke();
       c2.fillStyle = col;
       c2.fillRect(cx + dx - 6, cy - 3, 12, 6);
-    });
+    }
     /* le voyant, au centre */
     var rr = red ? 30 + Math.sin(ph * 22) * 3 : 24;
     c2.fillStyle = red ? 'rgba(255,92,77,.22)' : bad ? 'rgba(245,165,36,.16)' : 'rgba(4,139,154,.1)';
@@ -11745,6 +12023,17 @@ var VOICE = (function(){
   var NAMES = ['ONDULEUR', 'CŒUR RÉSEAU', 'STOCKAGE', 'HYPERVISEUR', 'SAUVEGARDE', 'PARE-FEU'];
   var COLS = ['#50C878', '#048B9A', '#4169E1', '#4169E1', '#F5A524', '#FF5C4D'];
   var seq = [], input = [], lvl = 0, best = 0, showing = -1, showT = 0, state = 'idle', flash = -1, flashT = 0;
+  /* la case fautive et celle qu'il fallait : après l'échec, l'écran ne disait
+     pas où l'ordre avait rompu. sonne retient le pas déjà entendu, waitT tient
+     le minuteur d'enchaînement, qui courait sans qu'on puisse l'arrêter. */
+  var faute = -1, attendu = -1, sonne = -1, waitT = null;
+  /* Le pas de défilement se resserre avec le palier : à douze équipements la
+     séquence demandait plus de sept secondes de contemplation. Le temps
+     allumé ne vaut que les deux tiers du pas — c'est le tiers éteint qui rend
+     lisible le même équipement tiré deux fois de suite, sinon les deux
+     impulsions n'en formaient qu'une et la partie se perdait sans rien
+     montrer, ce que le tirage produit une fois sur six. */
+  function pas(){ return Math.max(.34, .66 - lvl * .022); }
   try{ best = parseInt(localStorage.getItem('ad2026.g12.best'), 10) || 0; }catch(e){}
   if(bestEl) bestEl.textContent = TR('record ') + best;
   function layout(){
@@ -11796,8 +12085,13 @@ var VOICE = (function(){
   function step(dt){
     if(flashT > 0) flashT -= dt;
     if(state !== 'show') return;
+    /* la démonstration était muette : la couleur portait seule la séquence, et
+       elle ne suffit pas sur un écran de téléphone. Une note par pas, la même
+       qu'à l'appui — c'est aussi ce qui rend deux fois le même équipement
+       audible comme deux impulsions. */
+    if(sonne !== showing){ sonne = showing; SFX.note(seq[showing]); }
     showT += dt;
-    if(showT > .62){
+    if(showT > pas()){
       showT = 0; showing++;
       if(showing >= seq.length){
         showing = -1; state = 'play';
@@ -11883,7 +12177,10 @@ var VOICE = (function(){
     G.tour = 1; G.score = 0; G.fini = false; G.sel = -1;
     if(camp) G.camp = camp;
     ST = {};
-    NET.forEach(function(n){ ST[n.id] = { vu: false, faille: null, pris: false, isole: false, patche: false, bruit: 0 }; });
+    /* « fige » : une machine que l'exploitation a réclamée ne se recoupe plus.
+       Sans cela, la défense gagnait en débranchant le même poste douze fois. */
+    NET.forEach(function(n){ ST[n.id] = { vu: false, faille: null, pris: false, isole: false, patche: false, bruit: 0, fige: false }; });
+    if(inp) inp.value = '';   /* la commande de la partie précédente restait dans le champ */
     /* une faille par machine, connue de personne au départ */
     var F = ['mot de passe par défaut', 'greffon non corrigé', 'partage ouvert', 'session laissée ouverte', 'micrologiciel ancien', 'port d\'administration exposé'];
     NET.forEach(function(n, i){ ST[n.id].faille = F[i % F.length]; });
@@ -11963,10 +12260,12 @@ var VOICE = (function(){
     scan: function(n){
       if(!n) return ligne('scan : indiquez une machine.', '#F5A524'), false;
       var s = ST[n.id];
+      /* relire deux fois la même machine n'apprend rien et rapportait pourtant
+         des points à chaque fois : le score gonflait tout seul */
+      if(!s.vu) G.score += 2;
       s.vu = true; s.bruit += G.camp === 'rouge' ? 2 : 0;
       ligne('scan ' + n.id + ' → faille : ' + s.faille, '#5FD3E3');
       ligne('  voisins : ' + voisins(n.id).join(', '), '#56606A');
-      G.score += 2;
       return true;
     },
     logs: function(n){
@@ -11984,7 +12283,14 @@ var VOICE = (function(){
       if(s.isole) return ligne(n.id + ' est coupée du réseau : injoignable.', '#F5A524'), true;
       if(!s.vu) return ligne('Vous ne connaissez pas encore sa faille. scan ' + n.id + ' d\'abord.', '#F5A524'), false;
       if(!atteignable(n.id)) return ligne(n.id + ' n\'est voisine d\'aucune machine que vous tenez.', '#F5A524'), true;
-      if(s.patche) return ligne(n.id + ' a été corrigée : la faille ne répond plus.', '#4169E1'), true;
+      if(s.patche){
+        /* Un correctif fermait la partie sans le dire : deux scans sur la même
+           machine suffisaient à la faire corriger par la défense, et la cible
+           devenait inatteignable pour les dix tours restants. La tentative use
+           le tour, elle n'est plus perdue d'avance. */
+        if(Math.random() < .4){ s.patche = false; s.bruit += 2; return ligne(n.id + ' : le correctif est contourné, la faille se rouvre.', '#F5A524'), true; }
+        return ligne(n.id + ' a été corrigée : la faille ne répond plus.', '#4169E1'), true;
+      }
       s.pris = true; s.bruit += 4;
       G.score += n.id === CIBLE ? 40 : 12;
       ligne('exploit ' + n.id + ' → accès obtenu.', '#FF5C4D');
@@ -12036,7 +12342,28 @@ var VOICE = (function(){
         var s = ST[n.id];
         return !s.pris && !s.isole && !s.patche && atteignable(n.id);
       });
-      if(!cand.length){ ligne('· l\'attaque cherche une entrée', '#39424A'); return; }
+      if(!cand.length){
+        /* Corriger ou couper la base au premier tour suffisait à gagner sans
+           plus rien faire des onze tours suivants. Une machine débranchée est
+           une machine en panne : l'exploitation la réclame, et l'attaque finit
+           par contourner un correctif. La défense doit tenir tout le parc. */
+        var coupe = NET.filter(function(n){ return ST[n.id].isole && !ST[n.id].pris; });
+        if(coupe.length){
+          var q = coupe[(Math.random() * coupe.length) | 0];
+          ST[q.id].isole = false; ST[q.id].fige = true;
+          ligne('· ' + q.id + ' est réclamée par l\'exploitation : remise en service.', '#F5A524');
+          return;
+        }
+        var mur = NET.filter(function(n){ return ST[n.id].patche && !ST[n.id].pris && atteignable(n.id); });
+        if(mur.length && Math.random() < .4){
+          var m = mur[(Math.random() * mur.length) | 0];
+          ST[m.id].patche = false; ST[m.id].bruit += 2;
+          ligne('· ' + m.id + ' : le correctif est contourné.', '#FF5C4D');
+          return;
+        }
+        ligne('· l\'attaque cherche une entrée', '#39424A');
+        return;
+      }
       cand.sort(function(a, b){ return (a.id === CIBLE ? -1 : 0) - (b.id === CIBLE ? -1 : 0); });
       var t = cand[0];
       ST[t.id].pris = true; ST[t.id].bruit += 3;
@@ -12122,6 +12449,12 @@ var VOICE = (function(){
       c2.beginPath(); c2.arc(p.x, p.y, r, 0, 6.283); c2.fill();
       c2.strokeStyle = col; c2.lineWidth = G.sel === i ? 2 : 1.2;
       c2.beginPath(); c2.arc(p.x, p.y, r, 0, 6.283); c2.stroke();
+      /* la machine choisie ne se signalait que par huit dixièmes de trait de
+         plus : c'est elle que le verbe va toucher, elle doit se voir */
+      if(G.sel === i){
+        c2.strokeStyle = '#E4E8EA'; c2.lineWidth = 1;
+        c2.beginPath(); c2.arc(p.x, p.y, r + 5, 0, 6.283); c2.stroke();
+      }
       if(s.vu){ c2.fillStyle = col; c2.beginPath(); c2.arc(p.x, p.y, 2.5, 0, 6.283); c2.fill(); }
       c2.font = '8.5px "IBM Plex Mono", ui-monospace, monospace';
       c2.fillStyle = s.pris ? '#FF5C4D' : '#7C8791';
