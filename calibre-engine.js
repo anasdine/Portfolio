@@ -11005,6 +11005,9 @@ var VOICE = (function(){
       '<circle cx="15.6" cy="11.1" r="1.15" fill="#FFC53D"/>' +
       '</svg>';
     d.setAttribute('data-explain-dot', '1');
+    /* un repere de coin, par opposition a ceux qui vivent dans une ligne de
+       texte : seuls les premiers peuvent etre repositionnes sans degat */
+    if(!inText) d.setAttribute('data-dot-coin', '1');
     /* le repère d'un texte se pose dans la gouttière de gauche. Sur un écran
        étroit cette gouttière peut manquer, et il sortait alors de l'écran :
        on le mesure, et faute de place on le pose juste au-dessus du texte. */
@@ -11051,34 +11054,13 @@ var VOICE = (function(){
      défilement où le repère se dégage : il était inatteignable en permanence.
      On le redescend juste sous la barre, et on refait le calcul au redimension-
      nement, la hauteur de l'en-tête changeant avec la largeur. */
-  function degageEntete(){
-    /* On ne MESURE pas la barre : pendant le chargement des polices elle passe
-       par 56, puis 83, puis 113px, et toute passe déclenchée sur un état
-       intermédiaire laissait le repère à mi-chemin — mesuré, il restait à y=91
-       sous une barre de 113. Les seuils sont les nôtres, on les prend tels
-       quels : la valeur ne dépend plus de l'instant où la passe tourne. */
-    var hb = innerWidth <= 540 ? 124 : 76;
-    qsa('[data-explain-dot]').forEach(function(d){
-      /* `__inText` est posé sur l'élément expliqué, pas sur le repère ; et un
-         repère de texte porte un `top` en em, que parseFloat corromprait. */
-      if(d.__src && d.__src.__inText) return;
-      if(!/px$/.test(d.style.top || '')) return;
-      if(d.__decale === undefined) d.__decale = parseFloat(d.style.top) || 0;
-      d.style.top = d.__decale + 'px';
-      var t = d.getBoundingClientRect().top;
-      if(t < hb + 8) d.style.top = (d.__decale + (hb + 8 - t)) + 'px';
-    });
-  }
-  /* Cette passe tourne à la création des repères, or la feuille qui porte la
-     barre à 113px sur téléphone est injectée plus loin dans ce fichier, et la
-     barre traverse plusieurs hauteurs pendant le chargement des polices — j'ai
-     mesuré 56, puis 83, puis 113. Des minuteurs fixes attrapaient un état
-     intermédiaire et le repère restait sous la barre. On observe donc la barre
-     elle-même : chaque fois que sa hauteur change, on refait le calcul. */
-  degageEntete();
-  if(doc.fonts && doc.fonts.ready) doc.fonts.ready.then(degageEntete);
-  addEventListener('load', degageEntete);
-  addEventListener('resize', function(){ askResize(degageEntete); }, { passive: true });
+  /* Le repere du heros tombait sous la barre fixe. Une passe JS le
+     redescendait, mais elle calculait a la position de defilement du moment
+     et le heros bouge avec le defilement : le meme repere finissait tantot a
+     46px, tantot a 68px, et restait a cheval sur le bord de la barre. Une
+     tape y atteignait alors le repere ET une commande de la barre, ce qui
+     projetait la page tout en bas — mesure, defilement 0 -> 15 889.
+     Le calcul est abandonne au profit d'une regle fixe, plus bas. */
   /* aucune annonce spontanée : le repère jaune se comprend seul, et
      rien ne doit interrompre la lecture */
 })();
@@ -11255,6 +11237,11 @@ window.__ditAuDoigt.cache = function(){
        son bouton, qui est trop pres du bord. Sur telephone on cesse de
        l'accrocher au bouton : elle devient un panneau pose sous la barre,
        large de bord a bord. Il ne peut plus sortir. */
+    /* Le repere de coin du heros se posait a y=62 sous une barre de 113. On
+       l'accroche au bas de son bloc plutot qu'au haut : mesure, y=120..142,
+       degage, et toujours visuellement rattache a ce qu'il explique. */
+    '@media (max-width:540px){[data-hero] [data-dot-coin]{top:auto!important;' +
+      'bottom:-4px!important}}' +
     '@media (max-width:540px){[data-lang-wrap] ul{position:fixed!important;' +
       'left:12px!important;right:12px!important;width:auto!important;' +
       'max-width:none!important;top:118px!important;bottom:auto!important;' +
