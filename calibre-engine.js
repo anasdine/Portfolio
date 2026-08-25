@@ -146,11 +146,22 @@ function CDPR(){
   var t = (typeof BOOT_TIER === 'number' ? BOOT_TIER : 0);
   /* Un téléphone récent affiche à 3× : rendre à 1× revenait à peindre au tiers
      de la définition de l'écran, et c'est ce qui rendait les toiles et les vues
-     3D floues sur iPhone. On suit l'écran, borné pour ne pas noyer le GPU —
-     2× suffit à paraître net, au-delà on paie sans que cela se voie. */
-  if(t >= 2) return Math.min(1, d);
-  if(innerWidth < 640) return Math.min(2, d);
-  return Math.min(1.75, d);
+     3D floues sur iPhone. On suit donc l'écran — mais borné, car la finesse se
+     paie en surface, et 2× suffit à paraître net.
+     Le piège est la tablette : un iPad a un écran de bureau et un processeur
+     graphique de téléphone. À 2× sur 1024 × 1366, une seule toile plein écran
+     couvre 5,6 millions de pixels, et la page en compte vingt-trois — d'où un
+     effondrement à une quinzaine d'images par seconde. On borne donc par un
+     BUDGET DE SURFACE, et seulement sur les appareils tactiles : un ordinateur
+     de bureau a le processeur graphique qui va avec son écran. */
+  var max = t >= 2 ? 1 : (t === 1 ? 1.35 : 2);
+  if(TOUCH){
+    var cap = Math.sqrt(1900000 / Math.max(1, innerWidth * innerHeight));
+    if(cap < max) max = Math.max(1, cap);
+  }else if(max > 1.75){
+    max = 1.75;
+  }
+  return Math.min(max, d);
 }
 var g = window.gsap;
 if(!g){ rescue(); qsa('[data-reveal]').forEach(function(e){ e.style.opacity=1; }); return; }
@@ -9621,7 +9632,11 @@ var VOICE = (function(){
   }
   var followBtn = qs('[data-ada-follow]');
   if(followBtn){
-    if(RM || TOUCH) followBtn.style.display = 'none';
+    /* Ce bouton ne regle plus le mode suivi : il ouvre et ferme le panneau,
+         comme le montre le gestionnaire juste en dessous. Le masquer au doigt
+         privait donc le telephone du seul point d'entree sur vers l'assistante,
+         le robot lui-meme se pretant mal a la tape entre le glisse, le lancer
+         et le defilement. On le garde partout. */
     followBtn.addEventListener('click', function(e){
       e.preventDefault(); e.stopPropagation();
       A.open ? close() : open();
@@ -9642,7 +9657,11 @@ var VOICE = (function(){
   /* au doigt : une tape la garde près de vous pendant tout le défilement */
   if(TOUCH){
     doc.addEventListener('pointerdown', function(e){
-      if(!A.follow || A.open || !fromDot(e)) return;
+      /* le mode suivi n'a rien a voir avec le fait de taper un point :
+           l'exiger rendait les haut-parleurs jaunes inertes au doigt tant
+           que l'assistante ne suivait pas le defilement, c'est-a-dire
+           presque toujours. */
+        if(A.open || !fromDot(e)) return;
       var t = dotSrc(e);
       if(!t) return;
       var txt = t.getAttribute('data-explain');
