@@ -9549,6 +9549,13 @@ var VOICE = (function(){
     /* un seul écouteur parle par geste, mais le clic n'est jamais refusé */
     if(!exClaim(txt, true)) return;
     exEl = t; EX = t; exT = 0; exLast = txt;
+    /* Ce gestionnaire-ci n'est pas reserve a la souris : au doigt il s'enregistre
+       en PREMIER sur pointerdown, reclame le texte, et les deux gestionnaires
+       tactiles poses plus bas recoivent alors `false` d'exClaim et sortent.
+       C'est le chemin souris qui gagnait sur telephone — et il ecrit dans une
+       bulle masquee sous 720px. D'ou des haut-parleurs jaunes parfaitement
+       fonctionnels dont la reponse n'apparaissait nulle part. */
+    if(TOUCH && window.__ditAuDoigt) window.__ditAuDoigt(txt);
     BUB.owner = null; BUB.until = 0;
     /* pas de VOICE.stop() ici : la lecture prioritaire fait déjà place nette,
        et deux annulations coup sur coup coupaient la phrase suivante */
@@ -9940,7 +9947,8 @@ var VOICE = (function(){
       var t = dotSrc(e);
       if(!t) return;
       var txt = t.getAttribute('data-explain');
-      if(txt && exClaim(txt)){ exEl = t; EX = t; exLast = txt; say(txt, 9500); }
+      if(txt && exClaim(txt)){ exEl = t; EX = t; exLast = txt; say(txt, 9500);
+        if(window.__ditAuDoigt) window.__ditAuDoigt(txt); }
     }, {passive:true});
   }
   window.__ada = {
@@ -10416,6 +10424,7 @@ var VOICE = (function(){
       var txt = t.getAttribute('data-explain');
       if(!txt || !exClaim(txt)) return;
       exEl = t; EX = t; exT = 0; exLast = txt;
+      if(window.__ditAuDoigt) window.__ditAuDoigt(txt);
       if(dBub){
         var r = t.getBoundingClientRect();
         D.px = clamp(r.right - 30, 40, innerWidth - 40);
@@ -10990,6 +10999,78 @@ var VOICE = (function(){
   });
   /* aucune annonce spontanée : le haut-parleur jaune se comprend seul, et
      rien ne doit interrompre la lecture */
+})();
+
+/* =============================================================
+   AU DOIGT — donner une surface aux réponses, et rendre l'assistante
+   atteignable. Mesuré sur iPhone : taper un haut-parleur jaune déclenchait
+   bien le bon texte — la bulle passait de « Bienvenue sur le portfolio »
+   à « Quatre besoins concrets… » — mais `[data-ada-bubble]` est
+   `display:none !important` sous 720px, parce qu'elle est ancrée au
+   personnage 3D, lui-même masqué à cette largeur. La tape marchait, la
+   réponse partait dans le vide. C'est la cause de « les boutons jaunes ne
+   marchent pas sur téléphone ».
+============================================================= */
+window.__ditAuDoigt = function(txt){
+  if(!txt) return;
+  var b = qs('[data-dit-doigt]');
+  if(!b){
+    b = doc.createElement('div');
+    b.setAttribute('data-dit-doigt', '1');
+    b.setAttribute('role', 'status');
+    b.setAttribute('aria-live', 'polite');
+    b.style.cssText = 'position:fixed;left:12px;right:12px;bottom:12px;z-index:120;' +
+      'padding:15px 46px 15px 16px;border-radius:14px;' +
+      'background:rgba(10,12,14,.95);border:1px solid rgba(255,197,61,.5);' +
+      'color:#E8EDF2;font-size:14px;line-height:1.45;' +
+      'box-shadow:0 12px 34px rgba(0,0,0,.55);opacity:0;transform:translateY(12px);' +
+      'transition:opacity .22s ease,transform .22s ease;' +
+      'max-height:44vh;overflow:auto;-webkit-overflow-scrolling:touch';
+    var x = doc.createElement('button');
+    x.type = 'button';
+    x.setAttribute('aria-label', 'Fermer');
+    x.textContent = '✕';
+    /* 44px : la cible tactile minimale, sinon on ferme trois fois avant d'y arriver */
+    x.style.cssText = 'position:absolute;top:5px;right:5px;width:44px;height:44px;min-height:44px;' +
+      'background:none;border:0;color:#9AA6B2;font-size:16px;padding:0;cursor:pointer';
+    x.addEventListener('click', function(){ window.__ditAuDoigt.cache(); });
+    b.appendChild(x);
+    var p = doc.createElement('div');
+    p.setAttribute('data-dit-texte', '1');
+    b.appendChild(p);
+    doc.body.appendChild(b);
+  }
+  b.querySelector('[data-dit-texte]').textContent = txt;
+  b.style.opacity = '1'; b.style.transform = 'none';
+  clearTimeout(window.__ditAuDoigt.__t);
+  window.__ditAuDoigt.__t = setTimeout(function(){ window.__ditAuDoigt.cache(); }, 11000);
+};
+window.__ditAuDoigt.cache = function(){
+  var b = qs('[data-dit-doigt]');
+  if(b){ b.style.opacity = '0'; b.style.transform = 'translateY(12px)'; }
+};
+
+(function(){
+  if(!TOUCH) return;
+  var s = doc.createElement('style');
+  s.setAttribute('data-correctifs-doigt', '1');
+  s.textContent =
+    /* LES DEUX BARRES DU HAUT. `[data-nav]` est fixe et haut de 56px, mais son
+       contenu passe en `flex-wrap:wrap` sous ~470px et occupe alors 96px sur
+       deux lignes. Centré dans 56px, il débordait de 20px en haut — logo et
+       « ☰ SOMMAIRE » coupés par le bord de l'écran — et de 20px en bas, si bien
+       que « FR » et « MOUV. » pendaient SOUS le fond de la barre, à même le
+       texte de la page. Mesuré : deux lignes à y=-20 et y=36, fond s'arrêtant
+       à y=56. Au-dessus de 470px le contenu tient sur une ligne et tout va bien.
+       On laisse donc la barre prendre la hauteur de ce qu'elle contient. */
+    '@media (max-width:470px){[data-nav]{height:auto!important;min-height:56px}' +
+      '[data-nav]>[data-wrap]{padding-top:6px!important;padding-bottom:6px!important}}' +
+    /* L'entrée de l'assistante s'ouvrait au survol. Sans souris, elle restait
+       à opacité 0 et pointer-events:none tant qu'on n'avait pas défilé assez
+       loin : introuvable là où on la cherche, c'est-à-dire en arrivant. */
+    '@media (hover:none),(pointer:coarse){[data-ada-follow]{opacity:1!important;' +
+      'pointer-events:auto!important}}';
+  doc.head.appendChild(s);
 })();
 
 (function(){ /* JEU 07 — COLLECTE DE PAQUETS : la sonde parcourt le réseau */
