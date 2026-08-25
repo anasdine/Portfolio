@@ -169,6 +169,63 @@ Outils voisins ajoutés : `chevauchements.js` (texte sur texte) et `bandeau.js`
 
 ## 4. Reste à faire
 
+### Ce que le doigt révèle — 25 août
+
+Signalé par le propriétaire : barres du haut qui se chevauchent, assistante qui
+n'apparaît pas, bouton son inopérant, boutons jaunes morts. **La session
+précédente avait vérifié la _présence_ de ces commandes, jamais leur
+_fonctionnement_.** C'est tout l'écart. Outils : `doigt.js`, `sonde.js`,
+`entete.js`, `valide.js`, `audit.js`.
+
+**Piège de protocole, à ne pas refaire** : mes premières mesures étaient prises
+**en haut de page**, où l'en-tête n'est pas encore collant et où l'entrée de
+l'assistante est masquée. Elles étaient toutes fausses. Il faut mesurer **là où
+la commande existe**.
+
+**Corrigé et validé (5 tests sur 5, `valide.js`) :**
+
+- **Les haut-parleurs jaunes.** La tape fonctionnait parfaitement — mesuré : la
+  bulle passait de « Bienvenue sur le portfolio » à « Quatre besoins concrets… »,
+  le bon texte. Mais `[data-ada-bubble]` est `display:none !important` sous 720px,
+  parce qu'elle est ancrée au personnage 3D lui-même masqué à cette largeur.
+  **La réponse partait dans le vide.** Cause plus profonde : le gestionnaire de
+  la ligne ~9540 n'est pas réservé à la souris, s'enregistre en premier sur
+  `pointerdown`, réclame le texte via `exClaim`, et les deux gestionnaires
+  tactiles posés plus bas reçoivent `false` et sortent. **Au doigt, c'est le
+  chemin souris qui gagnait.** Une surface dédiée (`window.__ditAuDoigt`) est
+  posée en bas d'écran, branchée sur le gestionnaire qui gagne réellement.
+
+- **L'entrée de l'assistante.** `[data-ada-follow]` était `opacity:0` et
+  `pointer-events:none` tant qu'on n'avait pas défilé : introuvable en arrivant.
+  Forcée visible et cliquable sur `(hover:none),(pointer:coarse)`. La tape ouvre
+  bien le panneau.
+
+- **Les deux barres du haut.** `[data-nav]` est fixe et haut de **56px**, mais son
+  contenu passe en `flex-wrap:wrap` sous ~470px et occupe **96px sur deux lignes**.
+  Centré dans 56px, il débordait de 20px en haut — logo et « ☰ SOMMAIRE » coupés
+  par le bord — et de 20px en bas, si bien que **« FR » et « MOUV. » pendaient
+  sous le fond de la barre, à même le texte**. La barre prend désormais la hauteur
+  de son contenu sous 470px. Vérifié de 320 à 900px : plus rien ne déborde.
+
+**Le bouton son — non concluant, et je le dis.** Ce n'est pas `[data-sound]` :
+celui-là **n'existe dans aucun fichier publié**, `paintSound()` sort toujours sur
+`if(!b) return`. Le vrai bouton est `[data-voice-btn]` (« Couper la voix »).
+Sur **Chromium/Pixel il bascule correctement** (`aria-pressed` true→false).
+Sur **WebKit sans tête il est `display:none`** — non par bug, mais parce que
+`speechSynthesis` y est **absent** et que l'appli masque le bouton faute de voix.
+Un vrai iPhone a la synthèse vocale : le bouton s'y affiche, et **aucun moteur
+sans tête ne peut reproduire ce cas**. Piste à vérifier sur appareil : iOS exige
+un geste utilisateur direct pour démarrer la synthèse, et `getVoices()` y est
+asynchrone.
+
+**Trouvé, pas corrigé :**
+
+- Les boutons `JOUER` et `CHANGER DE CAMP` du **jeu 13 sont recouverts par sa
+  propre toile** (`canvas[data-g13]`) — injouables au doigt.
+- Les points jaunes font **22×22**, moitié de la cible tactile minimale, et l'un
+  d'eux est recouvert par le bouton `MOUV.`. Les agrandir risque de leur faire
+  voler la tape des commandes voisines : à traiter avec la disposition.
+
 ### Priorité haute
 1. ~~Réparer les profils mobiles de `voir.js`~~ — **fait**, voir § 3.
    Passage sur les six profils : aucune erreur de page, 8 langues, 13 jeux,
