@@ -218,13 +218,40 @@ sans tête ne peut reproduire ce cas**. Piste à vérifier sur appareil : iOS ex
 un geste utilisateur direct pour démarrer la synthèse, et `getVoices()` y est
 asynchrone.
 
+**Le bouton de voix — conforme, tranché avec le propriétaire.** Pas de synthèse
+sur l'appareil, pas de bouton : c'est le comportement voulu. Reste comblé le cas
+API présente / aucune voix installée, par une vérification différée de 6 s.
+⚠ **Ne jamais masquer sur `voiceschanged`** : cet événement se déclenche parfois
+une première fois avec une liste vide. Ma première version le faisait — trois
+voix présentes et bouton masqué. Mesuré, corrigé.
+
+**Jeu 13 — corrigé.** `@media (max-width:640px){[data-game] canvas{min-height:
+clamp(240px,42vh,340px)!important}}` imposait une taille minimale à la **toile**
+sans l'imposer à son conteneur, resté à `clamp(200px,30vh,320px)`. La toile étant
+en `position:absolute;inset:0`, elle sortait par le bas — 77 px sur iPhone, 88 sur
+Pixel, 89 à 360 px — pile sur `JOUER` et `CHANGER DE CAMP`. Le conteneur reçoit la
+même hauteur minimale. La règle vise `[data-game] [data-cursor]` : **tous les jeux**.
+
+### Limite de l'audit, à connaître avant de lire ses chiffres
+
+`audit.js` teste `elementFromPoint` au centre de chaque commande, à une position
+de défilement donnée. Tout ce qui se trouve alors sous l'**en-tête collant** ou
+sous la **barre fixe de droite** est compté « recouvert » — alors qu'il suffit
+souvent de défiler un peu. Après correction du jeu 13, **les 14 constats restants
+sont tous de cette classe** : points jaunes, champ de commande du terminal, boutons
+divers, passés sous `[data-nav]`, `[data-motion]` ou `[data-ada-follow]`.
+
+Ce ne sont pas 14 bugs. Le vrai travail derrière : poser un `scroll-margin-top`
+égal à la hauteur de l'en-tête sur les cibles d'ancre et les champs de saisie, pour
+que rien n'atterrisse jamais dessous. Et le détecteur devrait ignorer les paires
+dont l'élément du dessus a un fond opaque — il ne sait pas le voir aujourd'hui.
+
 **Trouvé, pas corrigé :**
 
-- Les boutons `JOUER` et `CHANGER DE CAMP` du **jeu 13 sont recouverts par sa
-  propre toile** (`canvas[data-g13]`) — injouables au doigt.
-- Les points jaunes font **22×22**, moitié de la cible tactile minimale, et l'un
-  d'eux est recouvert par le bouton `MOUV.`. Les agrandir risque de leur faire
-  voler la tape des commandes voisines : à traiter avec la disposition.
+- Les points jaunes font **22×22**, moitié de la cible tactile minimale. Les
+  agrandir risque de leur faire voler la tape des commandes voisines : à traiter
+  avec la disposition, pas isolément.
+- **`scroll-margin-top`** sur les ancres et les champs (voir ci-dessus).
 
 ### Priorité haute
 1. ~~Réparer les profils mobiles de `voir.js`~~ — **fait**, voir § 3.
