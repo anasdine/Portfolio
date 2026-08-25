@@ -13841,6 +13841,11 @@ function buildScene(){
     p4[j] = R4[0] * RXK + (lx4 * cr4 - dy4 * sr4) * sc4;
     p4[j + 1] = R4[1] + RYO + (lx4 * sr4 + dy4 * cr4 + .15) * sc4;
     p4[j + 2] = R4[2] + (Math.random() - .5) * .34;
+    /* aP1.y etait ecrit a zero et jamais relu : le nuanceur calcule la
+       hauteur de la colonne qui tombe par une autre voie. On y range donc
+       l'abscisse du mat de la machine, ce qui donne a la transition un
+       point de ralliement sans couter un seul tampon de plus. */
+    p1[j + 1] = R4[0] * RXK;
     /* L'outil se distingue par la TEINTE, canal aR.x — et par lui seul :
        aR.y et le choix du glyphe appartiennent deja a l'helice, qui s'en sert
        pour separer ses squelettes de ses barreaux. Deux phases, deux canaux,
@@ -13907,6 +13912,17 @@ function buildScene(){
       '  float lag = .24 * (.5 - aP3.y * .109) + .38 * (aP4.z + 2.6) * .192 + .18 * aR.x;',
       '  float u4 = clamp(t4 * 1.88 - lag, 0., 1.);',
       '  float w4 = es(u4);',
+      /* Trois temps qui se chevauchent, tires du meme u4 : l'helice se
+         REFERME comme une fermeture eclair, le cordon GLISSE vers l'abscisse
+         de sa machine et s'y plante, puis les membres SORTENT du tronc.
+         land depasse legerement aux deux bouts — la forme rentre de trois
+         pour cent avant de sortir, et deborde d'autant avant de se poser :
+         quatre multiplications, aucune transcendante, et land(0) comme
+         land(1) valent exactement 0 et 1. */
+      '  float bStand = es(clamp(u4 * 2.7, 0., 1.));',
+      '  float bMove  = es(clamp(u4 * 2.3 - .70, 0., 1.));',
+      '  float bForm  = es(clamp(u4 * 2.6 - 1.6, 0., 1.));',
+      '  float land = bForm + .45 * (4. * bForm * (1. - bForm)) * (2. * bForm - 1.);',
       /* la colonne coule vers le bas au lieu de flotter */
       '  vec3 c1 = vec3(aP1.x, mod(aR.z * 13. - uT * 1.9, 13.) - 6.5, aP1.z);',
       /* l'ADN tourne, et les harnais le serrent au passage. Rotation par
@@ -13925,16 +13941,26 @@ function buildScene(){
       '  float k5 = 1. - .22 * sq;',
       '  vec2 rz2 = vec2(aP3.x * c5 - aP3.z * s5, aP3.x * s5 + aP3.z * c5) * k5;',
       '  vec3 c3 = vec3(rz2.x, aP3.y + dy * .07 * sq, rz2.y);',
+      /* Le rayon tombe a 18 % : les deux brins se referment. On ne va pas a
+         zero, sinon des centaines de glyphes se superposent en additif et
+         donnent une barre blanche. Comme le rayon s'effondre, la rotation
+         s'eteint d'elle-meme : pas un cosinus de plus.
+         Puis le cordon rallie l'abscisse de sa machine et se tasse : le mat
+         unique se fend en fûts qui vont se planter chacun a son poste. C'est
+         la rime avec la phase II — la colonne qui tombait revient debout. */
+      '  vec2 mxz = mix(c3.xz * (1. - .82 * bStand), vec2(aP1.y, aP4.z), bMove);',
+      '  float mastY = c3.y * (1. - .42 * bMove);',
+      '  vec3 c4 = vec3(mix(mxz.x, aP4.x, land), mix(mastY, aP4.y, land), mix(mxz.y, aP4.z, land));',
       '  vec3 c2 = aP2 + aEV * fract(aR.x + uT * (.055 + aR.z * .06));',
       '  vec3 pos = mix(aP0, c1, w1);',
       '  pos = mix(pos, c2, w2);',
       '  pos = mix(pos, c3, w3);',
-      '  pos = mix(pos, aP4, w4);',
+      '  pos = mix(pos, c4, w4);',
       /* le désordre s'éteint à mesure que la page s'ordonne */
       '  vec3 q = pos * .3 + aR * 7. + vec3(uT * .11, uT * .08, -uT * .06);',
       '  pos += vec3(sin(q.y * 1.7), cos(q.z * 1.5), sin(q.x * 1.3)) * (1.25 * uChaos + .04);',
       '  vec4 mv = modelViewMatrix * vec4(pos, 1.);',
-      '  float sk = mix(1., .62, w2) * mix(1., 1.04, w3) * mix(1., 1.35, w4);',
+      '  float sk = mix(1., .62, w2) * mix(1., 1.04, w3) * mix(1., 1.35, bForm);',
       '  float s = uSize * sk * (.5 + aR.y * .8) * (1. + uPulse * .3);',
       '  mv.xy += position.xy * s;',
       '  gl_Position = projectionMatrix * mv;',
@@ -13949,7 +13975,7 @@ function buildScene(){
          Une A-T ne tient qu'à deux liaisons hydrogène : elle est plus terne.
          Une G-C en a trois : c'est le point le plus lumineux de l'hélice. */
       '  vec3 adn = aH < .5 ? uColA : (aH < 1.5 ? uColC : (aH < 2.5 ? mix(uColB, uColA, .45) : uColB));',
-      '  vCol = mix(vCol, adn, clamp(w3 - w4, 0., 1.) * .9);',
+      '  vCol = mix(vCol, adn, clamp(w3 - bForm, 0., 1.) * .9);',
       '  vA = (.26 + .74 * aR.y) * fog * (.6 + .55 * uOrder) * (1. + uPulse * .7);',
       '}'
     ].join('\n'),
