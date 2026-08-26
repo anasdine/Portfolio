@@ -353,12 +353,68 @@ Ce palier protège toute la page. **Ne pas le contourner** : alléger la scène.
 
 #### Ce qui reste ouvert
 
-- **Chevauchement légende × puces** signalé en photo près de Leonhard, non
-  reproduit : essayé à 402 px, à toutes les hauteurs, et avec le diagramme
-  défilé horizontalement comme sur la capture. `text-size-adjust` est déjà posé,
-  ce n'est donc pas l'inflation de texte d'iOS. **Question en suspens : le
-  défaut persiste-t-il à l'arrêt, ou seulement pendant le défilement ?** Si
-  c'est pendant, chercher du côté de l'animation d'apparition GSAP.
+- **Chevauchement légende × puces** signalé en photo près de Leonhard —
+  re-signalé le 26 août, voir « Ce que la seconde photo prouve » ci-dessous.
+  Toujours pas reproduit en mesure, mais on sait désormais que ce n'est pas la
+  mise en page.
+
+### Ce que la seconde photo prouve — 26 août
+
+Nouvelle photo du propriétaire, même section Leonhard, chevauchement massif.
+Cette fois la capture se laisse lire au pixel, et elle **disculpe la mise en
+page** :
+
+- la toile du diagramme y mesure **386 px de haut**, soit exactement `52vh`
+  d'une fenêtre de **743 px** — Safari barres visibles ;
+- interlignes des deux paragraphes, cinq lignes du pied, trois puces, panneau
+  « 41 alertes reçues » en dessous : **toutes les cotes internes sont justes** ;
+- mais le bloc `[data-plane-wrap]` est **peint ~470 px plus bas que sa place**,
+  et sa toile **~120 px plus à droite que sa propre boîte de découpe** — alors
+  que le paragraphe de pied, son voisin dans la même boîte, n'a pas bougé
+  horizontalement.
+
+Deux boîtes imbriquées désynchronisées **chacune de son côté** : c'est un
+décalage de calques composités, pas un défaut de calcul. Vérifié en face :
+l'écart entre le bloc et ce qui le suit vaut **+22 px, toujours** — à toutes les
+hauteurs de défilement, aux deux modes d'animation, aux deux hauteurs de
+fenêtre, dans les huit langues.
+
+**Deux axes de mesure qui manquaient à toutes les campagnes précédentes**, et
+que la photo a livrés :
+
+1. **Le mode.** Sa barre affiche « ANIMATION 3D — CALME » : *Réduire les
+   animations* est coché sur son iPhone. Tout ce qui avait été mesuré jusque-là
+   tournait en `full`. `final.js` prend désormais le mode en argument.
+2. **La hauteur de fenêtre.** 743 px barres visibles, pas 874. Plusieurs boîtes
+   de la page sont en `vh` : la géométrie n'est pas la même. `final.js` prend
+   aussi la hauteur.
+
+**Correctif posé** : `-webkit-overflow-scrolling:touch` retiré de
+`[data-chain-scroll]` — sans effet depuis iOS 13, où l'élan est devenu le
+comportement par défaut, et seul réglage de ce sous-arbre qui force iOS à
+confier la boîte à un calque composité séparé. `overscroll-behavior-x:none`
+supprime au passage le rebond latéral, celui-là même qui explique les 120 px.
+⚠ **Ciblé sur la seule hypothèse que la photo soutient, pas une reproduction.**
+À confirmer sur l'appareil.
+
+**Contrôle des huit langues à 402×743, en CALME** — ce que le propriétaire
+demandait : zéro débordement horizontal, zéro toile sur du texte, zéro erreur.
+Le seul texte réellement écrasé est un badge « en pause » de 65×17 px dans le
+jeu 1, présent en six langues sur huit. Nouvel outil `outils/ecrase.js` : il
+remonte la chaîne des parents jusqu'à trouver un fond et écarte les paires dont
+l'élément du dessus est opaque — l'angle mort que les autres détecteurs ont.
+
+**La flèche de choix de section** : signalée morte, non reproduite (7 entrées
+sur 7 naviguent, et le menu « SOMMAIRE » aussi). Une fragilité réelle a
+toutefois été corrigée — le bouton portait **deux** écouteurs de clic, celui
+d'origine qui remonte en haut de page et celui qui ouvre la liste, et le second
+comptait sur `stopPropagation()` pour museler le premier. Or sur la cible
+elle-même c'est `stopImmediatePropagation()` qui coupe les écouteurs du *même*
+élément. Sans lui, une tape remonte la page en haut ; le bouton, qui ne
+s'affiche qu'au-delà de 0,8 × la hauteur d'écran, s'efface aussitôt. Vu du
+doigt : « la flèche ne marche pas ». Son libellé annonçait par ailleurs
+« Revenir en haut de la page » alors qu'au doigt il ouvre une liste de
+sections — corrigé.
 - **Diagramme du parc** : sa toile est portée à 640 px sous 540 px de large et
   défile latéralement, avec un dégradé et l'invite « glissez pour voir la
   suite ». Le ramener à la largeur de l'écran a été essayé et rejeté — la mise
