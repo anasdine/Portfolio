@@ -11246,6 +11246,73 @@ window.__ditAuDoigt.cache = function(){
 })();
 
 /* =============================================================
+   LE BLOC DU DIAGRAMME — lui garantir la hauteur de son contenu
+
+   LE DÉFAUT, tenu le 26 août. Le propriétaire voyait la section Leonhard
+   écrasée, en permanence, et a dû « décaler le visuel pour se rendre compte
+   qu'il y avait du texte caché derrière ». Reproduit ici, et c'est un défaut de
+   calcul du moteur, pas de la feuille de style :
+
+     enfants posés à   1..172   172..559   559..675     (justes)
+     hauteur du bloc   204                              (fausse)
+
+   Un bloc `display:block` à hauteur automatique contenant 675px d'enfants ne
+   peut pas mesurer 204px. Aucune règle ne lui pose de hauteur — vérifié en
+   parcourant toutes les feuilles. WebKit se trompe, et le bloc suivant démarre
+   donc **471px trop haut** : le dessin et le pied se posent sur les paragraphes.
+   La photo est très exactement cet état — l'écart qu'on y mesure vaut ~473px.
+
+   Le déclencheur trouvé ici est `overflow` non-`visible` sur le bloc. C'est ce
+   qui rend `-webkit-overflow-scrolling:touch` suspect sur l'appareil : iOS lui
+   fait porter la boîte autrement. Il est retiré (voir la feuille injectée), mais
+   on ne s'en remet pas à ça.
+
+   CE FILET NE DÉPEND PAS DU DÉCLENCHEUR. Les positions des enfants restent
+   justes même quand la hauteur du parent est fausse : on les lit, et on en fait
+   un plancher. Quand le calcul est bon — tous les cas mesurés ici — le plancher
+   vaut la hauteur naturelle et ne change donc rien.
+
+   ⚠ On relâche TOUJOURS avant de mesurer : sans cela on mesurerait par-dessus
+   son propre plancher, et il ne pourrait plus que grandir.
+============================================================= */
+(function(){
+  var blocs = qsa('[data-plane-wrap]').filter(function(w){
+    return !!w.querySelector('[data-chain-scroll]');
+  });
+  if(!blocs.length) return;
+
+  function pose(){
+    /* deux passes : tout relâcher, puis mesurer une page revenue à son naturel */
+    blocs.forEach(function(w){ w.style.minHeight = ''; });
+    blocs.forEach(function(w){
+      var r = w.getBoundingClientRect();
+      if(r.width < 8) return;                       /* pas encore disposé */
+      var bas = r.top;
+      for(var i = 0; i < w.children.length; i++){
+        var c = w.children[i].getBoundingClientRect();
+        if(c.bottom > bas) bas = c.bottom;
+      }
+      var st = getComputedStyle(w);
+      var sous = (parseFloat(st.paddingBottom) || 0) + (parseFloat(st.borderBottomWidth) || 0);
+      var voulu = Math.ceil(bas - r.top + sous);
+      /* on ne pose le plancher que si le moteur annonce moins que son contenu */
+      if(voulu > 40 && voulu > r.height + 1) w.style.minHeight = voulu + 'px';
+    });
+  }
+
+  addEventListener('resize', function(){ askResize(pose); }, { passive: true });
+  addEventListener('orientationchange', function(){ setTimeout(pose, 260); });
+  /* la barre de chaîne se replie autrement selon la langue : sa hauteur change,
+     donc le plancher aussi */
+  if(window.CalibreEngine && window.CalibreEngine.relabel)
+    window.CalibreEngine.relabel(function(){ setTimeout(pose, 120); }, 'plancher-plan');
+  /* la toile se dimensionne après coup : on repasse quand elle s'est posée */
+  setTimeout(pose, 1200);
+  setTimeout(pose, 4200);
+  pose();
+})();
+
+/* =============================================================
    LES CHAÎNES D'ÉTAPES — les empiler plutôt que les couper n'importe où
    « Les équipements du parc émettent → Leonhard trie → P1 · P2 · P3 → … » est
    une rangée flex avec les flèches en enfants séparés. Sur téléphone elle se
@@ -11456,6 +11523,82 @@ window.__ditAuDoigt.cache = function(){
     if(pan.contains(e.target) || up.contains(e.target)) return;
     ferme();
   }, true);
+})();
+
+/* =============================================================
+   RAPPORTEUR DE COTES — seulement sur « ?diag=1 »
+   La superposition de la section Leonhard est signalée sur l'appareil du
+   propriétaire et ne se produit sur AUCUNE mesure d'ici : ni à 402×743 ni à
+   402×874, ni en calme ni en complet, ni dans aucune des huit langues. Deux
+   photos ont été épuisées ; il faut les chiffres pris sur le téléphone lui-même.
+   Ce panneau les affiche. Rien ne change pour qui n'ajoute pas le paramètre :
+   pas d'élément créé, pas d'écouteur posé, pas une ligne exécutée.
+============================================================= */
+(function(){
+  try{
+    if(!/[?&]diag=1/.test(location.search) && location.hash !== '#diag') return;
+  }catch(e){ return; }
+
+  function mesure(){
+    var cv = qs('canvas[data-pipe]');
+    if(!cv) return ['toile [data-pipe] introuvable'];
+    var w = cv.closest('[data-plane-wrap]'), boite = cv.parentElement;
+    var suite = w && w.nextElementSibling;
+    var R = function(e){ var r = e.getBoundingClientRect();
+      return { h: Math.round(r.height), t: Math.round(r.top + (window.pageYOffset || 0)),
+               l: Math.round(r.left), w: Math.round(r.width) }; };
+    var rw = R(w), rb = R(boite), rc = R(cv), rp = R(w.lastElementChild);
+    var rs = suite ? R(suite) : null;
+    var sw = getComputedStyle(w), sb = getComputedStyle(boite);
+    /* le texte du bloc suivant est-il REELLEMENT sous le dessin ? */
+    var couvert = '—';
+    if(suite){
+      var p = suite.querySelector('p');
+      if(p){
+        var r2 = p.getBoundingClientRect();
+        var x = Math.min(innerWidth - 2, Math.max(2, r2.left + r2.width * .8));
+        var y = Math.min(innerHeight - 2, Math.max(2, r2.top + 8));
+        var d = doc.elementFromPoint(x, y);
+        couvert = !d ? 'rien' : (d === p || p.contains(d) ? 'NON, le texte est devant'
+          : (d === cv || cv.contains(d) || d === boite ? 'OUI, la toile est devant'
+            : d.tagName.toLowerCase()));
+      }
+    }
+    return [
+      'fenetre ' + innerWidth + '×' + innerHeight + '  dpr ' + (window.devicePixelRatio || 1),
+      'mouvement ' + MOTION + '   palier ' + PERF.lvl,
+      'bloc      h=' + rw.h + '  pos=' + sw.position + '  ovf=' + sw.overflow,
+      'chaine    h=' + R(w.firstElementChild).h,
+      'boite     h=' + rb.h + '  pos=' + sb.position + '  ovfX=' + sb.overflowX +
+        '  defil=' + Math.round(boite.scrollWidth - boite.clientWidth) + ' (x=' + Math.round(boite.scrollLeft) + ')',
+      'toile     h=' + rc.h + '  l=' + rc.l + '  w=' + rc.w,
+      'pied      h=' + rp.h + '  t=' + rp.t,
+      'somme enfants ' + Math.round([].reduce.call(w.children, function(a, e){
+        return a + e.getBoundingClientRect().height; }, 0)),
+      rs ? ('suite     t=' + rs.t + '   ECART ' + (rs.t - (rw.t + rw.h)) +
+            (rs.t - (rw.t + rw.h) < 0 ? '  <<<<< CHEVAUCHEMENT' : '  (normal : +22)'))
+         : 'suite     absente',
+      'texte sous le dessin : ' + couvert
+    ];
+  }
+
+  var pan = doc.createElement('pre');
+  pan.setAttribute('data-diag', '1');
+  pan.style.cssText = 'position:fixed;left:6px;right:6px;top:120px;z-index:9999;margin:0;' +
+    'background:rgba(6,8,10,.97);color:#8FE4EE;border:1px solid #048B9A;border-radius:8px;' +
+    'padding:10px;font:600 10px/1.5 ui-monospace,monospace;white-space:pre-wrap;' +
+    'max-height:56vh;overflow:auto;pointer-events:auto';
+  var rafraichis = function(){
+    try{ pan.textContent = mesure().join('\n'); }
+    catch(e){ pan.textContent = 'mesure impossible : ' + (e && e.message); }
+  };
+  pan.addEventListener('click', function(){ pan.style.display = 'none'; });
+  doc.body.appendChild(pan);
+  rafraichis();
+  addEventListener('scroll', rafraichis, { passive: true });
+  addEventListener('resize', rafraichis, { passive: true });
+  setTimeout(rafraichis, 3000);
+  setTimeout(rafraichis, 9000);
 })();
 
 (function(){
