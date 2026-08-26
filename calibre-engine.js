@@ -6244,33 +6244,14 @@ var VOICE = (function(){
     resize();
     if(window.ResizeObserver) new ResizeObserver(function(){ askResize(resize); }).observe(cv);
     if(RM){ frame(.016, 1.2); return; }
-    if(MOB){
-      /* Aucune boucle au repos — c'est ce qui rend la scene abordable sur un
-         telephone. Mais elle ne se redessinait qu'au `pointerdown` : le glisse
-         changeait l'angle sans que rien ne suive, exactement le defaut releve
-         sur la baie. On reveille le rendu pendant que le doigt est pose, et
-         neuf dixiemes de seconde apres l'avoir leve pour que l'amorti se pose. */
-      frame(.016, 1.2);
-      var tL = 1.2, jusquaL = 0, enCoursL = 0;
-      var tourneL = function(){
-        tL += .016; frame(.016, tL);
-        if(performance.now() < jusquaL) requestAnimationFrame(tourneL);
-        else enCoursL = 0;
-      };
-      var reveilleL = function(){
-        jusquaL = performance.now() + 900;
-        if(!enCoursL){ enCoursL = 1; requestAnimationFrame(tourneL); }
-      };
-      cv.addEventListener('pointerdown', reveilleL);
-      cv.addEventListener('pointermove', reveilleL);
-      addEventListener('pointerup', reveilleL);
-      /* les boutons de manipulation redessinent aussi */
-      ['[data-leap-side]', '[data-leap-zin]', '[data-leap-zout]', '[data-leap-fit]',
-       '[data-leap-ecl]', '[data-leap-anim]'].forEach(function(sel){
-        var el = qs(sel); if(el) el.addEventListener('click', reveilleL);
-      });
-      return;
-    }
+    /* Le telephone suit desormais le meme chemin que l'ordinateur : la scene
+       s'anime en continu — ventilateurs, flux d'air — mais UNIQUEMENT quand elle
+       est a l'ecran, via l'observateur d'intersection plus bas. J'avais d'abord
+       choisi de ne la reveiller qu'au doigt, pour la batterie ; le proprietaire
+       la trouve figee, et il a raison : un boitier dont les ventilateurs ne
+       tournent pas ne raconte rien. La mesure autorise ce choix — 1,90 ms par
+       image a la taille d'un telephone, page entiere a 4,7 ms sur un moteur
+       avec GPU. Hors ecran, il ne se passe toujours rien. */
     var api = { vis: false, warm: 0 };
     api.frame = function(dt, t){
       if(!api.vis) return;
