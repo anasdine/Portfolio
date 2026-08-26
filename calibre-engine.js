@@ -11392,10 +11392,30 @@ window.__ditAuDoigt.cache = function(){
   doc.body.appendChild(jauge);
 
   var attente = 0, dernier = -1;
+  /* La jauge est fixe : elle se posait sur le bandeau de section, « 4 / 4 ·
+     SAVOIR OÙ VOUS EN ÊTES » écrit par-dessus « CE QUE JE FAIS CHEZ VOUS ».
+     C'est la seconde moitié du « libellés superposés » signalé le 26 août.
+     On ne devine pas la hauteur des deux : on les mesure, et la colonne
+     collante démarre sous la jauge. Robuste au repli de la barre sur deux
+     rangs, et à la langue — l'allemand rallonge les deux. */
+  var col = sec.firstElementChild;
+  function degage(){
+    if(!col) return;
+    var jr = jauge.getBoundingClientRect();
+    var bas = jr.height > 2 ? jr.bottom : 0;
+    var nav = qs('[data-nav]');
+    var nb = nav ? nav.getBoundingClientRect().height : 56;
+    var voulu = Math.ceil(Math.max(nb, bas) + 4);
+    if(String(col.__degage) !== String(voulu)){
+      col.__degage = voulu;
+      col.style.setProperty('padding-top', voulu + 'px', 'important');
+    }
+  }
   function pose(){
     attente = 0;
     var nav = qs('[data-nav]');
     jauge.style.top = ((nav ? nav.getBoundingClientRect().height : 56) + 6) + 'px';
+    degage();
     var r = sec.getBoundingClientRect();
     /* visible seulement pendant la traversée de la section */
     var dedans = r.top < innerHeight * .5 && r.bottom > innerHeight * .5;
@@ -11434,6 +11454,11 @@ window.__ditAuDoigt.cache = function(){
     if(!tete) tete = li.textContent;
     etiq.textContent = (actif + 1) + ' / ' + n + '  ·  ' +
       (tete || '').trim().replace(/\s+/g, ' ').slice(0, 32);
+    /* le libellé vient d'être écrit : la jauge a sa hauteur définitive, on
+       remesure. Sans ce second passage la première pose se fait sur une jauge
+       encore vide, trop courte de quelques pixels, et le bandeau remonte
+       dessus. */
+    degage();
   }
   function demande(){ if(!attente){ attente = 1; requestAnimationFrame(pose); } }
   addEventListener('scroll', demande, { passive: true });
@@ -11459,6 +11484,104 @@ window.__ditAuDoigt.cache = function(){
    ⚠ Ne pas la re-greffer. Si un jour le choix des sections doit exister en bas
    d'écran, que ce soit un SECOND bouton, pas celui-ci.
 ============================================================= */
+
+/* =============================================================
+   LE CHOIX DES SECTIONS — son propre bouton, à côté de la flèche
+
+   « la flèche vers le haut marche, te pousse en haut, mais ne propose pas de
+   choisir par section, c'est dommage. » La liste était utile ; c'est de l'avoir
+   posée SUR la flèche qui ne l'était pas. Elle a donc son bouton à elle, juste
+   au-dessus. La flèche remonte, le bouton liste : une commande, un travail.
+
+   Les entrées sont construites à partir des ancres existantes — mêmes cibles,
+   mêmes libellés, donc mêmes traductions, sans table à maintenir.
+============================================================= */
+(function(){
+  if(!TOUCH) return;
+  var liens = qsa('[data-nav-links] a[data-anchor]');
+  if(!liens.length) return;
+
+  var btn = doc.createElement('button');
+  btn.type = 'button';
+  btn.setAttribute('data-sections', '1');
+  btn.setAttribute('aria-label', 'Choisir une section');
+  btn.setAttribute('aria-haspopup', 'true');
+  btn.setAttribute('aria-expanded', 'false');
+  btn.title = 'Choisir une section';
+  btn.style.cssText = 'position:fixed;right:12px;bottom:134px;z-index:120;' +
+    'width:46px;height:46px;display:grid;place-items:center;padding:0;cursor:pointer;' +
+    'background:rgba(10,12,14,.96);border:1px solid rgba(4,139,154,.55);border-radius:12px;' +
+    'color:#5FD3E3;box-shadow:0 8px 24px rgba(0,0,0,.55);' +
+    'opacity:0;pointer-events:none;transform:translateY(8px);' +
+    'transition:opacity .3s ease,transform .3s ease';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" ' +
+    'stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:block">' +
+    '<path d="M4 6h16M4 12h16M4 18h10"/></svg>';
+  doc.body.appendChild(btn);
+
+  var pan = doc.createElement('nav');
+  pan.setAttribute('data-choix-section', '1');
+  pan.setAttribute('aria-label', 'Sections');
+  pan.style.cssText = 'position:fixed;left:12px;right:12px;bottom:190px;z-index:130;' +
+    'background:rgba(10,12,14,.97);border:1px solid rgba(4,139,154,.5);border-radius:14px;' +
+    'padding:6px;display:none;box-shadow:0 14px 40px rgba(0,0,0,.6);' +
+    /* pas de `-webkit-overflow-scrolling:touch` : sans effet depuis iOS 13, où
+       l'élan est devenu le comportement par défaut, et connu pour faire porter
+       la boîte par un calque composité à part. `overscroll-behavior:contain`
+       évite qu'un glissé dans la liste emporte la page derrière. */
+    'max-height:54vh;overflow:auto;overscroll-behavior:contain';
+
+  function entree(txt, aller){
+    var b = doc.createElement('button');
+    b.type = 'button';
+    b.textContent = txt;
+    b.style.cssText = 'display:block;width:100%;text-align:left;background:none;border:0;' +
+      'border-bottom:1px solid rgba(228,232,234,.07);color:#E4E8EA;' +
+      'font:600 12px/1.2 "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.1em;' +
+      'text-transform:uppercase;padding:14px 12px;min-height:48px;cursor:pointer';
+    b.addEventListener('click', function(e){ e.preventDefault(); ferme(); aller(); });
+    return b;
+  }
+  pan.appendChild(entree('↑  ' + (typeof tr === 'function' ? tr('Haut de page') : 'Haut de page'),
+    function(){ scrollTo({ top: 0, behavior: 'smooth' }); }));
+  liens.forEach(function(a){
+    var t = (a.textContent || '').trim().replace(/\s+/g, ' ');
+    if(!t) return;
+    pan.appendChild(entree(t, function(){
+      var h = a.getAttribute('href') || '';
+      var c = h.charAt(0) === '#' ? doc.getElementById(h.slice(1)) : null;
+      if(c) c.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      else a.click();
+    }));
+  });
+  doc.body.appendChild(pan);
+
+  var ouvert = false;
+  function ouvre(){ ouvert = true; pan.style.display = 'block'; btn.setAttribute('aria-expanded', 'true'); }
+  function ferme(){ ouvert = false; pan.style.display = 'none'; btn.setAttribute('aria-expanded', 'false'); }
+  btn.addEventListener('click', function(e){
+    e.preventDefault();
+    ouvert ? ferme() : ouvre();
+  });
+  doc.addEventListener('pointerdown', function(e){
+    if(!ouvert) return;
+    if(pan.contains(e.target) || btn.contains(e.target)) return;
+    ferme();
+  }, true);
+
+  /* même règle d'apparition que la flèche : on ne l'affiche qu'une fois
+     descendu, sinon deux boutons flottent devant un en-tête déjà complet */
+  var vu = false;
+  addEventListener('scroll', function(){
+    var on = scrollY > innerHeight * .8;
+    if(on === vu) return;
+    vu = on;
+    btn.style.opacity = on ? '1' : '0';
+    btn.style.pointerEvents = on ? 'auto' : 'none';
+    btn.style.transform = on ? 'translateY(0)' : 'translateY(8px)';
+    if(!on && ouvert) ferme();
+  }, { passive: true });
+})();
 
 /* =============================================================
    RAPPORTEUR DE COTES — seulement sur « ?diag=1 »
@@ -11632,8 +11755,51 @@ window.__ditAuDoigt.cache = function(){
        337..535, bandeau 552..642, recouvrement 0%.
        `:has()` est requis — Safari 15.4 et Chrome 105. Sans lui la règle est
        simplement ignorée, on retombe sur l'état actuel, jamais pire. */
+    /* …et ce correctif-là a créé le suivant. `max-content` interdit toute
+       compression : le bloc réclame sa taille préférée, la colonne collante
+       fait 100svh, et le trop-plein part en `overflow:hidden`. Mesuré le
+       26 août sur les captures du propriétaire — « sec 02 les animations sont
+       coupées » : le panneau AVANT/APRÈS tronqué de 23 à 66px, et le bandeau
+       des quatre libellés coupé de 130 à 173px, donc invisible à 100%.
+
+       Le compte, à 402×743 : barre 113 + haut 62 + bandeau 84 + contenu 663 +
+       libellés 107 + bas 18 = 1047 pour 743. La composition ne tient pas sur un
+       téléphone, barre ou pas barre. Il faut donc rendre de la place, pas
+       seulement débloquer la compression.
+
+       `min-content` remplace `max-content` : le bloc peut rendre son mou, mais
+       jamais passer sous le plancher de la toile (288px, règle ci-dessous), qui
+       est ce que la composition réclame. */
     '@media (max-width:720px){[data-wrap]:has(canvas[data-s2]){' +
-      'min-height:max-content!important}}' +
+      'min-height:min-content!important;padding-top:2px!important;gap:8px!important}}' +
+    /* La colonne dégage la barre — 113px mesurés, 116 posés. Sans cela le haut
+       du bandeau passe dessous : c'est le « libellés superposés » signalé. */
+    '@media (max-width:720px){#strates > div{' +
+      'padding-top:114px!important;padding-bottom:2px!important}}' +
+    /* Le bandeau des quatre libellés est aujourd'hui coupé à 100% : il n'est
+       pas perdu, il n'a jamais été visible sur téléphone. On l'assume et on
+       rend ses 107px à ce qui se voit. Le repère « 01 / 04 » du haut porte
+       déjà la même information. */
+    '@media (max-width:720px){#strates [data-wrap]:has([data-s2-nav]){' +
+      'display:none!important}}' +
+    '@media (max-width:720px){#strates [data-s2-nav]{display:none!important}}' +
+    /* On resserre le texte et les repères, jamais la toile */
+    '@media (max-width:720px){' +
+      '[data-s2-num]{font-size:30px!important}' +
+      '[data-s2-quote]{font-size:19px!important;line-height:1.14!important;' +
+        'margin-top:5px!important}' +
+      '[data-s2-do]{font-size:14px!important;line-height:1.3!important;' +
+        'margin-top:4px!important}' +
+      '[data-s2-gain]{font-size:13px!important;line-height:1.3!important;' +
+        'margin-top:4px!important;padding-top:0!important;padding-bottom:0!important}' +
+      '[data-s2-quote] + p{margin-top:7px!important}' +
+      '[data-sec-banner] > span:first-child{font-size:26px!important}}' +
+    /* Le compteur du bandeau — « 01 / 04 · quatre problèmes, quatre réponses » —
+       dit exactement ce que dit la jauge fixe posée sous la barre. Sur
+       téléphone on garde la jauge, qui est toujours visible, et on rend au
+       contenu la rangée que le compteur imposait au bandeau. */
+    '@media (max-width:720px){[data-sec-banner]:has([data-s2-count]) > ' +
+      'span:has([data-s2-count]){display:none!important}}' +
     /* La composition de la section 02 cale ses reperes verticaux en pixels
        fixes — les utilisateurs a cy+74, leur libelle a cy+90 — alors que le
        pied de page utilise `12 * SC()`, et que SC() = clamp(W/400, 1, 2.3)
