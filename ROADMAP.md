@@ -450,17 +450,33 @@ jeu 1, présent en six langues sur huit. Nouvel outil `outils/ecrase.js` : il
 remonte la chaîne des parents jusqu'à trouver un fond et écarte les paires dont
 l'élément du dessus est opaque — l'angle mort que les autres détecteurs ont.
 
-**La flèche de choix de section** : signalée morte, non reproduite (7 entrées
-sur 7 naviguent, et le menu « SOMMAIRE » aussi). Une fragilité réelle a
-toutefois été corrigée — le bouton portait **deux** écouteurs de clic, celui
-d'origine qui remonte en haut de page et celui qui ouvre la liste, et le second
-comptait sur `stopPropagation()` pour museler le premier. Or sur la cible
-elle-même c'est `stopImmediatePropagation()` qui coupe les écouteurs du *même*
-élément. Sans lui, une tape remonte la page en haut ; le bouton, qui ne
-s'affiche qu'au-delà de 0,8 × la hauteur d'écran, s'efface aussitôt. Vu du
-doigt : « la flèche ne marche pas ». Son libellé annonçait par ailleurs
-« Revenir en haut de la page » alors qu'au doigt il ouvre une liste de
-sections — corrigé.
+### La flèche d'en bas — le détournement est annulé
+
+**J'ai cherché loin avant d'écouter.** Le propriétaire parlait de la flèche
+classique de retour en haut : « la flèche en bas, quand tu cliques pour
+remonter, ça clique dans le vide ». J'avais échafaudé des hypothèses sur
+`stopPropagation` et sur le menu « SOMMAIRE » ; la réponse était dans la phrase.
+
+Une session précédente avait greffé une **liste de sections** sur `[data-up]`,
+au motif que « sur téléphone, la liste des six liens est repliée derrière
+SOMMAIRE ». Le greffon posait `preventDefault` + `stopPropagation` en phase de
+**capture**, donc avant le comportement d'origine : **la page ne remontait
+plus**. Un panneau s'ouvrait à la place — pas ce qu'on demande à une flèche vers
+le haut.
+
+⚠ **Et mon premier correctif a aggravé la chose** : j'ai ajouté
+`stopImmediatePropagation()` pour « fiabiliser » le greffon, verrouillant
+définitivement le retour en haut, et j'ai renommé le bouton « Choisir une
+section ». Exactement à l'envers de ce qui était demandé.
+
+**Le greffon est retiré.** Une flèche vers le haut remonte. Le choix des
+sections garde son bouton, « ☰ SOMMAIRE », vérifié atteignable et fonctionnel
+(8 entrées sur 8). Testé par tape réelle aux quatre combinaisons
+calme/complet × 743/874 : `scrollY` revient à 0, rien ne recouvre le bouton,
+son libellé redit « Revenir en haut de la page ».
+
+**Ne pas la re-greffer.** Si le choix des sections doit un jour exister en bas
+d'écran, que ce soit un *second* bouton.
 - **Diagramme du parc** : sa toile est portée à 640 px sous 540 px de large et
   défile latéralement, avec un dégradé et l'invite « glissez pour voir la
   suite ». Le ramener à la largeur de l'écran a été essayé et rejeté — la mise

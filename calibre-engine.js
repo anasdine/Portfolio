@@ -11443,87 +11443,22 @@ window.__ditAuDoigt.cache = function(){
 })();
 
 /* =============================================================
-   LA FLÈCHE D'EN BAS À GAUCHE — une liste de sections
-   Elle ne faisait que remonter en haut de page. Sur téléphone, où la liste des
-   six liens est repliée derrière « SOMMAIRE », c'est le seul repère permanent :
-   elle ouvre désormais le choix des sections, « Haut de page » compris.
-   Les entrées sont construites à partir des ancres existantes : mêmes cibles,
-   mêmes libellés, donc mêmes traductions, sans table à maintenir.
+   LA FLÈCHE D'EN BAS — elle remonte en haut de page, et rien d'autre
+
+   Une session précédente lui avait greffé une liste de sections, au motif que
+   « sur téléphone, la liste des six liens est repliée derrière SOMMAIRE ».
+   C'était une erreur, et le propriétaire l'a dit sans détour le 26 août :
+   « la flèche en bas, quand tu cliques pour remonter, ça clique dans le vide ».
+
+   Le détournement posait `preventDefault` + `stopPropagation` en phase de
+   CAPTURE, donc avant le comportement d'origine : la page ne remontait plus.
+   Un panneau s'ouvrait à la place — pas ce qu'on demande à une flèche vers le
+   haut. Une flèche vers le haut remonte. Le choix des sections a déjà son
+   bouton, « ☰ SOMMAIRE », vérifié atteignable et fonctionnel dans la barre.
+
+   ⚠ Ne pas la re-greffer. Si un jour le choix des sections doit exister en bas
+   d'écran, que ce soit un SECOND bouton, pas celui-ci.
 ============================================================= */
-(function(){
-  if(!TOUCH) return;
-  var up = qs('[data-up]'); if(!up) return;
-  var liens = qsa('[data-nav-links] a[data-anchor]');
-  if(!liens.length) return;
-
-  var pan = doc.createElement('nav');
-  pan.setAttribute('data-choix-section', '1');
-  pan.setAttribute('aria-label', 'Sections');
-  pan.style.cssText = 'position:fixed;left:12px;right:12px;bottom:70px;z-index:130;' +
-    'background:rgba(10,12,14,.97);border:1px solid rgba(4,139,154,.5);border-radius:14px;' +
-    'padding:6px;display:none;box-shadow:0 14px 40px rgba(0,0,0,.6);' +
-    /* pas de `-webkit-overflow-scrolling:touch` : sans effet depuis iOS 13, où
-       l'élan est devenu le comportement par défaut, et connu pour faire porter
-       la boîte par un calque composité à part. `overscroll-behavior:contain`
-       évite qu'un glissé dans la liste emporte la page derrière. */
-    'max-height:62vh;overflow:auto;overscroll-behavior:contain';
-
-  function entree(txt, aller){
-    var b = doc.createElement('button');
-    b.type = 'button';
-    b.textContent = txt;
-    b.style.cssText = 'display:block;width:100%;text-align:left;background:none;border:0;' +
-      'border-bottom:1px solid rgba(228,232,234,.07);color:#E4E8EA;' +
-      'font:600 12px/1.2 "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.1em;' +
-      'text-transform:uppercase;padding:14px 12px;min-height:48px;cursor:pointer';
-    b.addEventListener('click', function(e){ e.preventDefault(); ferme(); aller(); });
-    return b;
-  }
-  pan.appendChild(entree('↑  ' + (typeof tr === 'function' ? tr('Haut de page') : 'Haut de page'),
-    function(){ scrollTo({ top: 0, behavior: 'smooth' }); }));
-  liens.forEach(function(a){
-    var t = (a.textContent || '').trim().replace(/\s+/g, ' ');
-    if(!t) return;
-    pan.appendChild(entree(t, function(){
-      var h = a.getAttribute('href') || '';
-      var c = h.charAt(0) === '#' ? doc.getElementById(h.slice(1)) : null;
-      if(c) c.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      else a.click();
-    }));
-  });
-  doc.body.appendChild(pan);
-
-  var ouvert = false;
-  function ouvre(){ ouvert = true; pan.style.display = 'block'; up.setAttribute('aria-expanded', 'true'); }
-  function ferme(){ ouvert = false; pan.style.display = 'none'; up.setAttribute('aria-expanded', 'false'); }
-  up.setAttribute('aria-haspopup', 'true');
-  up.setAttribute('aria-expanded', 'false');
-  /* Le libellé disait « Revenir en haut de la page » alors qu'au doigt le bouton
-     ouvre une liste de sections. Il annonce désormais ce qu'il fait vraiment. */
-  up.setAttribute('aria-label', 'Choisir une section');
-  up.title = 'Choisir une section';
-  /* On prend la main avant le comportement d'origine, sans le supprimer :
-     l'entrée « Haut de page » le rend toujours accessible.
-
-     ⚠ `stopPropagation()` ne suffit PAS ici. Le bouton porte DEUX écouteurs de
-     clic : celui d'origine (ligne ~1478, phase de bulle, qui remonte en haut de
-     page) et celui-ci (phase de capture). Sur la cible elle-même, arrêter la
-     propagation ne garantit pas que le second ne parte pas — c'est
-     `stopImmediatePropagation()` qui coupe les autres écouteurs du MÊME élément.
-     Sans lui, une tape remonte la page en haut ; le bouton, qui ne s'affiche
-     qu'au-delà de 0,8 × la hauteur d'écran, s'efface aussitôt et devient
-     intapable. Le panneau est ouvert, mais on est reparti tout en haut : vu du
-     doigt, « la flèche pour choisir la section ne marche pas ». */
-  up.addEventListener('click', function(e){
-    e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
-    ouvert ? ferme() : ouvre();
-  }, true);
-  doc.addEventListener('pointerdown', function(e){
-    if(!ouvert) return;
-    if(pan.contains(e.target) || up.contains(e.target)) return;
-    ferme();
-  }, true);
-})();
 
 /* =============================================================
    RAPPORTEUR DE COTES — seulement sur « ?diag=1 »
