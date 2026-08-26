@@ -11584,6 +11584,277 @@ window.__ditAuDoigt.cache = function(){
 })();
 
 /* =============================================================
+   THÈME CLAIR — une bascule à côté de l'assistante
+
+   Demande du propriétaire : « mets un bouton dark mode ou white mode à côté de
+   l'assistant, comme ça on peut basculer facilement selon les préférences
+   visuelles ».
+
+   CE QUI REND LA CHOSE FAISABLE. Le site n'a pas « des couleurs partout » : sa
+   palette tient en une trentaine de teintes — une rampe de gris et six accents.
+   Compté : 32 couleurs distinctes dans le gabarit, 51 dans le moteur, dominées
+   par #048B9A (247 emplois), la rampe #E4E8EA → #39424A, et quatre fonds
+   quasi noirs. On ne remplace donc pas « toutes les couleurs » : on traduit
+   CETTE palette, teinte par teinte.
+
+   SUR QUOI ON TRAVAILLE. Les navigateurs normalisent : `getAttribute('style')`
+   rend « color: rgb(228, 232, 234) », jamais « #E4E8EA » — vérifié sur les
+   1 401 éléments à style en ligne de la page. On traduit donc des TRIPLETS, ce
+   qui attrape du même coup les `rgba()` et conserve leur alpha. Les bordures
+   `rgba(228,232,234,.12)` deviennent ainsi des bordures sombres discrètes sur
+   fond clair, sans règle particulière.
+
+   TROIS COUCHES, une méthode chacune :
+   1. styles en ligne — une passe sur le document, puis un observateur pour ce
+      que le moteur écrit ensuite (le fond de la barre, la jauge, les boutons) ;
+   2. feuilles de style — on les relit et on en génère une feuille miroir ;
+   3. toiles de fond — elles peignent leurs pixels en JavaScript et échappent au
+      CSS. Les trois couches d'ambiance sont donc inversées par filtre, ce qui
+      d'une scène sombre bleu-vert fait une scène claire de même teinte.
+
+   CE QUI RESTE SOMBRE, ET POURQUOI. Les toiles de CONTENU — diagrammes, jeux,
+   illustrations — gardent leur fond. Elles portent chacune un cadre et se
+   lisent comme des écrans d'instruments posés sur un bureau clair. Les
+   retourner demanderait de reprendre un millier de littéraux de couleur dans
+   le moteur, sans garantie de lisibilité pour les tracés fins.
+
+   ⚠ La traduction est RÉVERSIBLE PAR CALCUL, pas par mémoire : on retraduit en
+   sens inverse au lieu de restaurer un style mémorisé. Sans cela, tout style
+   écrit par le moteur pendant la période claire serait effacé au retour. Les
+   valeurs claires sont choisies pour ne jamais être elles-mêmes des clés — pas
+   de blanc pur, donc pas d'aller-retour possible.
+============================================================= */
+(function(){
+  var CLE = 'ad2026.theme';
+  var TRAD = {
+    /* fonds, du plus profond au plus clair */
+    '7,9,11': '243,245,246', '6,8,10': '240,242,243', '5,7,10': '241,243,244',
+    '10,12,14': '254,255,255', '11,14,17': '252,253,254', '10,13,16': '250,251,252',
+    '14,16,18': '247,249,250',
+    /* deux noirs trouvés en balayant la page entière : le voile « Jouer » des
+       jeux et le fond de leurs cartes. Aucune valeur claire n'est elle-même une
+       clé — c'est ce qui garantit l'aller-retour. */
+    '9,12,15': '253,254,255', '7,10,12': '244,246,247',
+    /* rampe de texte, inversée */
+    '228,232,234': '18,22,26', '198,206,212': '48,56,63', '154,164,172': '74,84,92',
+    '124,135,145': '92,102,110', '86,96,106': '118,128,136', '57,66,74': '166,174,180',
+    /* accents : même teinte, assez foncés pour se lire sur du clair */
+    '4,139,154': '3,110,122', '95,211,227': '7,124,138', '143,228,238': '5,105,117',
+    '65,105,225': '48,80,190', '245,165,36': '176,110,4', '255,197,61': '168,120,10',
+    '255,92,77': '198,42,28', '80,200,120': '26,128,66', '255,138,128': '190,60,50',
+    '42,18,21': '253,238,238', '92,43,46': '240,205,205'
+  };
+  var INV = {};
+  for(var k in TRAD) if(Object.prototype.hasOwnProperty.call(TRAD, k)) INV[TRAD[k]] = k;
+
+  /* ⚠ DEUX ÉCRITURES, PAS UNE. Les styles EN LIGNE sont normalisés par le
+     navigateur en « rgb(228, 232, 234) » — mesuré. Mais les règles des FEUILLES
+     de style gardent l'écriture de l'auteur : `getPropertyValue` y rend
+     « #0A0C0E ». Ma première version ne traduisait que les `rgb()` : la feuille
+     miroir sortait vide — 158 caractères, deux règles, les miennes — et la
+     barre du haut restait noire sur fond clair. On traduit donc les deux. */
+  function enHex(t){
+    var p = t.split(',');
+    return '#' + p.map(function(v){
+      var h = (+v).toString(16);
+      return h.length < 2 ? '0' + h : h;
+    }).join('');
+  }
+  var HEX = {}, HEXINV = {};
+  for(var k2 in TRAD) if(Object.prototype.hasOwnProperty.call(TRAD, k2)){
+    HEX[enHex(k2)] = enHex(TRAD[k2]);
+    HEXINV[enHex(TRAD[k2])] = enHex(k2);
+  }
+
+  var RE = /rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*(?:,\s*([\d.]+)\s*)?\)/g;
+  var REHEX = /#[0-9a-fA-F]{6}\b/g;
+  function traduit(txt, table){
+    if(!txt) return txt;
+    var hex = (table === TRAD) ? HEX : HEXINV;
+    var aRgb = txt.indexOf('rgb') >= 0, aHex = txt.indexOf('#') >= 0;
+    if(!aRgb && !aHex) return txt;
+    if(aRgb) txt = txt.replace(RE, function(tout, r, v, b, a){
+      var c = table[r + ',' + v + ',' + b];
+      if(!c) return tout;
+      return a !== undefined ? 'rgba(' + c + ',' + a + ')' : 'rgb(' + c + ')';
+    });
+    if(aHex) txt = txt.replace(REHEX, function(tout){
+      return hex[tout.toLowerCase()] || tout;
+    });
+    return txt;
+  }
+
+  var enCours = 0;
+  function unNoeud(e, table){
+    if(!e || e.nodeType !== 1) return;
+    var s = e.getAttribute && e.getAttribute('style');
+    if(!s) return;
+    var t = traduit(s, table);
+    if(t !== s) e.setAttribute('style', t);
+  }
+  function passe(racine, table){
+    enCours = 1;
+    try{
+      unNoeud(racine, table);
+      var els = racine.querySelectorAll ? racine.querySelectorAll('[style]') : [];
+      for(var i = 0; i < els.length; i++) unNoeud(els[i], table);
+    }finally{ enCours = 0; }
+  }
+
+  /* La feuille miroir : on relit chaque règle et l'on n'en réécrit que les
+     déclarations qui portent une couleur de la palette. */
+  function feuilleMiroir(){
+    var out = [];
+    /* ⚠ L'ORDRE DES TESTS EST LE PIÈGE. Depuis l'imbrication CSS, une simple
+       règle de style porte elle aussi un `cssRules` — vide, mais NON NUL, donc
+       vrai. Ma première version testait le groupe d'abord : chaque règle était
+       prise pour un groupe, on descendait dans sa liste vide et l'on passait à
+       la suivante. Résultat mesuré : 0 règle parcourue sur 173, feuille miroir
+       vide, barre du haut restée noire sur fond clair. On reconnaît donc une
+       règle de style à son sélecteur, et on ne descend qu'ensuite. */
+    function visite(regles, media){
+      for(var i = 0; i < regles.length; i++){
+        var r = regles[i];
+        if(!r.selectorText || !r.style){
+          if(r.cssRules && r.cssRules.length)
+            visite(r.cssRules, r.conditionText !== undefined ? r.conditionText : media);
+          continue;
+        }
+        if(r.selectorText.indexOf('&') >= 0) continue;   /* imbriquée : hors sujet */
+        var decl = [];
+        for(var j = 0; j < r.style.length; j++){
+          var prop = r.style[j], val = r.style.getPropertyValue(prop);
+          if(!val || (val.indexOf('rgb') < 0 && val.indexOf('#') < 0)) continue;
+          var t = traduit(val, TRAD);
+          if(t !== val) decl.push(prop + ':' + t + ' !important');
+        }
+        if(decl.length){
+          var bloc = r.selectorText + '{' + decl.join(';') + '}';
+          out.push(media ? '@media ' + media + '{' + bloc + '}' : bloc);
+        }
+      }
+    }
+    for(var s = 0; s < doc.styleSheets.length; s++){
+      var f = doc.styleSheets[s];
+      try{
+        if(f.ownerNode && f.ownerNode.getAttribute &&
+           f.ownerNode.getAttribute('data-theme-clair')) continue;   /* la nôtre */
+        visite(f.cssRules, '');
+      }catch(eF){ /* feuille illisible : on la laisse */ }
+    }
+    /* Ce que la traduction automatique ne peut pas atteindre : les toiles
+       d'ambiance peignent leurs pixels en JavaScript. Inversées puis remises en
+       teinte, une scène sombre bleu-vert donne une scène claire de même teinte. */
+    out.push('[data-gl],[data-matrix],[data-grain-layer]{' +
+      'filter:invert(1) hue-rotate(180deg)!important}');
+    /* les toiles de contenu gardent leur fond : elles se lisent comme des
+       écrans posés sur un bureau clair. On leur pose un liseré pour qu'elles ne
+       flottent pas. */
+    out.push('html[data-theme="clair"] body{background:rgb(243,245,246)!important}');
+    return out.join('\n');
+  }
+
+  var feuille = null;
+  function actif(){ return doc.documentElement.getAttribute('data-theme') === 'clair'; }
+
+  function allume(){
+    if(actif()) return;
+    doc.documentElement.setAttribute('data-theme', 'clair');
+    doc.documentElement.style.colorScheme = 'light';
+    passe(doc.documentElement, TRAD);
+    if(!feuille){
+      feuille = doc.createElement('style');
+      feuille.setAttribute('data-theme-clair', '1');
+    }
+    feuille.textContent = feuilleMiroir();
+    doc.head.appendChild(feuille);
+    var m = qs('meta[name="theme-color"]');
+    if(m){ m.__sombre = m.getAttribute('content'); m.setAttribute('content', '#F3F5F6'); }
+    peintBouton();
+  }
+  function eteint(){
+    if(!actif()) return;
+    doc.documentElement.removeAttribute('data-theme');
+    doc.documentElement.style.colorScheme = '';
+    if(feuille && feuille.parentNode) feuille.parentNode.removeChild(feuille);
+    passe(doc.documentElement, INV);
+    var m = qs('meta[name="theme-color"]');
+    if(m && m.__sombre) m.setAttribute('content', m.__sombre);
+    peintBouton();
+  }
+
+  /* Le moteur écrit des styles en ligne tout au long de la vie de la page — le
+     fond de la barre au défilement, la jauge, les boutons flottants. On les
+     rattrape à mesure. `enCours` empêche que notre propre écriture relance
+     l'observateur, et aucune valeur claire n'étant une clé, il n'y a de toute
+     façon pas d'aller-retour possible. */
+  if(window.MutationObserver){
+    new MutationObserver(function(muts){
+      if(enCours || !actif()) return;
+      var lot = [];
+      for(var i = 0; i < muts.length; i++){
+        var m = muts[i];
+        if(m.type === 'attributes'){ if(m.target) lot.push(m.target); }
+        else for(var j = 0; j < m.addedNodes.length; j++)
+          if(m.addedNodes[j].nodeType === 1) lot.push(m.addedNodes[j]);
+      }
+      if(!lot.length) return;
+      enCours = 1;
+      try{ for(var n = 0; n < lot.length; n++) passeSansGarde(lot[n]); }
+      finally{ enCours = 0; }
+    }).observe(doc.documentElement, { subtree: true, childList: true,
+      attributes: true, attributeFilter: ['style'] });
+  }
+  function passeSansGarde(racine){
+    unNoeud(racine, TRAD);
+    var els = racine.querySelectorAll ? racine.querySelectorAll('[style]') : [];
+    for(var i = 0; i < els.length; i++) unNoeud(els[i], TRAD);
+  }
+
+  /* --- le bouton --- */
+  var SOLEIL = '<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" ' +
+    'stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:block">' +
+    '<circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2' +
+    'M5.4 5.4l1.6 1.6M17 17l1.6 1.6M18.6 5.4L17 7M7 17l-1.6 1.6"/></svg>';
+  var LUNE = '<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" ' +
+    'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ' +
+    'style="display:block"><path d="M20.5 14.3A8.6 8.6 0 0 1 9.7 3.5a8.6 8.6 0 1 0 10.8 10.8Z"/></svg>';
+
+  var btn = doc.createElement('button');
+  btn.type = 'button';
+  btn.setAttribute('data-theme-btn', '1');
+  /* même dessin que la flèche et le sommaire : sur tactile la colonne de
+     droite, sur ordinateur le coin bas-droit. La flèche y est à gauche. */
+  btn.style.cssText = 'position:fixed;right:12px;bottom:' + (TOUCH ? '194px' : '14px') + ';z-index:120;' +
+    'width:46px;height:46px;display:grid;place-items:center;padding:0;cursor:pointer;' +
+    'background:rgba(10,12,14,.96);border:1px solid rgba(4,139,154,.55);border-radius:12px;' +
+    'color:#5FD3E3;box-shadow:0 8px 24px rgba(0,0,0,.55);' +
+    'transition:color .2s ease,border-color .2s ease';
+  function peintBouton(){
+    var clair = actif();
+    btn.innerHTML = clair ? LUNE : SOLEIL;
+    btn.setAttribute('aria-pressed', clair ? 'true' : 'false');
+    var t = clair ? 'Passer au thème sombre' : 'Passer au thème clair';
+    btn.setAttribute('aria-label', t);
+    btn.title = t;
+  }
+  btn.addEventListener('click', function(e){
+    e.preventDefault();
+    var versClair = !actif();
+    versClair ? allume() : eteint();
+    try{ localStorage.setItem(CLE, versClair ? 'clair' : 'sombre'); }catch(eL){}
+  });
+  doc.body.appendChild(btn);
+  peintBouton();
+
+  /* le choix du visiteur fait foi. Rien n'est déduit du réglage du système :
+     le sombre est l'identité du site, on ne bascule que sur demande. */
+  var voulu = null;
+  try{ voulu = localStorage.getItem(CLE); }catch(eL2){}
+  if(voulu === 'clair') setTimeout(allume, 60);
+})();
+
+/* =============================================================
    RAPPORTEUR DE COTES — seulement sur « ?diag=1 »
    La superposition de la section Leonhard est signalée sur l'appareil du
    propriétaire et ne se produit sur AUCUNE mesure d'ici : ni à 402×743 ni à
