@@ -1281,6 +1281,8 @@ var T = {
 'corridor de données': ['data corridor', 'Datenkorridor', 'corridoio di dati', '数据走廊', 'ممر البيانات', 'データ回廊', 'Datenkorridor'],
 'baie froide': ['cold rack', 'kaltes Rack', 'baia fredda', '冷机柜', 'خزانة باردة', 'コールドラック', 'kaltes Rack'],
 'zone de bruit': ['noise zone', 'Rauschzone', 'zona di rumore', '噪声区', 'منطقة الضجيج', 'ノイズ帯', 'Rauschzone'],
+'grappe de sauvegarde': ['backup cluster', 'Backup-Cluster', 'cluster di backup', '备份集群', 'عنقود النسخ الاحتياطي', 'バックアップ・クラスタ', 'Backup-Cluster'],
+'tunnel de chiffrement': ['encryption tunnel', 'Verschlüsselungstunnel', 'tunnel di cifratura', '加密隧道', 'نفق التشفير', '暗号化トンネル', 'Verschlüsselungstunnel'],
 'cœur du modèle': ['model core', 'Modellkern', 'cuore del modello', '模型核心', 'قلب النموذج', 'モデル中枢', 'Modellkern'],
 'NODE CH · SUISSE ROMANDE': ['NODE CH · FRENCH-SPEAKING SWITZERLAND', 'NODE CH · WESTSCHWEIZ', 'NODE CH · SVIZZERA FRANCESE', '节点 CH · 瑞士法语区', 'العقدة CH · سويسرا الفرنسية', 'ノード CH · スイス仏語圏', 'NODE CH · WESTSCHWEIZ'],
 'Portfolio · build 2026.08': ['Portfolio · build 2026.08', 'Portfolio · Build 2026.08', 'Portfolio · build 2026.08', '作品集 · 构建 2026.08', 'ملف الأعمال · إصدار 2026.08', 'ポートフォリオ · ビルド 2026.08', 'Portfolio · Build 2026.08'],
