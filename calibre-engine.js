@@ -11395,7 +11395,11 @@ window.__ditAuDoigt.cache = function(){
   pan.style.cssText = 'position:fixed;left:12px;right:12px;bottom:70px;z-index:130;' +
     'background:rgba(10,12,14,.97);border:1px solid rgba(4,139,154,.5);border-radius:14px;' +
     'padding:6px;display:none;box-shadow:0 14px 40px rgba(0,0,0,.6);' +
-    'max-height:62vh;overflow:auto;-webkit-overflow-scrolling:touch';
+    /* pas de `-webkit-overflow-scrolling:touch` : sans effet depuis iOS 13, où
+       l'élan est devenu le comportement par défaut, et connu pour faire porter
+       la boîte par un calque composité à part. `overscroll-behavior:contain`
+       évite qu'un glissé dans la liste emporte la page derrière. */
+    'max-height:62vh;overflow:auto;overscroll-behavior:contain';
 
   function entree(txt, aller){
     var b = doc.createElement('button');
@@ -11427,10 +11431,24 @@ window.__ditAuDoigt.cache = function(){
   function ferme(){ ouvert = false; pan.style.display = 'none'; up.setAttribute('aria-expanded', 'false'); }
   up.setAttribute('aria-haspopup', 'true');
   up.setAttribute('aria-expanded', 'false');
-  /* on prend la main avant le comportement d'origine, sans le supprimer :
-     l'entrée « Haut de page » le rend toujours accessible */
+  /* Le libellé disait « Revenir en haut de la page » alors qu'au doigt le bouton
+     ouvre une liste de sections. Il annonce désormais ce qu'il fait vraiment. */
+  up.setAttribute('aria-label', 'Choisir une section');
+  up.title = 'Choisir une section';
+  /* On prend la main avant le comportement d'origine, sans le supprimer :
+     l'entrée « Haut de page » le rend toujours accessible.
+
+     ⚠ `stopPropagation()` ne suffit PAS ici. Le bouton porte DEUX écouteurs de
+     clic : celui d'origine (ligne ~1478, phase de bulle, qui remonte en haut de
+     page) et celui-ci (phase de capture). Sur la cible elle-même, arrêter la
+     propagation ne garantit pas que le second ne parte pas — c'est
+     `stopImmediatePropagation()` qui coupe les autres écouteurs du MÊME élément.
+     Sans lui, une tape remonte la page en haut ; le bouton, qui ne s'affiche
+     qu'au-delà de 0,8 × la hauteur d'écran, s'efface aussitôt et devient
+     intapable. Le panneau est ouvert, mais on est reparti tout en haut : vu du
+     doigt, « la flèche pour choisir la section ne marche pas ». */
   up.addEventListener('click', function(e){
-    e.preventDefault(); e.stopPropagation();
+    e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
     ouvert ? ferme() : ouvre();
   }, true);
   doc.addEventListener('pointerdown', function(e){
@@ -11616,6 +11634,31 @@ window.__ditAuDoigt.cache = function(){
       'width:34px;pointer-events:none;z-index:2;' +
       'background:linear-gradient(90deg,rgba(10,12,14,0),rgba(10,12,14,.92))}' +
       '[data-pipe-defil][data-au-bout]::after{opacity:0;transition:opacity .3s ease}}' +
+    /* LE CHEVAUCHEMENT DE LA PHOTO DU 26 AOÛT, dans ce même diagramme.
+       Ce que la photo prouve : la toile y mesure 386px de haut, soit très
+       exactement `52vh` d'une fenêtre de 743 — la hauteur de Safari barres
+       visibles. Interlignes, les cinq lignes du pied, les trois puces, le
+       panneau d'alertes en dessous : toutes les cotes internes sont justes.
+       Le calcul de mise en page était donc BON. Ce qui est faux, c'est où le
+       bloc a été peint : environ 470px plus bas que sa place, et sa toile
+       120px plus à droite que sa propre boîte de découpe — alors que le
+       paragraphe de pied, son voisin dans la même boîte, n'a pas bougé
+       horizontalement. Deux boîtes imbriquées désynchronisées chacune de son
+       côté : c'est un décalage de calques composités, pas un défaut de mise en
+       page. Mesuré ici à toutes les hauteurs de défilement, aux deux modes
+       d'animation, aux deux hauteurs de fenêtre et dans les huit langues :
+       l'écart entre le bloc et ce qui le suit vaut +22px, toujours.
+
+       `-webkit-overflow-scrolling:touch` (posé par le gabarit sous 880px) est
+       le seul réglage de ce sous-arbre qui force iOS à confier la boîte à un
+       calque composité séparé. Il ne sert plus à rien depuis iOS 13, où l'élan
+       est devenu le comportement par défaut, et c'est un pourvoyeur documenté
+       de ce genre de désynchronisation. On le retire.
+       `overscroll-behavior-x:none` supprime au passage le rebond latéral —
+       celui-là même qui explique les 120px de décalage de la toile — et empêche
+       un glissé horizontal d'emporter la page derrière. */
+    '@media (max-width:880px){[data-chain-scroll]{' +
+      '-webkit-overflow-scrolling:auto;overscroll-behavior-x:none}}' +
     /* Rien ne doit atterrir sous l'en-tête collant quand on suit une ancre ou
        qu'un champ prend le focus. La barre monte à ~110px sur téléphone. */
     '@media (max-width:540px){[id],[data-anchor-target],input,textarea,' +
