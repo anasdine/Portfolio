@@ -6002,8 +6002,21 @@ var VOICE = (function(){
      manipuler : on le rend aux telephones, et la tablette garde la video.
      `Math.min` couvre les deux orientations : un telephone couche reste un
      telephone. Un appareil declare faible (`sansGL`) garde la video lui aussi. */
-  var petitEcran = Math.min(innerWidth, innerHeight) <= 560;
-  if((TOUCH && !petitEcran) || sansGL || !window.THREE){
+  /* RETOUR A LA VIDEO SUR TACTILE. J'avais rendu la scene aux telephones sur une
+     mesure de 1,90 ms par image a leur taille — mais prise sur un GPU de bureau.
+     Sur l'iPhone du proprietaire, le resultat a ete net : au bout de trois
+     secondes tout se fige. Le moteur a un palier de sauvegarde — au-dela de
+     85 ms de moyenne par image il ne repeint plus qu'une image sur vingt, soit
+     environ trois par seconde — et le regulateur echantillonne 45 images avant
+     de decider, d'ou le delai. Les ventilateurs s'arretaient, et les boutons de
+     manipulation agissaient sur le modele sans que leur etat se rafraichisse :
+     un seul et meme symptome.
+     Ce palier existe pour proteger toute la page, pas seulement ce module :
+     le tenir en echec aurait coute la fluidite de tout le reste. La video
+     revient donc sur tactile. Pour rendre le boitier manipulable au doigt, il
+     faudra d'abord alleger la scene elle-meme — ombres, definition — ce qui est
+     un autre chantier. */
+  if(TOUCH || sansGL || !window.THREE){
     try{ videoLeap(); }catch(eV){ console.warn('[leap57] video', eV && eV.message); }
     return;
   }
