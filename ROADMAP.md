@@ -300,6 +300,69 @@ l'écran, saisie présente, bouton fermer présent. Sur bureau l'entrée passe p
   opaque. Sans ça, chaque commande de la barre fixe compte comme un
   chevauchement.
 
+### État au 26 août — passation
+
+Tout est poussé et déployé. Contrôle final dans les **huit langues** à 402 px,
+la largeur de l'iPhone 16 Pro du propriétaire : **zéro débordement horizontal,
+zéro toile posée sur du texte, zéro erreur de page**.
+
+Les seules commandes signalées injoignables sont les quatre boutons du jeu 1
+sous leur voile « Jouer » — vérifié, un appui sur le voile le retire et les
+boutons redeviennent atteignables. C'est le fonctionnement voulu, pas un défaut.
+
+**Outils de vérification** (dans le scratchpad de session, à recréer si perdu) :
+`final.js` (chevauchements et clics, huit langues), `points.js` (les 37 repères
+jaunes, une tape chacun), `langues.js`, `toileTexte.js`, `rack2.js`, `leap2.js`,
+`entete2.js`, `sec02b.js`, `bulle.js`, `cadence.js`.
+
+#### Trois pièges de mesure, payés cher
+
+1. **Les images par seconde sous Chromium sans tête sont bimodales** : 60 ou 24,
+   jamais entre. Ce n'est pas le chemin de rendu — `WEBGL_debug_renderer_info`
+   renvoie le même ANGLE dans les deux cas. Mesurer avec
+   `--disable-gpu-vsync --disable-frame-rate-limit`, par `requestAnimationFrame`,
+   versions **alternées**.
+2. **WebKit sans tête rend en logiciel, sans GPU.** Il a annoncé 151 ms par image
+   là où un moteur avec GPU en donnait 2,6. Ne jamais conclure sur une
+   performance depuis ce moteur.
+3. **Aucun moteur sans tête ne represente un vrai iPhone.** La 3D de LEAP57 a été
+   rendue aux téléphones sur une mesure de 1,90 ms prise sur GPU de bureau : sur
+   l'appareil, la page est tombée au palier de sauvegarde. Voir ci-dessous.
+
+#### Le palier de sauvegarde — à connaître avant de toucher aux modules 3D
+
+`perfTick` échantillonne 45 images. Au-delà de **85 ms de moyenne**, `PERF.lvl`
+passe à 3 et `budgetOk()` ne laisse plus passer qu'**une image sur vingt** hors
+défilement. Symptômes vus par le propriétaire : « ça reste figé au bout de trois
+secondes, les ventilos s'arrêtent » et « les boutons agissent sur le modèle mais
+on ne voit pas le curseur bouger ». Un seul mécanisme, deux symptômes.
+
+Ce palier protège toute la page. **Ne pas le contourner** : alléger la scène.
+
+#### Ce qui reste ouvert
+
+- **Chevauchement légende × puces** signalé en photo près de Leonhard, non
+  reproduit : essayé à 402 px, à toutes les hauteurs, et avec le diagramme
+  défilé horizontalement comme sur la capture. `text-size-adjust` est déjà posé,
+  ce n'est donc pas l'inflation de texte d'iOS. **Question en suspens : le
+  défaut persiste-t-il à l'arrêt, ou seulement pendant le défilement ?** Si
+  c'est pendant, chercher du côté de l'animation d'apparition GSAP.
+- **Diagramme du parc** : sa toile est portée à 640 px sous 540 px de large et
+  défile latéralement, avec un dégradé et l'invite « glissez pour voir la
+  suite ». Le ramener à la largeur de l'écran a été essayé et rejeté — la mise
+  en page est en fractions de largeur, les colonnes tombent à 60 px pour du
+  texte qui en demande 90 et tout se colle. Une vraie mise en page téléphone
+  demanderait d'empiler les trois panneaux sous la baie, ce qui casse la lecture
+  de gauche à droite du schéma. Chantier à part entière.
+- **LEAP57 manipulable au doigt** : possible, mais il faut d'abord alléger la
+  scène — ombres douces, définition de rendu — pour rester sous les 85 ms.
+- **Points jaunes à 22×22**, moitié de la cible tactile minimale.
+- **Un jeu tiers** demandé par le propriétaire : non ajouté. « Sans coder »
+  implique un `<iframe>` externe, ce qui contredit frontalement l'argumentaire
+  du site — « aucune donnée sortante », « hébergé en local ». À trancher avec
+  lui : soit un classique codé aux couleurs du site, soit un vrai jeu tiers
+  assumé.
+
 ### Priorité haute
 1. ~~Réparer les profils mobiles de `voir.js`~~ — **fait**, voir § 3.
    Passage sur les six profils : aucune erreur de page, 8 langues, 13 jeux,

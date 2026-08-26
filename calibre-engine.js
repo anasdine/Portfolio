@@ -11208,6 +11208,41 @@ window.__ditAuDoigt.cache = function(){
 })();
 
 /* =============================================================
+   LE DIAGRAMME DU PARC — dire qu'il continue a droite
+   Sa toile est plus large que l'ecran et defile lateralement. Rien ne le
+   signalait : on croyait la moitie du schema manquante. On marque le conteneur
+   pour le degrade, et on pose une invite qui s'efface des qu'on a defile.
+============================================================= */
+(function(){
+  if(!TOUCH) return;
+  var cv = qs('[data-pipe]'); if(!cv) return;
+  var boite = cv.parentElement; if(!boite) return;
+  boite.setAttribute('data-pipe-defil', '1');
+
+  var invite = doc.createElement('span');
+  invite.textContent = '→ ' + (typeof tr === 'function' ? tr('glissez pour voir la suite') : 'glissez pour voir la suite');
+  invite.setAttribute('data-i18n-skip', '1');
+  invite.style.cssText = 'position:absolute;right:8px;bottom:8px;z-index:3;pointer-events:none;' +
+    'font:600 9px/1 "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.12em;' +
+    'text-transform:uppercase;color:#8FE4EE;background:rgba(10,12,14,.9);' +
+    'border:1px solid rgba(143,228,238,.4);border-radius:20px;padding:6px 10px;' +
+    'transition:opacity .3s ease';
+  boite.appendChild(invite);
+
+  var maj = function(){
+    var reste = boite.scrollWidth - boite.clientWidth - boite.scrollLeft;
+    var fini = reste < 8;
+    invite.style.opacity = (boite.scrollLeft > 12 || fini) ? '0' : '1';
+    if(fini) boite.setAttribute('data-au-bout', '1');
+    else boite.removeAttribute('data-au-bout');
+  };
+  boite.addEventListener('scroll', maj, { passive: true });
+  addEventListener('resize', function(){ askResize(maj); }, { passive: true });
+  setTimeout(maj, 900);
+  maj();
+})();
+
+/* =============================================================
    LES CHAÎNES D'ÉTAPES — les empiler plutôt que les couper n'importe où
    « Les équipements du parc émettent → Leonhard trie → P1 · P2 · P3 → … » est
    une rangée flex avec les flèches en enfants séparés. Sur téléphone elle se
@@ -11562,6 +11597,22 @@ window.__ditAuDoigt.cache = function(){
       'left:12px!important;right:12px!important;width:auto!important;' +
       'max-width:none!important;top:118px!important;bottom:auto!important;' +
       'max-height:58vh!important;overflow:auto!important;z-index:200!important}}' +
+    /* LE DIAGRAMME DU PARC. Sa toile fait 880px : sur un ecran de 402 on n'en
+       voyait que 45 %, et le proprietaire signalait « elle ne s'affiche pas
+       completement ». La ramener a la largeur de l'ecran ne marche pas — j'ai
+       essaye : la mise en page est en fractions de largeur, les colonnes
+       tombent a 60px pour du texte qui en demande 90, et tout se colle
+       (« Sauveg12/12rifi »). A 640px en revanche la fiche equipement se lit
+       entierement, et l'on voit 63 % du schema d'un coup. */
+    '@media (max-width:540px){canvas[data-pipe]{width:640px!important;' +
+      'min-width:640px!important}}' +
+    /* et le defilement lateral cesse d'etre devinable : un degrade sur le bord
+       droit dit qu'il reste quelque chose a voir */
+    '@media (max-width:540px){[data-pipe-defil]{position:relative}' +
+      '[data-pipe-defil]::after{content:"";position:absolute;top:0;right:0;bottom:0;' +
+      'width:34px;pointer-events:none;z-index:2;' +
+      'background:linear-gradient(90deg,rgba(10,12,14,0),rgba(10,12,14,.92))}' +
+      '[data-pipe-defil][data-au-bout]::after{opacity:0;transition:opacity .3s ease}}' +
     /* Rien ne doit atterrir sous l'en-tête collant quand on suit une ancre ou
        qu'un champ prend le focus. La barre monte à ~110px sur téléphone. */
     '@media (max-width:540px){[id],[data-anchor-target],input,textarea,' +
