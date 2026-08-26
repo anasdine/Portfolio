@@ -1225,7 +1225,7 @@ function navResponsive(){
   /* on repart d'un état complet, puis on dégrade */
   if(links) links.style.display = 'flex';
   if(tm) tm.style.display = 'inline';
-  if(mb){ mb.__srcFr = RM ? 'ANIMATION 3D — FIGÉ' : (CALM ? 'ANIMATION 3D — CALME' : 'ANIMATION 3D — COMPLET'); mb.textContent = tr(mb.__srcFr); }
+  peintMouv(mb);
   if(sb) paintSound(pressed);
   var over = function(){ return row.scrollWidth > row.clientWidth + 1; };
   /* on repart d'une barre de sections pleine */
@@ -1256,11 +1256,10 @@ function navResponsive(){
   };
   var steps = [
     function(){ if(tm) tm.style.display = 'none'; },
-    function(){ if(mb){ mb.__srcFr = RM ? 'MOUV. FIGÉ' : (CALM ? 'MOUV. CALME' : 'MOUV. ✓'); mb.textContent = tr(mb.__srcFr); } },
+    /* le bouton de mouvement ne se raccourcit plus : « 3D » est déjà minimal */
     function(){ /* le bouton son est un pictogramme : rien à raccourcir */ },
     shrinkLinks('14px', '10px'),
     shrinkLinks('9px', '9px'),
-    function(){ if(mb){ mb.__srcFr = RM ? 'FIGÉ' : (CALM ? 'CALME' : 'MOUV.'); mb.textContent = tr(mb.__srcFr); } },
     /* on retire les numéros : cela raccourcit franchement sans rien cacher */
     function(){
       if(!links) return;
@@ -1881,19 +1880,54 @@ function paintSound(on){
 /* le bouton d'ambiance n'existe plus : la seule sortie audio du site est
    la voix des points jaunes */
 var sndBtn = null;
+/* =============================================================
+   LE BOUTON DE MOUVEMENT — « 3D », barré quand tout est figé
+
+   Il affichait « ANIMATION 3D — CALME ». Le propriétaire : « enlève le 3D
+   calme, je sais pas quoi ; mets juste dans bouton 3D ça marche, et on rappuie
+   ça fait un 3D barré et c'est en figé ». Il a raison sur les deux points : le
+   libellé n'apprenait rien — « calme » ne veut rien dire pour un visiteur — et
+   il occupait à lui seul la moitié de la seconde rangée de la barre sur
+   téléphone.
+
+   Deux états, lisibles d'un coup d'œil : « 3D » ça bouge, « 3D » barré c'est
+   figé. Les trois modes internes restent (figé / calme / complet) — « calme »
+   est ce que le système demande quand « Réduire les animations » est coché, et
+   il ne se choisit pas à la main. Le bouton ne pilote donc que ce qui se voit :
+   figé, ou pas figé. Dégeler rend exactement le mode d'avant.
+============================================================= */
+function peintMouv(el){
+  if(!el) return;
+  el.__srcFr = '3D';
+  el.textContent = '3D';
+  el.setAttribute('data-i18n-skip', '1');          /* « 3D » ne se traduit pas */
+  el.style.textDecoration = RM ? 'line-through' : 'none';
+  el.style.textDecorationThickness = RM ? '2px' : '';
+  el.setAttribute('aria-pressed', RM ? 'false' : 'true');
+  el.style.color = RM ? '#F5A524' : (CALM ? '#048B9A' : '#7C8791');
+  el.style.borderColor = RM ? 'rgba(245,165,36,.5)'
+    : (CALM ? 'rgba(4,139,154,.45)' : 'rgba(228,232,234,.14)');
+  var t = RM ? 'Animations figées — appuyez pour les remettre'
+             : 'Animations actives — appuyez pour tout figer';
+  el.title = t;
+  el.setAttribute('aria-label', t);
+}
 var motionBtn = qs('[data-motion]');
 if(motionBtn){
-  motionBtn.setAttribute('aria-pressed', RM ? 'false' : 'true');
-  motionBtn.style.color = RM ? '#F5A524' : (CALM ? '#048B9A' : '#7C8791');
-  motionBtn.style.borderColor = RM ? 'rgba(245,165,36,.5)' : (CALM ? 'rgba(4,139,154,.45)' : 'rgba(228,232,234,.14)');
-  motionBtn.title = RM
-    ? 'Tout est figé — aucune animation. Cliquez pour revenir au mouvement complet.'
-    : (CALM
-      ? 'Mode calme : animations réduites. Cliquez pour tout figer.'
-      : 'Mouvement complet. Cliquez pour passer en mode calme.');
+  peintMouv(motionBtn);
   motionBtn.addEventListener('click', function(){
-    var next = MOTION === 'full' ? 'calme' : (MOTION === 'calme' ? 'reduced' : 'full');
-    try{ localStorage.setItem('ad2026.motion', next === 'calme' ? '' : next); }catch(e){}
+    var vers;
+    if(RM){
+      /* on dégèle : on rend le mode qu'il avait avant d'être figé. '' signifie
+         « pas de préférence explicite » et laisse le système décider. */
+      var av = null;
+      try{ av = localStorage.getItem('ad2026.motion.avant'); }catch(e){}
+      vers = (av === 'full' || av === '') ? av : '';
+    }else{
+      try{ localStorage.setItem('ad2026.motion.avant', MOTION === 'full' ? 'full' : ''); }catch(e){}
+      vers = 'reduced';
+    }
+    try{ localStorage.setItem('ad2026.motion', vers); }catch(e){}
     location.reload();
   });
 }
@@ -4238,9 +4272,22 @@ var VOICE = (function(){
     { nom: 'corridor de données', col: 0x048B9A, bg: 0x05070a, ring: 0x1b4453, etoile: 0x7fa8bd, spin: .12, foe: 1,    loot: 1.1, anneau: 1,    forme: 'libre' },
     { nom: 'baie froide',         col: 0x4169E1, bg: 0x04060d, ring: 0x1e2c58, etoile: 0x8fa2d8, spin: .3,  foe: 1.15, loot: .95, anneau: .82, forme: 'slalom' },
     { nom: 'zone de bruit',       col: 0xF5A524, bg: 0x0a0806, ring: 0x4a3a16, etoile: 0xc9a86a, spin: .52, foe: 1.9,  loot: .8,  anneau: 1.14, forme: 'nuee' },
-    { nom: 'cœur du modèle',      col: 0x50C878, bg: 0x040a07, ring: 0x1c4a32, etoile: 0x86c9a4, spin: .2,  foe: .9,   loot: 1.3, anneau: .95, forme: 'ligne' }
+    { nom: 'cœur du modèle',      col: 0x50C878, bg: 0x040a07, ring: 0x1c4a32, etoile: 0x86c9a4, spin: .2,  foe: .9,   loot: 1.3, anneau: .95, forme: 'ligne' },
+    /* Deux secteurs de plus, demandés le 26 août : « ajoute des cartes au jeu
+       corridor de données, comme ça au moins on a un jeu qui est bien ». Le
+       principe des quatre premiers tient toujours — ce qui change un secteur,
+       c'est la FAÇON DONT LES ADVERSAIRES ARRIVENT, pas la couleur du décor.
+       Ces deux-là amènent donc chacun leur propre tracé, et les vagues 5 et 6
+       cessent de répéter les vagues 1 et 2. */
+    { nom: 'grappe de sauvegarde', col: 0x9B6DFF, bg: 0x07050e, ring: 0x35245e, etoile: 0xb69ce0, spin: .38, foe: 1.1,  loot: 1,   anneau: .9,   forme: 'spirale' },
+    { nom: 'tunnel de chiffrement', col: 0xE0559B, bg: 0x0c040a, ring: 0x5a1f3d, etoile: 0xd79bbd, spin: .62, foe: .7,   loot: .9,  anneau: 1.05, forme: 'tenaille' }
+    /* ⚠ « tenaille » pose DEUX adversaires par appel : sa densité compte donc
+       double. Mesuré à foe 1.5, elle vidait la coque en six secondes là où le
+       premier secteur en laisse 20 % au bout de douze. À .7 elle revient au
+       niveau de « zone de bruit », qui en pose un seul à 1.9. Même règle pour
+       « ligne », qui en pose quatre et tourne à .9. */
   ];
-  var mapI = 0, slalom = 1;
+  var mapI = 0, slalom = 1, spir = 0;
   /* les mots courts du bandeau : écrits par le script, donc tenus à la main */
   var LEX = {
     vague: { fr:'vague', en:'wave', de:'Welle', it:'ondata', zh:'波次', ar:'موجة', ja:'ウェーブ' },
@@ -4562,11 +4609,34 @@ var VOICE = (function(){
       }
       return;
     }
+    if(forme === 'tenaille'){
+      /* deux à la fois, face à face sur le même anneau : il faut passer entre
+         les deux ou plonger au centre. Le tir n'en règle qu'un — l'autre
+         arrive pendant le refroidissement. */
+      var ang = Math.random() * 6.2832, zt = -108 - Math.random() * 22, mis = 0;
+      for(var w = 0; w < foes.length && mis < 2; w++){
+        var h = foes[w];
+        if(h.live) continue;
+        var aa = ang + mis * Math.PI, rt = R * .66;
+        h.live = 1; h.z = zt;
+        h.x = Math.cos(aa) * rt; h.y = Math.sin(aa) * rt;
+        h.sp = 6 + wave * 1.5;
+        h.ph = Math.random() * 6.28; h.hp = 1;
+        h.m.scale.setScalar(1.1); h.m.visible = true;
+        mis++;
+      }
+      return;
+    }
     for(var i = 0; i < foes.length; i++){
       var f = foes[i];
       if(f.live) continue;
       var a, rr;
-      if(forme === 'slalom'){
+      if(forme === 'spirale'){
+        /* ils s'enroulent le long de la paroi : chaque arrivée avance d'un cran
+           sur l'hélice, et le rayon respire. On suit la vis, ou on la coupe. */
+        spir += 1.05;
+        a = spir; rr = R * (.58 + .24 * Math.sin(spir * .37));
+      }else if(forme === 'slalom'){
         /* un couloir étroit : ils longent les parois, en alternance */
         slalom = -slalom || 1;
         a = slalom > 0 ? 0 : Math.PI;
@@ -11826,7 +11896,7 @@ window.__ditAuDoigt.cache = function(){
          nommée aurait manqué. Il coûte un `querySelectorAll('[style]')` et
          deux `indexOf` par élément : sous la milliseconde, deux fois moins
          d'une fois par seconde. */
-  var ECRIVAINS = '[data-nav],[data-s2-item],[data-si-n],[data-si-state],' +
+  var ECRIVAINS = '[data-nav],[data-motion],[data-s2-item],[data-si-n],[data-si-state],' +
     '[data-jauge-s2] span,[data-pile-spine],[data-up],[data-ada-follow],' +
     '[data-sections],[data-theme-btn],[data-dit-doigt],[data-ada-panel],' +
     '[data-choix-section],[data-logo-menu],[data-lang-menu]';
