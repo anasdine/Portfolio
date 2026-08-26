@@ -6053,13 +6053,33 @@ var VOICE = (function(){
       var p = v.play();
       if(p && p.catch) p.catch(function(){ /* lecture refusee : le poster reste */ });
     };
+    /* ⚠ ELLE NE S'ARRETAIT JAMAIS. L'observateur se debranchait a la premiere
+       apparition : la video decodait donc en continu jusqu'a la fin de la
+       visite, meme a l'autre bout de la page. Deja du gaspillage en 720x720 ;
+       depuis qu'elle est rendue a 1080x1350 pour la nettete, c'est 2,8 fois
+       plus de pixels a decoder, trente fois par seconde, pour rien.
+       Le proprietaire a signale « de grosses latences » : un decodeur qui
+       tourne en permanence derriere une page deja chargee en animations en est
+       une cause directe sur telephone.
+       On garde donc l'observateur branche : elle joue quand elle est en vue,
+       elle se met en pause des qu'elle n'y est plus. Et quand l'onglet passe
+       en arriere-plan, elle s'arrete aussi. */
+    var enVue = false;
     if(window.IntersectionObserver){
-      var io = new IntersectionObserver(function(en){
-        if(!en[0].isIntersecting) return;
-        io.disconnect(); lance();
-      }, { rootMargin: '300px' });
-      io.observe(v);
+      new IntersectionObserver(function(en){
+        enVue = !!en[0].isIntersecting;
+        if(enVue){ if(v.paused) lance(); }
+        else if(!v.paused) v.pause();
+      }, { rootMargin: '300px' }).observe(v);
+      /* `autoplay` est posé sur l'élément pour qu'iOS accepte le démarrage :
+         il la lance donc de lui-même, sans passer par l'observateur. Mesuré —
+         elle jouait déjà alors qu'elle était encore à quatre écrans de là. On
+         referme la porte : si la lecture part hors champ, on l'arrête. */
+      v.addEventListener('play', function(){ if(!enVue) v.pause(); });
     }else lance();
+    doc.addEventListener('visibilitychange', function(){
+      if(doc.hidden && !v.paused) v.pause();
+    });
   }
   var eclEl = qs('[data-leap-ecl]'), animEl = qs('[data-leap-anim]'), listEl = qs('[data-leap-list]');
   start();
@@ -11770,6 +11790,7 @@ window.__ditAuDoigt.cache = function(){
     doc.head.appendChild(feuille);
     var m = qs('meta[name="theme-color"]');
     if(m){ m.__sombre = m.getAttribute('content'); m.setAttribute('content', '#F3F5F6'); }
+    branche();
     peintBouton();
   }
   function eteint(){
@@ -11777,6 +11798,7 @@ window.__ditAuDoigt.cache = function(){
     doc.documentElement.removeAttribute('data-theme');
     doc.documentElement.style.colorScheme = '';
     if(feuille && feuille.parentNode) feuille.parentNode.removeChild(feuille);
+    debranche();
     passe(doc.documentElement, INV);
     var m = qs('meta[name="theme-color"]');
     if(m && m.__sombre) m.setAttribute('content', m.__sombre);
@@ -11784,31 +11806,71 @@ window.__ditAuDoigt.cache = function(){
   }
 
   /* Le moteur écrit des styles en ligne tout au long de la vie de la page — le
-     fond de la barre au défilement, la jauge, les boutons flottants. On les
-     rattrape à mesure. `enCours` empêche que notre propre écriture relance
-     l'observateur, et aucune valeur claire n'étant une clé, il n'y a de toute
-     façon pas d'aller-retour possible. */
-  if(window.MutationObserver){
-    new MutationObserver(function(muts){
-      if(enCours || !actif()) return;
-      var lot = [];
-      for(var i = 0; i < muts.length; i++){
-        var m = muts[i];
-        if(m.type === 'attributes'){ if(m.target) lot.push(m.target); }
-        else for(var j = 0; j < m.addedNodes.length; j++)
-          if(m.addedNodes[j].nodeType === 1) lot.push(m.addedNodes[j]);
-      }
-      if(!lot.length) return;
-      enCours = 1;
-      try{ for(var n = 0; n < lot.length; n++) passeSansGarde(lot[n]); }
-      finally{ enCours = 0; }
-    }).observe(doc.documentElement, { subtree: true, childList: true,
-      attributes: true, attributeFilter: ['style'] });
-  }
+     fond de la barre au défilement, l'étape courante de la section 02, la
+     jauge. Il faut les rattraper. Reste à ne pas le payer trop cher.
+
+     ⚠ CE QUE J'AI FAIT DE TRAVERS, ET QUE LE PROPRIÉTAIRE A SENTI TOUT DE
+     SUITE — « j'ai remarqué des grosses latences ». Ma première version posait
+     un observateur d'attributs sur TOUT le document, et le laissait branché
+     même en thème sombre, où il ne sert à rien. Mesuré : le moteur écrit
+     **8 735 styles par seconde** pendant le défilement, et le navigateur alloue
+     un enregistrement pour chacun. Coût relevé par cadences alternées :
+     2,9 ms → 4,0 ms par image, soit **+38 % sur toute la page**, pour un
+     observateur qui sortait aussitôt sur `if(!actif()) return`.
+
+     Trois étages désormais, et rien du tout en thème sombre :
+       — les nouveaux éléments, par `childList` (il en naît peu) ;
+       — les quelques éléments dont le moteur RÉÉCRIT une couleur, observés
+         nommément : une poignée d'éléments au lieu du document entier ;
+       — un balayage de sûreté toutes les 700 ms, qui rattrape ce que la liste
+         nommée aurait manqué. Il coûte un `querySelectorAll('[style]')` et
+         deux `indexOf` par élément : sous la milliseconde, deux fois moins
+         d'une fois par seconde. */
+  var ECRIVAINS = '[data-nav],[data-s2-item],[data-si-n],[data-si-state],' +
+    '[data-jauge-s2] span,[data-pile-spine],[data-up],[data-ada-follow],' +
+    '[data-sections],[data-theme-btn],[data-dit-doigt],[data-ada-panel],' +
+    '[data-choix-section],[data-logo-menu],[data-lang-menu]';
+  var obsEnfants = null, obsAttrs = null, minuterie = 0;
+
   function passeSansGarde(racine){
     unNoeud(racine, TRAD);
     var els = racine.querySelectorAll ? racine.querySelectorAll('[style]') : [];
     for(var i = 0; i < els.length; i++) unNoeud(els[i], TRAD);
+  }
+  function branche(){
+    if(!window.MutationObserver || obsEnfants) return;
+    obsEnfants = new MutationObserver(function(muts){
+      if(enCours || !actif()) return;
+      var lot = [];
+      for(var i = 0; i < muts.length; i++)
+        for(var j = 0; j < muts[i].addedNodes.length; j++)
+          if(muts[i].addedNodes[j].nodeType === 1) lot.push(muts[i].addedNodes[j]);
+      if(!lot.length) return;
+      enCours = 1;
+      try{ for(var n = 0; n < lot.length; n++) passeSansGarde(lot[n]); }
+      finally{ enCours = 0; }
+    });
+    obsEnfants.observe(doc.body, { subtree: true, childList: true });
+
+    obsAttrs = new MutationObserver(function(muts){
+      if(enCours || !actif()) return;
+      enCours = 1;
+      try{ for(var i = 0; i < muts.length; i++) if(muts[i].target) unNoeud(muts[i].target, TRAD); }
+      finally{ enCours = 0; }
+    });
+    var cibles = qsa(ECRIVAINS);
+    for(var c = 0; c < cibles.length; c++)
+      obsAttrs.observe(cibles[c], { attributes: true, attributeFilter: ['style'] });
+
+    minuterie = setInterval(function(){
+      if(!actif()) return;
+      passe(doc.body, TRAD);
+    }, 700);
+  }
+  function debranche(){
+    if(obsEnfants){ obsEnfants.disconnect(); obsEnfants = null; }
+    if(obsAttrs){ obsAttrs.disconnect(); obsAttrs = null; }
+    if(minuterie){ clearInterval(minuterie); minuterie = 0; }
   }
 
   /* --- le bouton --- */
