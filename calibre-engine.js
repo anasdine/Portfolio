@@ -2534,10 +2534,18 @@ function buildChain(cv){
     var R = G.rack;
     c2.strokeStyle = 'rgba(228,232,234,.16)'; c2.lineWidth = 1;
     c2.strokeRect(R.x, R.y, R.w, R.h);
-    lbl('LE PARC ÉCOUTÉ', R.x, R.y - 9, GR, FS - 1, '600 ');
+    /* En mode etroit, ce titre se posait exactement sur « 01 PARC ÉCOUTÉ » de la
+       rangee d'etapes : les deux se lisaient l'un dans l'autre. L'etape le nomme
+       deja, on ne le redit pas. */
+    if(!narrow) lbl('LE PARC ÉCOUTÉ', R.x, R.y - 9, GR, FS - 1, '600 ');
     var tot = 0;
     for(var f0 = 0; f0 < FAM.length; f0++) tot += FAM[f0][1];
-    lbl(tot + ' objets', R.x + R.w - c2.measureText(tot + ' objets').width, R.y + R.h + 10, DM, FS - 1.5);
+    /* Sous la baie, ce compte tombait sur « IA LOCALE », qui commence a la meme
+       abscisse et douze pixels plus haut que sa ligne. En mode etroit on le
+       remonte a l'interieur du cadre, ou la place est libre. */
+    var libObj = tot + ' objets';
+    lbl(libObj, R.x + R.w - c2.measureText(libObj).width,
+        narrow ? R.y + R.h - 4 : R.y + R.h + 10, DM, FS - 1.5);
     for(var f = 0; f < FAM.length; f++){
       var y = R.y + f * R.rowH, h = R.rowH - 2;
       var hot = 0;
@@ -6188,7 +6196,16 @@ var VOICE = (function(){
       dragging = true; cv.style.cursor = 'grabbing';
       if(cv.setPointerCapture) try{ cv.setPointerCapture(e.pointerId); }catch(err){}
     });
-    addEventListener('pointerup', function(){ dragging = false; cv.style.cursor = 'grab'; }, {passive:true});
+    /* `pointercancel` manquait. Sur tactile, quand le navigateur reprend le
+       geste — un debut de defilement, un appel entrant, un changement d'appli —
+       il envoie `pointercancel` et JAMAIS `pointerup` : `dragging` restait vrai
+       indefiniment et le boitier se mettait a tourner au moindre passage de
+       doigt, sans qu'on appuie. C'est ce que le proprietaire decrit comme
+       « en mode buge quand on clique dessus ». */
+    var relache = function(){ dragging = false; cv.style.cursor = 'grab'; };
+    addEventListener('pointerup', relache, {passive:true});
+    addEventListener('pointercancel', relache, {passive:true});
+    cv.addEventListener('lostpointercapture', relache);
     cv.addEventListener('pointerleave', function(){ if(!dragging){ mx = 0; my = 0; } });
     function setZoom(z){
       zoom = clamp(z, .45, 2.6);
