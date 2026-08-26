@@ -11222,6 +11222,9 @@ window.__ditAuDoigt.cache = function(){
   var invite = doc.createElement('span');
   invite.textContent = '→ ' + (typeof tr === 'function' ? tr('glissez pour voir la suite') : 'glissez pour voir la suite');
   invite.setAttribute('data-i18n-skip', '1');
+  /* marquee : elle flotte au-dessus de la toile, un detecteur de
+     chevauchements doit pouvoir l'ecarter sans deviner */
+  invite.setAttribute('data-invite-defil', '1');
   invite.style.cssText = 'position:absolute;right:8px;bottom:8px;z-index:3;pointer-events:none;' +
     'font:600 9px/1 "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.12em;' +
     'text-transform:uppercase;color:#8FE4EE;background:rgba(10,12,14,.9);' +
