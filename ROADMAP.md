@@ -169,6 +169,69 @@ Outils voisins ajoutés : `chevauchements.js` (texte sur texte) et `bandeau.js`
 
 ## 4. Reste à faire
 
+---
+
+## ⏸ MISE EN PAUSE — 26 août au soir. À LIRE EN PREMIER À LA REPRISE.
+
+Le propriétaire met le projet en pause : **« ok top, je vais mettre en pause ce
+projet, il tourne pour l'instant, on verra ma prise de note par la suite. »**
+Tout est poussé, déployé, et vérifié par lui sur son iPhone : « le site tourne
+nickel ». Rien n'est en cours, rien n'est à moitié fait.
+
+### Ce qui a été fait ce jour-là, dans l'ordre
+
+| Sujet | État | Détail plus bas |
+|---|---|---|
+| Section Leonhard écrasée | corrigé, **confirmé par photo** | « Le vrai défaut » |
+| Flèche du bas qui « cliquait dans le vide » | détournement retiré | « La flèche d'en bas » |
+| Choix des sections | rendu, en **second** bouton | commit `275c5ff` |
+| Section 02, panneau coupé + libellés superposés | 130-173 px → 3 px | commit `275c5ff` |
+| Vidéo LEAP57 floue | refaite depuis la scène 3D du site | commit `ec6809d` |
+| Thème clair | bascule complète, mémorisée | « Le thème clair » |
+| Latences | deux gaspillages permanents supprimés | « Deux gaspillages » |
+| Bouton « 3D » barré | remplace « ANIMATION 3D — CALME » | commit `9ec2ab6` |
+| Jeu 04, deux secteurs de plus | spirale + tenaille | commit `bc0c9c7` |
+
+### Les trois questions laissées ouvertes, à poser au propriétaire
+
+1. **Les toiles restent sombres en thème clair.** Diagrammes, jeux et
+   illustrations gardent leur fond : ils se lisent comme des écrans
+   d'instruments posés sur un bureau clair. C'est un parti pris, pas une
+   fatalité. Les éclaircir demanderait de reprendre un millier de littéraux de
+   couleur dans le moteur. **Il ne s'est pas encore prononcé.**
+2. **L'équilibre des deux nouveaux secteurs du jeu 04.** Réglé à la mesure
+   (« tenaille » ramenée de 1.5 à .7 parce qu'elle pose deux adversaires par
+   appel), mais **cela se juge en jouant**, pas en mesurant. Il devait essayer.
+3. **Sa « prise de note »** — il annonce qu'il reviendra avec des remarques
+   accumulées. Les attendre plutôt que de deviner.
+
+### Ce qui reste ouvert de plus longue date
+
+Rien de neuf : voir « Ce qui reste ouvert » plus bas — diagramme du parc empilé
+sur téléphone, LEAP57 manipulable au doigt, points jaunes à 22×22, jeu tiers.
+
+### Comment reprendre en dix minutes
+
+```
+node outils/final.js  https://anasdine.github.io/Portfolio/ 402 calme 743
+node outils/points.js https://anasdine.github.io/Portfolio/
+```
+
+Référence attendue à 402×743 en calme : **0 px de débordement, 0 toile sur du
+texte, 0 erreur**, et 3/3/3/3/2/0/2/1 chevauchements texte selon la langue —
+tous le même badge « en pause » du jeu 1. Tout écart est une régression.
+
+⚠ **Les quatre pièges de mesure sont dans ce document** — cadence bimodale de
+Chromium, WebKit sans tête qui rend en logiciel, aucun moteur sans tête ne vaut
+un iPhone, et l'onglet piloté par l'extension Chrome toujours signalé
+`hidden`. Les lire avant de mesurer quoi que ce soit.
+
+⚠ **Deux axes qu'aucune campagne d'avant le 26 août n'avait couverts** : son
+téléphone est en **mouvement réduit** (mode `calme`) et sa fenêtre fait **743 px
+de haut**, pas 874. `final.js` prend les deux en argument.
+
+---
+
 ### Ce que le doigt révèle — 25 août
 
 Signalé par le propriétaire : barres du haut qui se chevauchent, assistante qui
