@@ -310,10 +310,22 @@ Les seules commandes signalées injoignables sont les quatre boutons du jeu 1
 sous leur voile « Jouer » — vérifié, un appui sur le voile le retire et les
 boutons redeviennent atteignables. C'est le fonctionnement voulu, pas un défaut.
 
-**Outils de vérification** (dans le scratchpad de session, à recréer si perdu) :
-`final.js` (chevauchements et clics, huit langues), `points.js` (les 37 repères
-jaunes, une tape chacun), `langues.js`, `toileTexte.js`, `rack2.js`, `leap2.js`,
-`entete2.js`, `sec02b.js`, `bulle.js`, `cadence.js`.
+**Outils de vérification : `outils/`** — 31 scripts Playwright, sortis du
+scratchpad de session pour survivre. Le dossier est dans `.gitignore` : le dépôt
+étant servi tel quel par GitHub Pages, ils ne doivent pas être publiés.
+`outils/LISEZ-MOI.md` documente chacun, la mise en route, et les angles morts
+connus des détecteurs.
+
+Les deux à lancer en premier :
+
+```
+node outils/final.js  https://anasdine.github.io/Portfolio/ 402
+node outils/points.js https://anasdine.github.io/Portfolio/
+```
+
+Le premier donne, pour les huit langues : débordement horizontal, texte sur
+texte, toile sur texte, commandes injoignables, erreurs de page. Le second tape
+les 37 repères jaunes un par un et déclenche `pointerdown` sur les 23 toiles.
 
 #### Trois pièges de mesure, payés cher
 
