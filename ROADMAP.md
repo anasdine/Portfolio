@@ -286,6 +286,34 @@ reste sombre**, le bouton CONTACT rempli à la couleur d'accent, qui est voulu.
 Retour au sombre exact, choix mémorisé, aucune erreur, sur téléphone comme sur
 ordinateur. Le sombre reste le défaut : rien n'est déduit du réglage système.
 
+### Deux gaspillages permanents — 26 août
+
+Signalés par le propriétaire : « j'ai remarqué des grosses latences ». Trouvés,
+mesurés, corrigés. Confirmé par lui après déploiement : « le site tourne nickel ».
+
+1. **Un `MutationObserver` d'attributs sur tout le document coûte +38 % par
+   image.** Le module de thème clair en posait un, et le laissait branché même
+   en thème sombre où il ne sert à rien. Le moteur écrit **8 735 styles en ligne
+   par seconde** pendant le défilement, et le navigateur alloue un
+   enregistrement pour chacun. Cadences alternées : 2,9 ms → 4,0 ms par image,
+   pour un observateur qui sortait aussitôt. Il est désormais **ciblé** (une
+   poignée d'éléments nommés + un balayage de sûreté à 700 ms) et **débranché
+   en sombre**.
+
+2. **La vidéo LEAP57 décodait en continu.** Son observateur d'intersection se
+   débranchait à la première apparition : elle tournait jusqu'à la fin de la
+   visite, même à l'autre bout de la page. Déjà du gaspillage en 720×720 ; en
+   1080×1350 c'est 2,8× plus de pixels, trente fois par seconde, pour rien.
+   ⚠ `autoplay` — nécessaire pour qu'iOS accepte le démarrage — la relance
+   **derrière le dos de l'observateur** : il faut aussi arrêter sur l'événement
+   `play` si l'on est hors champ.
+
+⚠ **Quatrième piège de mesure : l'onglet piloté par l'extension Chrome est
+signalé `visibilityState: "hidden"`.** `requestAnimationFrame` n'y tourne
+jamais : une mesure de cadence y expire au lieu de répondre, et le moteur n'y
+finit même pas son initialisation. Reconfirmé le 26 août. **Passer par
+Playwright**, jamais par ce canal, pour tout ce qui touche à la fluidité.
+
 ### Limite de l'audit, à connaître avant de lire ses chiffres
 
 `audit.js` teste `elementFromPoint` au centre de chaque commande, à une position
