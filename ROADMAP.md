@@ -373,11 +373,53 @@ page** :
   que le paragraphe de pied, son voisin dans la même boîte, n'a pas bougé
   horizontalement.
 
-Deux boîtes imbriquées désynchronisées **chacune de son côté** : c'est un
-décalage de calques composités, pas un défaut de calcul. Vérifié en face :
-l'écart entre le bloc et ce qui le suit vaut **+22 px, toujours** — à toutes les
-hauteurs de défilement, aux deux modes d'animation, aux deux hauteurs de
-fenêtre, dans les huit langues.
+J'en avais conclu à un décalage de calques composités. **C'était faux**, et le
+propriétaire l'a corrigé aussitôt : « j'ai pas besoin de scroller pour voir ça,
+par contre j'ai dû décaler le visuel de Leonhard pour me rendre compte qu'il y
+avait du texte caché derrière ». Le défaut est **permanent**. Voir ci-dessous.
+
+### Le vrai défaut — tenu le 26 août
+
+C'est un **défaut de calcul de hauteur du moteur**, pas de la feuille de style :
+
+```
+enfants posés à   1..172   172..559   559..675     (justes)
+hauteur du bloc   204                              (fausse)
+```
+
+Un bloc `display:block` à hauteur automatique contenant 675 px d'enfants ne peut
+pas mesurer 204 px. Aucune règle ne lui pose de hauteur — vérifié en parcourant
+**toutes** les feuilles et en testant `matches()` sur chaque sélecteur qui
+déclare `height`, `min-height`, `max-height`, `aspect-ratio`, `display` ou
+`position`. Il n'y en a aucune, et le style en ligne n'en porte pas non plus.
+
+Conséquence : le bloc suivant démarre **471 px trop haut**, le dessin et le pied
+se posent sur les paragraphes. **La photo est très exactement cet état** —
+l'écart qu'on y mesure vaut ~473 px.
+
+Le déclencheur trouvé ici est `overflow` non-`visible` sur le bloc : instantané,
+déterministe, réversible. C'est ce qui rend `-webkit-overflow-scrolling:touch`
+suspect sur l'appareil — iOS lui fait porter la boîte autrement.
+
+⚠ **Piège dans lequel je suis tombé** : j'avais d'abord posé
+`[data-plane-wrap]{overflow:hidden}` comme « garde-fou », en pensant que le
+dessin se couperait au lieu de recouvrir. **Cette règle *produit* le défaut**
+au lieu de l'éviter — c'est même elle qui l'a révélé. Retirée.
+
+**Le correctif** ne dépend pas du déclencheur. Les positions des enfants restent
+justes quand la hauteur du parent est fausse : on les lit et on en fait un
+plancher (`min-height`), relâché avant chaque mesure pour ne jamais mesurer
+par-dessus lui-même. Quand le calcul est bon — tous les cas mesurés ici — le
+plancher n'est pas posé du tout. Vérifié aux quatre combinaisons
+calme/complet × 743/874 : forcé dans l'état de la photo, le bloc revient à sa
+hauteur pleine au lieu de tomber à 204.
+
+**Reste ouvert** : ce qui déclenche le mauvais calcul sur *son* appareil.
+`?diag=1` est là pour ça (voir plus bas).
+
+Mesuré en face, sans déclencheur : l'écart entre le bloc et ce qui le suit vaut
+**+22 px, toujours** — à toutes les hauteurs de défilement, aux deux modes
+d'animation, aux deux hauteurs de fenêtre, dans les huit langues.
 
 **Deux axes de mesure qui manquaient à toutes les campagnes précédentes**, et
 que la photo a livrés :
@@ -389,13 +431,17 @@ que la photo a livrés :
    de la page sont en `vh` : la géométrie n'est pas la même. `final.js` prend
    aussi la hauteur.
 
-**Correctif posé** : `-webkit-overflow-scrolling:touch` retiré de
-`[data-chain-scroll]` — sans effet depuis iOS 13, où l'élan est devenu le
-comportement par défaut, et seul réglage de ce sous-arbre qui force iOS à
-confier la boîte à un calque composité séparé. `overscroll-behavior-x:none`
-supprime au passage le rebond latéral, celui-là même qui explique les 120 px.
-⚠ **Ciblé sur la seule hypothèse que la photo soutient, pas une reproduction.**
-À confirmer sur l'appareil.
+**Correctifs posés** : le plancher de hauteur décrit ci-dessus, plus
+`-webkit-overflow-scrolling:touch` retiré de `[data-chain-scroll]` — sans effet
+depuis iOS 13, où l'élan est devenu le comportement par défaut, et seule chose
+de ce sous-arbre qui puisse faire porter la boîte autrement par iOS.
+`overscroll-behavior-x:none` supprime au passage le rebond latéral, celui-là
+même qui explique les 120 px.
+
+**`?diag=1`** — `https://anasdine.github.io/Portfolio/?diag=1` affiche, depuis
+l'appareil, les cotes réelles du bloc : hauteur annoncée, somme des enfants,
+écart avec le bloc suivant, et si le texte passe sous le dessin. Une capture
+suffit à trancher. Rien n'est créé, ni écouté, ni exécuté sans le paramètre.
 
 **Contrôle des huit langues à 402×743, en CALME** — ce que le propriétaire
 demandait : zéro débordement horizontal, zéro toile sur du texte, zéro erreur.
