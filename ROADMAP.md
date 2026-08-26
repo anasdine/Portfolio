@@ -232,6 +232,60 @@ en `position:absolute;inset:0`, elle sortait par le bas — 77 px sur iPhone, 88
 Pixel, 89 à 360 px — pile sur `JOUER` et `CHANGER DE CAMP`. Le conteneur reçoit la
 même hauteur minimale. La règle vise `[data-game] [data-cursor]` : **tous les jeux**.
 
+### Le thème clair — 26 août
+
+Demandé : « un bouton dark mode ou white mode à côté de l'assistant ».
+
+**Ce qui rend la chose faisable** : le site n'a pas « des couleurs partout ».
+Sa palette tient en une trentaine de teintes — 32 distinctes dans le gabarit,
+51 dans le moteur — dominées par `#048B9A` (247 emplois), la rampe
+`#E4E8EA → #39424A` et quatre fonds quasi noirs. On ne remplace donc pas toutes
+les couleurs : on traduit **cette** palette, teinte par teinte.
+
+**Trois couches, une méthode chacune :**
+
+1. **Styles en ligne** (1 401 éléments) — une passe sur le document, puis un
+   `MutationObserver` pour ce que le moteur écrit ensuite : fond de la barre au
+   défilement, jauge, boutons flottants.
+2. **Feuilles de style** — relues, et l'on en génère une feuille miroir qui ne
+   réécrit que les déclarations portant une couleur de la palette.
+3. **Toiles de fond** — elles peignent leurs pixels en JavaScript et échappent
+   au CSS. Les trois couches d'ambiance sont inversées par filtre
+   (`invert(1) hue-rotate(180deg)`) : d'une scène sombre bleu-vert on obtient
+   une scène claire de même teinte.
+
+**Ce qui reste sombre, et pourquoi.** Les toiles de **contenu** — diagrammes,
+jeux, illustrations — gardent leur fond. Elles portent chacune un cadre et se
+lisent comme des écrans d'instruments posés sur un bureau clair. Les retourner
+demanderait de reprendre un millier de littéraux de couleur dans le moteur,
+sans garantie pour les tracés fins. **À trancher avec le propriétaire.**
+
+#### Deux pièges payés cher, à ne pas refaire
+
+1. **Une règle de style porte un `cssRules` vide mais NON NUL** — depuis
+   l'imbrication CSS. Ma première version testait « est-ce un groupe ? » avant
+   « est-ce une règle ? » : chaque règle était prise pour un groupe, on
+   descendait dans sa liste vide, et l'on passait à la suivante. Mesuré :
+   **0 règle parcourue sur 173**, feuille miroir vide (158 caractères, mes deux
+   règles à moi), barre du haut restée noire sur fond clair. On reconnaît une
+   règle de style à son **sélecteur**, et on ne descend qu'ensuite.
+2. **Deux écritures de couleur, pas une.** Les styles en ligne sont normalisés
+   par le navigateur en `rgb(228, 232, 234)` — vérifié. Mais les règles des
+   feuilles gardent l'écriture de l'auteur : `getPropertyValue` y rend
+   `#0A0C0E`. Traduire les seuls `rgb()` ne touchait aucune feuille.
+
+**Réversible par calcul, pas par mémoire** : on retraduit en sens inverse au
+lieu de restaurer un style mémorisé. Sans cela, tout style écrit par le moteur
+pendant la période claire serait effacé au retour. Aucune valeur claire n'est
+elle-même une clé — pas de blanc pur — donc pas d'aller-retour possible.
+
+**Mesuré** : contraste à parité avec le sombre (5 échantillons sous 3:1 sur 140
+dans les deux thèmes, minimum 2,06 en clair contre 1,89 en sombre — les mêmes
+éléments volontairement estompés). Balayage de la page entière : **un seul
+reste sombre**, le bouton CONTACT rempli à la couleur d'accent, qui est voulu.
+Retour au sombre exact, choix mémorisé, aucune erreur, sur téléphone comme sur
+ordinateur. Le sombre reste le défaut : rien n'est déduit du réglage système.
+
 ### Limite de l'audit, à connaître avant de lire ses chiffres
 
 `audit.js` teste `elementFromPoint` au centre de chaque commande, à une position
