@@ -1,4 +1,19 @@
+# Le dépôt ne publie que ce que la page sert. Tout le reste — sources de
+# travail, notes internes, captures, outils — reste sur la machine.
+
+# dossiers de travail
 uploads/
 screenshots/
-.thumbnail
 outils/
+.thumbnail
+
+# notes internes : chemins locaux, journal de chantier, métadonnées d'outillage
+ROADMAP.md
+github.md
+
+# sources de travail : la page publiée est index.html, compilée depuis celles-ci
+Calibre AD-2026.dc.html
+leap57-v2.html
+support.js
+leap57-modele.js
+canvas-labels.json
