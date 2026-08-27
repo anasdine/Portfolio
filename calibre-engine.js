@@ -15930,18 +15930,50 @@ function buildScene(){
   var GLo = { renderer: renderer, usePost: false, postOk: false, uGrain: O.grain * 1.4,
               introT0: 0, lowDpr: false, ftAcc: 0, ftN: 0, static: false, lastOp: 0 };
 
+  /* LA DEFINITION DU FOND. C'est le seul calque plein écran de la page, et
+     c'est lui qui décide de la fluidité : un plan de cette taille se paie au
+     pixel, pas au triangle. Or on le rendait à la définition de l'écran —
+     jusqu'à 2,4 millions de pixels par image — pour un décor qui vit sous le
+     texte, à moins d'un demi-opacité, et qui n'est fait que de points, de
+     traits fins et de glyphes flous. Sur un téléphone à 3×, la moitié du
+     budget graphique partait là, et c'est le défilement qui le payait.
+     On le rend donc plus petit et on laisse le navigateur l'agrandir : il le
+     fait mieux que nous et gratuitement. Le reste de la page — les toiles,
+     les vues 3D, le texte — garde sa définition pleine. */
+  var FOND_DPR = 1.15, FOND_PX = 1250000;
+  var lastW = 0, lastH = 0;
   function resize(){
     var w = innerWidth, h = innerHeight;
     MOBW = w < 900;
-    var dpr = Math.min(2, devicePixelRatio || 1) * (GLo.lowDpr ? .7 : 1);
-    var cap = Math.sqrt(2400000 / Math.max(1, w * h));
-    if(cap < dpr) dpr = Math.max(.75, cap);
+    var dpr = Math.min(FOND_DPR, devicePixelRatio || 1) * (GLo.lowDpr ? .72 : 1);
+    var cap = Math.sqrt(FOND_PX / Math.max(1, w * h));
+    if(cap < dpr) dpr = Math.max(.5, cap);
+    lastW = w; lastH = h;
     renderer.setPixelRatio(dpr);
     renderer.setSize(w, h, false);
     camera.aspect = w / h; camera.updateProjectionMatrix();
     U.uSize.value = MOBW ? .46 : .40;
   }
-  addEventListener('resize', function(){ resize(); }, { passive: true });
+  /* LA BARRE D'ADRESSE. Au téléphone, elle se retire dès qu'on défile vers le
+     bas et revient dès qu'on remonte : chaque fois, un « resize » où la
+     largeur n'a pas bougé. On réallouait alors le tampon plein écran EN PLEIN
+     GESTE — l'endroit précis où la page devait être la plus fluide était
+     l'endroit où elle s'arrêtait. On garde donc le tampon et on se contente
+     de recadrer la caméra : l'image est réétirée par le compositeur, ce qui
+     ne coûte rien et ne se voit pas sur un décor. Un vrai changement de
+     format (rotation, fenêtre redimensionnée) passe, lui, par le tampon —
+     mais une fois le geste fini, pas quarante fois pendant. */
+  var rzT = 0;
+  addEventListener('resize', function(){
+    if(TOUCH && innerWidth === lastW && Math.abs(innerHeight - lastH) < 160){
+      lastH = innerHeight;
+      camera.aspect = innerWidth / Math.max(1, innerHeight);
+      camera.updateProjectionMatrix();
+      return;
+    }
+    clearTimeout(rzT);
+    rzT = setTimeout(resize, 120);
+  }, { passive: true });
 
   function L(a, b, w){ return a + (b - a) * w; }
   function ss(x, a, b){
@@ -15951,6 +15983,9 @@ function buildScene(){
   }
 
   var intro = 0, pulse = 0, camD = 17, camA = -.45, camE = .16, look = 0;
+  /* dernier fondu écrit, et dernière opacité posée : deux repères qui évitent
+     de refaire à chaque image un travail dont le résultat n'a pas changé */
+  var kVu = -1, bVu = -1, opVu = -1;
   function fin(v, d){ return typeof v === 'number' && isFinite(v) ? v : d; }
   function pose(t, dt){
     t = fin(t, 0); dt = fin(dt, .016);
@@ -15994,11 +16029,18 @@ function buildScene(){
          a aucun moment le fond ne « change », il se deplace avec le defilement. */
       var q5 = u5 * ARCH.length, k5 = Math.floor(q5);
       var b5 = ss(q5 - k5, .40, .99);
-      /* une bascule qui echouerait ne doit pas emporter la boucle d image :
-         le fond garderait alors la derniere forme valide, ce qui se voit a
-         peine, la ou une exception arreterait tout le rendu de la page */
-      try{ fondArchi(k5, b5); }
-      catch(eA){ if(!ecritArchi.__prevenu){ ecritArchi.__prevenu = 1; console.warn('[fond] bascule', eA && eA.message); } }
+      /* Le fondu ne dépend que du défilement. À l'arrêt — c'est-à-dire la
+         plupart du temps, quand on lit — on recalculait quand même les
+         quarante nœuds et tout le câblage à chaque image, pour réécrire
+         exactement les mêmes valeurs dans les mêmes tampons. */
+      if(k5 !== kVu || Math.abs(b5 - bVu) > .0015){
+        kVu = k5; bVu = b5;
+        /* une bascule qui echouerait ne doit pas emporter la boucle d image :
+           le fond garderait alors la derniere forme valide, ce qui se voit a
+           peine, la ou une exception arreterait tout le rendu de la page */
+        try{ fondArchi(k5, b5); }
+        catch(eA){ if(!ecritArchi.__prevenu){ ecritArchi.__prevenu = 1; console.warn('[fond] bascule', eA && eA.message); } }
+      }
     }
     nU.uT.value = t; nU.uNet.value = net;
     sU.uT.value = t; sU.uNet.value = net;
@@ -16037,7 +16079,13 @@ function buildScene(){
     if(w4 > .01) op = Math.max(op, iE * .52 * w4);
     op = clamp(op * (MOBW ? .72 : 1), 0, 1);
     if(zoomActif) op = 0;
-    cvs.style.opacity = op.toFixed(3);
+    /* réécrire la même opacité à chaque image réveille tout de même le
+       compositeur, et fabrique une chaîne de caractères au passage : on
+       n'écrit que lorsqu'elle a vraiment bougé */
+    if(op > 0 !== opVu > 0 || Math.abs(op - opVu) > .003){
+      opVu = op;
+      cvs.style.opacity = op.toFixed(3);
+    }
     return op;
   }
 
@@ -16156,8 +16204,21 @@ function perfTick(dt){
     if(bas !== !!GL.lowDpr){ GL.lowDpr = bas; GL.resize(); }
   }
 }
+/* LES ECRANS RAPIDES. Un téléphone ou un portable récent affiche à 120 Hz, et
+   requestAnimationFrame suit : la boucle tournait cent vingt fois par seconde,
+   et « pleine vitesse » voulait donc dire cent vingt repeints de toiles. Aucune
+   de ces animations n'a besoin de plus de soixante — au-delà on ne gagne rien
+   de visible, et l'on prend tout le temps machine qui manque ensuite au
+   défilement, lui bien réel à 120 Hz. On plafonne au TEMPS, pas au compteur
+   d'images : sur un écran à 60 Hz rien ne change, sur un écran à 120 la page
+   rend la moitié du travail et gagne la fluidité qui lui manquait. */
+var TOILE_AT = 0;
 function budgetOk(){
-  if(PERF.lvl === 0) return true;
+  if(PERF.lvl === 0){
+    if(TICK_AT - TOILE_AT < 15){ return false; }
+    TOILE_AT = TICK_AT;
+    return true;
+  }
   if(PERF.lvl === 1) return (PERF.frame & 1) === 0;
   if(PERF.lvl === 2) return PERF.frame % 3 === 0;
   /* palier de sauvegarde : cadence lente mais continue. Conditionner le
@@ -16188,6 +16249,8 @@ function pumpLenis(time){
   }
 }
 var TICK_AT = 0, TICK_FAILS = 0;
+/* horloge du fond : dernière pose rendue, et temps écoulé depuis */
+var FOND_AT = 0, GL_ACC = 0;
 if(!RM){
   try{ g.ticker.wake(); }catch(e){}
   g.ticker.lagSmoothing(0);
@@ -16203,16 +16266,31 @@ if(!RM){
     var canDraw = budgetOk();
     try{ navState(); }catch(e){}
     var op = 1;
-    if(GL && !GL.static && (canDraw || GL.lastOp > .35)){
+    /* LA CADENCE DU FOND. Le décor est plein écran : c'est la dépense la plus
+       lourde de la page, et la seule qu'on ne regarde jamais. Il dérivait
+       pourtant à la cadence de l'écran — cent vingt fois par seconde sur un
+       appareil récent — alors qu'il bouge lentement par construction.
+       On lui donne soixante images par seconde quand la page bouge, trente
+       quand plus rien ne bouge : ni défilement, ni souris. Le temps écoulé est
+       cumulé et passé tel quel à la pose, sinon la caméra et le vent
+       avanceraient au ralenti au lieu d'avancer moins souvent. */
+    GL_ACC += dt;
+    var bouge = Math.abs(S.vel) > 3 || Math.abs(S.velS) > 3 ||
+                Math.abs(S.mx - S.mxS) > .004 || Math.abs(S.my - S.myS) > .004;
+    var duFond = (TICK_AT - FOND_AT) >= (bouge ? 15 : 31);
+    if(GL && !GL.static && duFond && (canDraw || GL.lastOp > .35)){
+      FOND_AT = TICK_AT;
       /* appel direct : la scène est le chemin le plus chaud de la page */
       var res = null;
       var tScene = performance.now();
+      var dtF = GL_ACC > .1 ? .1 : GL_ACC;   /* un retour d'onglet ne fait pas un saut */
+      GL_ACC = 0;
       try{
-        var o = GL.pose(t, dt);
+        var o = GL.pose(t, dtF);
         GL.lastOp = o;
         if(o > .04) GL.render();
         res = o;
-        GL.ftAcc += dt; GL.ftN++;
+        GL.ftAcc += dtF; GL.ftN++;
         if(GL.ftN === 40){
           var avg = GL.ftAcc / 40;
           var wk = (PERF.glAcc || 0) / Math.max(1, PERF.nSpl) / 1000;
