@@ -3496,6 +3496,82 @@ var VOICE = (function(){
 /* =============================================================
    MINI-JEUX — triage SOC, pare-feu, entraînement d'un neurone
 ============================================================= */
+/* MOUVEMENT FIGÉ ET JEUX EN TEMPS RÉEL. Avec « 3D » barré, la boucle
+   maîtresse ne tourne pas : les jeux en temps réel restaient figés après
+   JOUER — quarante secondes de pare-feu sans un paquet, une sonde immobile,
+   une séquence jamais montrée. Une partie lancée par le visiteur est un
+   mouvement qu'il demande, et sans lui le jeu n'existe pas : elle tourne sur
+   sa propre boucle le temps de la partie, et s'arrête avec elle (une
+   dernière image pour l'écran de fin). Hors mouvement figé : rien. */
+function boucleFigee(frame, enJeu){
+  if(!RM) return null;
+  var on = false, tp = 0;
+  function pas(ts){
+    var fin = !enJeu();
+    var dt = tp ? Math.min(.05, (ts - tp) / 1000) : .016;
+    tp = ts;
+    try{ frame(dt, ts / 1000); }catch(e){}
+    if(fin){ on = false; tp = 0; return; }
+    requestAnimationFrame(pas);
+  }
+  return function(){ if(on) return; on = true; tp = 0; requestAnimationFrame(pas); };
+}
+/* TEXTES VIVANTS DES JEUX. i18n.js garde, pour chaque élément, l'empreinte
+   française du GABARIT, et à chaque balayage (une seconde et demie après
+   toute phrase qu'il ne connaît pas) il repose SA traduction. Hors du
+   français, la partie en cours était donc réécrite sous les yeux du joueur :
+   l'alerte à classer du jeu 01 redevenait « An alert comes in… », le tour 3
+   du terminal « Zug 1 / 12 », la vitesse ×1,5 du jeu 05 « TEMPO ×1 », un
+   record battu « record 0 » — dix textes sur quarante, mesuré le 5 octobre.
+   Un texte écrit par un jeu sort donc du balayage dès sa première écriture,
+   et c'est le jeu qui le retraduit quand la langue change. Avant toute
+   écriture, le texte du gabarit reste à i18n.js, qui le traduit comme avant. */
+/* une phrase qui porte des nombres : la table la range sous « # » (« depuis
+   # minutes »). TR la cherchait telle quelle, chiffres compris, et l'alerte du
+   jeu 01 sortait en français dans les sept autres langues. */
+function TRn(s){
+  if(!s) return s;
+  var nums = String(s).match(/\d+/g);
+  if(!nums) return TR(s);
+  var k = String(s).replace(/\d+/g, '#');
+  var t = TR(k);
+  if(t === k) return s;
+  var parts = t.split('#');
+  if(parts.length !== nums.length + 1) return s;
+  var out = parts[0];
+  for(var i = 0; i < nums.length; i++) out += nums[i] + parts[i + 1];
+  return out;
+}
+var VIFS = [];
+function marque(el){
+  if(!el || el.__vif) return el;
+  el.__vif = 1;
+  el.setAttribute('data-i18n-skip', '1');
+  el.removeAttribute('data-i18n-fr');
+  /* une liste de nœuds déjà constituée peut encore le viser : sa « source »
+     est alors le texte affiché, que la réécriture laisse tel quel */
+  try{ Object.defineProperty(el, '__fr', { configurable: true, get: function(){ return this.textContent; }, set: function(){} }); }catch(e){}
+  VIFS.push(el);
+  return el;
+}
+function vif(el, rendu){
+  if(!el) return;
+  marque(el);
+  el.__vifR = rendu;
+  el.textContent = rendu();
+}
+try{
+  window.CalibreEngine.onLangAdd(function(){
+    setTimeout(function(){
+      /* les lignes du journal du jeu 13 sortent du document au-delà de 90 */
+      VIFS = VIFS.filter(function(e){ return e.isConnected; });
+      for(var i = 0; i < VIFS.length; i++){
+        var e = VIFS[i];
+        if(e.__vifR) try{ e.textContent = e.__vifR(); }catch(err){}
+      }
+    }, 60);
+  });
+}catch(e){}
 (function(){ /* JEU 01 — TRIAGE */
   var alertEl = qs('[data-g1-alert]'), verdict = qs('[data-g1-verdict]');
   var scoreEl = qs('[data-g1-score]'), timeEl = qs('[data-g1-time]'), startBtn = qs('[data-g1-start]');
@@ -3523,6 +3599,9 @@ var VOICE = (function(){
     ['Sauvegarde nocturne terminée, 41 machines, zéro échec', 3, 'BKP-01', 'Zéro échec : à lire le matin, pas à traiter la nuit.']
   ];
   var LBL = ['P1', 'P2', 'P3', 'BRUIT'];
+  /* « BRUIT » restait en français dans le verdict des sept autres langues,
+     alors que la touche du dessous, elle, disait « NOISE » ou « RAUSCHEN » */
+  function lib(k){ return k === 3 ? TR(LBL[3]) : LBL[k]; }
   var cur = null, score = 0, left = 40, run = false, iv = null, pool = [];
   var serie = 0, meilleure = 0;
   var idle = 0, helped = 0, coach = null;
@@ -3540,7 +3619,8 @@ var VOICE = (function(){
     var d = new Date();
     var hh = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ':' +
              String(d.getSeconds()).padStart(2, '0');
-    alertEl.textContent = hh + '  ' + (cur[2] || '—') + '  ' + TR(cur[0]);
+    var ligneAl = cur;
+    vif(alertEl, function(){ return hh + '  ' + (ligneAl[2] || '—') + '  ' + TRn(ligneAl[0]); });
     if(!RM) g.fromTo(alertEl, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .3, ease: EASE });
   }
   function stop(){
@@ -3559,13 +3639,13 @@ var VOICE = (function(){
     /* la phrase de fin était assemblée avant d'être écrite : aucune clé ne
        pouvait lui correspondre. On traduit des gabarits à trou, le nombre
        reprend sa place ensuite. */
-    alertEl.textContent = TR(Math.abs(score) > 1 ? 'Terminé — # points sur 40 secondes.'
-                                                 : 'Terminé — # point sur 40 secondes.').replace('#', score);
-    verdict.textContent = (meilleure >= 3 ? TR('Meilleure série : # d\'affilée.').replace('#', meilleure) + ' ' : '') +
+    vif(alertEl, function(){ return TR(Math.abs(score) > 1 ? 'Terminé — # points sur 40 secondes.'
+                                                 : 'Terminé — # point sur 40 secondes.').replace('#', score); });
+    vif(verdict, function(){ return (meilleure >= 3 ? TR('Meilleure série : # d\'affilée.').replace('#', meilleure) + ' ' : '') +
       TR(score >= 14 ? 'Vous savez trier. Le reste, Leonhard le fait pour vous.'
-                     : 'Le tri, c\'est ce qui coûte le plus de temps en vrai.');
+                     : 'Le tri, c\'est ce qui coûte le plus de temps en vrai.'); });
     verdict.style.color = '#7C8791';
-    setTR(startBtn, 'REJOUER');
+    setTR(marque(startBtn), 'REJOUER');
   }
   function answer(k){
     if(!run || !cur) return;
@@ -3585,11 +3665,15 @@ var VOICE = (function(){
     SFX[ok ? 'ok' : 'bad']();
     scoreEl.textContent = score + (mult > 1 ? ' ×' + mult : '');
     /* la raison, toujours : c'est elle qui apprend quelque chose */
-    var pourquoi = cur[3] ? ' · ' + TR(cur[3]) : '';
+    /* l'alerte suivante remplace « cur » juste après : le verdict garde la
+       sienne, et se retraduit entier si la langue change */
+    var raison = cur[3], attendu = cur[1];
     /* « ✗ c'était » est dans la table, mais collé au libellé avant d'être écrit
        il n'était jamais cherché : la ligne la plus lue du jeu restait en
        français dans les sept autres langues */
-    verdict.textContent = (ok ? '✓ ' + LBL[cur[1]] : TR('✗ c\'était') + ' ' + LBL[cur[1]]) + pourquoi;
+    vif(verdict, function(){
+      return (ok ? '✓ ' + lib(attendu) : TR('✗ c\'était') + ' ' + lib(attendu)) + (raison ? ' · ' + TRn(raison) : '');
+    });
     verdict.style.color = ok ? '#048B9A' : '#FF5C4D';
     var btn = keys[k];
     if(btn && !RM) g.fromTo(btn, { scale: .94 }, { scale: 1, duration: .3, ease: 'back.out(3)' });
@@ -3610,8 +3694,16 @@ var VOICE = (function(){
   });
   /* elle regarde par-dessus votre épaule : un indice si vous bloquez,
      et elle prend un tour toutes les huit secondes pour vous soulager */
+  /* la carte sortie de l'écran, la manche se met en attente : le sablier
+     brûlait les quarante secondes pendant qu'on lisait plus haut, et l'on
+     revenait sur un « Terminé » qu'on n'avait pas joué */
+  var vu = true;
+  if(window.IntersectionObserver){
+    new IntersectionObserver(function(en){ vu = en[0].isIntersecting; })
+      .observe(alertEl.closest('[data-game]') || alertEl);
+  }
   function tick1(){
-    if(!run || !ADA.ready) return;
+    if(!run || !ADA.ready || !vu) return;
     idle += .5;
     if(idle > 6.5 && cur){
       idle = 0;
@@ -3634,14 +3726,19 @@ var VOICE = (function(){
       /* même assemblage que l'indice, même conséquence : les deux moitiés sont
          dans la table, la phrase entière non — le libellé de priorité tombe au
          milieu. On traduit chaque moitié avant de coller. */
-      ADA.say(TR('J\'en prends une :') + ' ' + LBL[k] + '. ' + TR('À vous.'), 3200);
+      ADA.say(TR('J\'en prends une :') + ' ' + lib(k) + '. ' + TR('À vous.'), 3200);
       answer(k);
       return;
     }
     helped += .5;
   }
   addEventListener('keydown', function(e){
-    if(!run) return;
+    if(!run || !vu) return;
+    /* les chiffres tapés dans le terminal du jeu 13 ou dans la bulle de
+       l'assistante étaient avalés par la manche en cours */
+    var tg = e.target, tn = tg && tg.tagName;
+    if(tn === 'INPUT' || tn === 'TEXTAREA' || tn === 'SELECT' || (tg && tg.isContentEditable)) return;
+    if(e.ctrlKey || e.metaKey || e.altKey) return;
     var m = { '1': 0, '2': 1, '3': 2, '0': 3 };
     if(m[e.key] !== undefined){ e.preventDefault(); answer(m[e.key]); }
   });
@@ -3651,11 +3748,11 @@ var VOICE = (function(){
        record qui n'appartenait pas à celle qu'on venait de jouer */
     score = 0; left = 40; run = true; pool = []; serie = 0; meilleure = 0;
     scoreEl.textContent = '0'; timeEl.textContent = '40 s';
-    startBtn.textContent = TR('EN COURS');
+    setTR(marque(startBtn), 'EN COURS');
     /* la table range cette consigne avec un « # » à la place du chiffre : le
        « 1 » écrit en clair ne trouvait aucune clé, et la seule phrase qui
        explique la règle partait en traduction automatique */
-    verdict.textContent = TR('Priorité # = production arrêtée · Bruit = aucune action attendue.').replace('#', '1');
+    vif(verdict, function(){ return TR('Priorité # = production arrêtée · Bruit = aucune action attendue.').replace('#', '1'); });
     verdict.style.color = '#56606A';
     pick();
     idle = 0; helped = 0;
@@ -3671,7 +3768,7 @@ var VOICE = (function(){
     iv = setInterval(function(){
       /* l'onglet passé à l'arrière-plan brûlait la manche : on revenait sur un
          « Terminé » qu'on n'avait pas joué. Le sablier attend le retour. */
-      if(doc.hidden) return;
+      if(doc.hidden || !vu) return;
       left--; timeEl.textContent = left + ' s';
       if(left <= 0) stop();
     }, 1000);
@@ -3759,7 +3856,7 @@ var VOICE = (function(){
            elle restait française partout ailleurs. Et une fuite silencieuse
            passe inaperçue quand on surveille l'autre moitié du mur. */
         if(b.state === 2){ leaks++; b.flash = 1; b.ok = false; SFX.bad();
-          if(hint) hint.textContent = TR(leaks > 1 ? '# fuites — un paquet hostile est passé' : '# fuite — un paquet hostile est passé').replace('#', leaks); }
+          if(hint) vif(hint, function(){ return TR(leaks > 1 ? '# fuites — un paquet hostile est passé' : '# fuite — un paquet hostile est passé').replace('#', leaks); }); }
         b.state = 0;
       }
     }
@@ -3773,7 +3870,7 @@ var VOICE = (function(){
         else if(aLock <= 0){
           b3.state = 0; b3.flash = 1; b3.ok = true; b3.byAda = 1;
           score++; scoreEl.textContent = score;
-          if(hint) hint.textContent = TR('ADA a bloqué :') + b3.port + ' ' + TR('— gardez la gauche, je tiens la droite');
+          if(hint) vif(hint, function(){ return TR('ADA a bloqué :') + b3.port + ' ' + TR('— gardez la gauche, je tiens la droite'); });
           aCell = -1;
         }
       }else if(aT > .55){
@@ -3803,11 +3900,11 @@ var VOICE = (function(){
     for(var i = 0; i < cells.length; i++){
       var b = cells[i];
       if(x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h){
-        if(b.state === 2){ score++; b.flash = 1; b.ok = true; SFX.ok(); if(hint) hint.textContent = TR('bloqué sur :') + b.port; if(ADA.ready && score === 5) ADA.say('Bon rythme. Je continue sur la droite.', 3000); }
-        else if(b.state === 1){ score = Math.max(0, score - 1); b.flash = 1; b.ok = false; SFX.bad(); if(hint) hint.textContent = TR('faux positif — vous avez coupé du trafic légitime'); }
+        if(b.state === 2){ score++; b.flash = 1; b.ok = true; SFX.ok(); if(hint) vif(hint, function(){ return TR('bloqué sur :') + b.port; }); if(ADA.ready && score === 5) ADA.say('Bon rythme. Je continue sur la droite.', 3000); }
+        else if(b.state === 1){ score = Math.max(0, score - 1); b.flash = 1; b.ok = false; SFX.bad(); if(hint) vif(hint, function(){ return TR('faux positif — vous avez coupé du trafic légitime'); }); }
         /* au doigt, le paquet s'éteint souvent pendant que la main descend :
            sanctionner la case vide faisait passer le jeu pour cassé */
-        else { b.flash = .6; b.ok = false; SFX.clic(); if(hint) hint.textContent = TR('port fermé pour rien'); }
+        else { b.flash = .6; b.ok = false; SFX.clic(); if(hint) vif(hint, function(){ return TR('port fermé pour rien'); }); }
         b.state = 0;
         scoreEl.textContent = score;
         return;
@@ -3821,17 +3918,22 @@ var VOICE = (function(){
     run = true; score = 0; leaks = 0; left = 40; spawnT = .2;
     cells.forEach(function(b){ b.state = 0; b.flash = 0; b.life = 0; b.ok = false; b.byAda = 0; });
     scoreEl.textContent = '0'; timeEl.textContent = '40 s';
-    startBtn.textContent = TR('EN COURS');
-    if(hint){ hint.style.color = '#39424A'; hint.textContent = TR('rouge = à bloquer · cyan = à laisser passer'); }
+    setTR(marque(startBtn), 'EN COURS');
+    if(hint){ hint.style.color = '#39424A'; vif(hint, function(){ return TR('rouge = à bloquer · cyan = à laisser passer'); }); }
     aCell = -1; aLock = 0; said = 0; aT = 0;
     if(ADA.ready){ ADA.focus(cv); ADA.say('On se partage le mur : vous à gauche, moi à droite.', 4600); }
+    if(relance) relance();
     clearInterval(iv);
     iv = setInterval(function(){
+      /* hors de l'écran ou onglet caché, le mur attend : les paquets
+         continuaient d'arriver et de fuir sans personne pour les bloquer,
+         et la partie se jouait — et se perdait — pendant qu'on lisait ailleurs */
+      if(doc.hidden || (api && !api.vis)) return;
       left--; timeEl.textContent = left + ' s';
       if(left <= 0){
         if(ADA.ready){ ADA.release(cv); ADA.say(leaks ? 'Trois secondes de retard et ça passe. C\'est pour ça qu\'on automatise.' : 'Mur tenu. À deux, c\'est plus simple.', 4600); }
         clearInterval(iv); iv = null; run = false;
-        setTR(startBtn, 'REJOUER');
+        setTR(marque(startBtn), 'REJOUER');
         /* les paquets encore en vol continuaient de vieillir après la fin : une
            fuite s'ajoutait au récapitulatif une seconde après son écriture */
         for(var ci = 0; ci < cells.length; ci++){ cells[ci].state = 0; cells[ci].life = 0; }
@@ -3842,8 +3944,8 @@ var VOICE = (function(){
         if(hint){
           /* la couleur dit ce que les deux nombres ne disaient pas : tenu, ou non */
           hint.style.color = tenu ? '#048B9A' : '#F5A524';
-          hint.textContent = TR('# bloqués, # fuites — c\'est exactement ce que le filtre automatise')
-            .replace('#', score).replace('#', leaks);
+          vif(hint, function(){ return TR('# bloqués, # fuites — c\'est exactement ce que le filtre automatise')
+            .replace('#', score).replace('#', leaks); });
         }
         if(tenu) TROPHY.win('g2');
       }
@@ -3851,11 +3953,12 @@ var VOICE = (function(){
   });
   layout();
   if(window.ResizeObserver) new ResizeObserver(function(){ askResize(layout); }).observe(cv);
+  var relance = boucleFigee(function(dt, t){ step(dt); draw(t); }, function(){ return run; });
   if(RM){ draw(0); return; }
   var api = { vis: false };
-  /* hors écran, la partie continue de compter — le temps ne s'arrête pas — mais
-     la peinture ne sert à personne : douze cases repeintes par image pour rien */
-  api.frame = function(dt, t){ if(!api.vis && !run) return; step(dt); if(api.vis) draw(t); };
+  /* hors écran, la partie attend avec le sablier : rien ne vieillit, rien
+     ne fuit, et douze cases ne sont pas repeintes pour personne */
+  api.frame = function(dt, t){ if(!api.vis) return; step(dt); draw(t); };
   PIPES.push(api);
   if(window.IntersectionObserver){
     new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; }, { rootMargin: '80px' }).observe(cv);
@@ -3920,7 +4023,7 @@ var VOICE = (function(){
        écran de victoire sans bonus, sans suite et sans rendre la main. */
     if(placed >= LIB.length - 1) return false;
     it.ok = true; seat(it);
-    placed++; flash = 1; if(!it.paid){ it.paid = 1; score += 100; } msg = 'ADA : ' + it.def.why;
+    placed++; flash = 1; if(!it.paid){ it.paid = 1; score += 100; } msg = TR('ADA :') + ' ' + TR(it.def.why);
     if(mvEl) mvEl.textContent = placed + ' / ' + LIB.length;
     return true;
   }
@@ -3939,7 +4042,10 @@ var VOICE = (function(){
       ADA.focus(cv);
       ADA.say('Je monte avec vous. La règle : le lourd en bas, l\'onduleur au sol, et de l\'air entre les serveurs.', 6200);
       aCoach = setInterval(function(){
-        if(done || !items){ return; }
+        /* la baie sortie de l'écran, ADA attend : elle posait des unités
+           pendant qu'on lisait ailleurs, et l'on revenait sur un montage
+           avancé sans y avoir touché */
+        if(done || !items || (api && !api.vis)){ return; }
         aIdle += .6;
         /* un conseil quand on hésite */
         if(aIdle > 5 && aIdle < 5.7){
@@ -3962,8 +4068,10 @@ var VOICE = (function(){
       }, 600);
     }
     if(mvEl) mvEl.textContent = '0 / ' + LIB.length;
-    if(lvEl) lvEl.textContent = 'baie ' + level;
-    if(stEl){ stEl.textContent = TR('glissez chaque appareil à sa place'); stEl.style.color = DM; }
+    /* « baie # » n'est pas dans la table, « baie 1 » si : on en garde la
+       traduction et l'on remplace le seul chiffre qu'elle porte */
+    if(lvEl) vif(lvEl, function(){ return TR('baie 1').replace('1', String(level)); });
+    if(stEl){ vif(stEl, function(){ return TR('glissez chaque appareil à sa place'); }); stEl.style.color = DM; }
     layout();
   }
   /* --- bilans en direct --- */
@@ -4012,16 +4120,23 @@ var VOICE = (function(){
     var bw = (W - 20) / 4;
     for(var i = 0; i < 4; i++){
       var b = bars[i], bx = 10 + i * bw;
-      c2.fillStyle = DM; c2.fillText(b.k, bx, 12);
-      var val = b.v + b.u;
+      var val = b.v + b.u, vw = c2.measureText(val).width;
+      /* sur un téléphone chaque jauge n'a que 90 px : « STABILITÉ » touchait
+         « 100 % » (et le recouvrait en arabe ou en allemand). Le libellé,
+         traduit, se resserre jusqu'à tenir, puis s'abrège. */
+      var lab = TR(b.k), place2 = bw - 12 - vw - 5, fs = 8.5;
+      while(fs > 6.5 && c2.measureText(lab).width > place2){ fs -= .5; c2.font = fs + 'px "IBM Plex Mono", ui-monospace, monospace'; }
+      while(lab.length > 2 && c2.measureText(lab).width > place2) lab = lab.slice(0, -2) + '…';
+      c2.fillStyle = DM; c2.fillText(lab, bx, 12);
+      c2.font = '8.5px "IBM Plex Mono", ui-monospace, monospace';
       c2.fillStyle = b.col;
-      c2.fillText(val, bx + bw - 12 - c2.measureText(val).width, 12);
+      c2.fillText(val, bx + bw - 12 - vw, 12);
       c2.fillStyle = 'rgba(228,232,234,.09)'; c2.fillRect(bx, 20, bw - 14, 2.5);
       c2.fillStyle = b.col; c2.fillRect(bx, 20, (bw - 14) * clamp(b.v / b.max, 0, 1), 2.5);
     }
     /* --- réserve --- */
     c2.fillStyle = DM; c2.fillText('À POSER', G.lx, G.ry - 10);
-    c2.fillText('BAIE ' + U + ' U', G.rx, G.ry - 10);
+    c2.fillText(TR('BAIE') + ' ' + U + ' U', G.rx, G.ry - 10);
     /* --- montants --- */
     var sx = shake > 0 ? (Math.random() - .5) * shake * 5 : 0;
     shake = Math.max(0, shake - .04);
@@ -4083,22 +4198,46 @@ var VOICE = (function(){
     if(msg){
       c2.font = '8.5px "IBM Plex Mono", ui-monospace, monospace';
       c2.fillStyle = flash > 0 ? GRN : 'rgba(124,135,145,.9)';
-      var mm = msg;
-      while(c2.measureText(mm).width > W - 20 && mm.length > 4) mm = mm.slice(0, -1);
-      c2.fillText(mm, 10, H - 12);
+      /* la raison du refus était coupée en plein mot au bord droit — sur un
+         téléphone, toute la seconde moitié de la règle disparaissait. Le
+         message est déjà traduit : il passe sur deux lignes, sous la baie. */
+      var ls = deuxLignes(msg, W - 20);
+      for(var li = 0; li < ls.length; li++) c2.fillText(ls[li], 10, H - 12 - (ls.length - 1 - li) * 11);
     }
     flash = Math.max(0, flash - d * 1.2);
     if(done){
       c2.fillStyle = 'rgba(92,225,166,.1)'; c2.fillRect(0, 0, W, H);
       c2.font = '600 11px "IBM Plex Mono", ui-monospace, monospace';
       c2.fillStyle = GRN;
-      var m1 = 'INSPECTION PASSÉE — ' + score + ' PTS';
+      var m1 = TR('INSPECTION PASSÉE —') + ' ' + score + ' PTS';
       c2.fillText(m1, W * .5 - c2.measureText(m1).width * .5, H * .5);
       c2.font = '9px "IBM Plex Mono", ui-monospace, monospace';
       c2.fillStyle = 'rgba(198,206,212,.9)';
       var m2 = T2.p + ' W · ' + T2.w + ' kg · stabilité ' + Math.round(T2.stab * 100) + ' %';
       c2.fillText(m2, W * .5 - c2.measureText(m2).width * .5, H * .5 + 16);
     }
+  }
+  /* coupe un texte en deux lignes au plus, aux espaces quand il y en a
+     (le chinois et le japonais n'en ont pas : on coupe alors au caractère) */
+  function deuxLignes(tx, max){
+    if(c2.measureText(tx).width <= max) return [tx];
+    var out = [], cur = '', mots = tx.indexOf(' ') >= 0 ? tx.split(' ') : tx.split('');
+    var sep = tx.indexOf(' ') >= 0 ? ' ' : '';
+    for(var i = 0; i < mots.length; i++){
+      var essai = cur ? cur + sep + mots[i] : mots[i];
+      if(c2.measureText(essai).width <= max || !cur){ cur = essai; continue; }
+      out.push(cur); cur = mots[i];
+      if(out.length === 1 && i < mots.length){
+        var reste = mots.slice(i).join(sep);
+        if(c2.measureText(reste).width > max){
+          while(reste.length > 2 && c2.measureText(reste + '…').width > max) reste = reste.slice(0, -1);
+          reste += '…';
+        }
+        out.push(reste); return out;
+      }
+    }
+    out.push(cur);
+    return out;
   }
   function unit(it, t){
     var col = it.ok ? GRN : (it === drag ? IV : 'rgba(124,135,145,.72)');
@@ -4155,7 +4294,7 @@ var VOICE = (function(){
     if(it.ok){
       it.ok = false; placed--; park(it);
       if(mvEl) mvEl.textContent = placed + ' / ' + LIB.length;
-      msg = 'retiré : ' + it.def.n;
+      msg = TR('retiré :') + ' ' + it.def.n;
       return;
     }
     drag = it;
@@ -4195,20 +4334,20 @@ var VOICE = (function(){
     var inRack = it.x + it.w * .5 > G.rx - 50;
     if(!inRack){ park(it); return; }
     if(!freeAt(su, it.def.h, it)){
-      msg = 'emplacement déjà occupé'; shake = 1; park(it); return;
+      msg = TR('emplacement déjà occupé'); shake = 1; park(it); return;
     }
     if(su !== it.def.u){
-      msg = 'pas là : ' + it.def.why; shake = .6; park(it); return;
+      msg = TR('pas là :') + ' ' + TR(it.def.why); shake = .6; park(it); return;
     }
     it.ok = true; seat(it);
     aIdle = 0;
     /* les points ne sont dus qu a la premiere pose : reprendre une unite posée
        puis la reposer permettait de gonfler le score autant qu on voulait */
-    placed++; flash = 1; if(!it.paid){ it.paid = 1; score += 100; } msg = it.def.why;
+    placed++; flash = 1; if(!it.paid){ it.paid = 1; score += 100; } msg = TR(it.def.why);
     if(mvEl) mvEl.textContent = placed + ' / ' + LIB.length;
     var T2 = tally();
-    if(T2.p > pwrCap){ msg = 'attention : ' + T2.p + ' W pour ' + pwrCap + ' W disponibles'; score -= 30; }
-    else if(T2.c > coolCap){ msg = 'attention : la ventilation sature'; score -= 30; }
+    if(T2.p > pwrCap){ msg = TR('attention : # W pour # W disponibles').replace('#', T2.p).replace('#', pwrCap); score -= 30; }
+    else if(T2.c > coolCap){ msg = TR('attention : la ventilation sature'); score -= 30; }
     if(placed === LIB.length){
       done = true;
       clearInterval(aCoach); aCoach = null;
@@ -4218,7 +4357,7 @@ var VOICE = (function(){
       }
       var bonus = Math.round(T2.stab * 200) + (T2.p <= pwrCap ? 100 : 0) + (T2.c <= coolCap ? 100 : 0);
       score += bonus;
-      if(stEl){ stEl.textContent = TR('inspection passée · # pts').replace('#', score); stEl.style.color = GRN; }
+      if(stEl){ vif(stEl, function(){ return TR('inspection passée · # pts').replace('#', score); }); stEl.style.color = GRN; }
       setTimeout(function(){
         level++;
         U = Math.min(20, 14 + level);
@@ -4290,8 +4429,8 @@ var VOICE = (function(){
   var mapI = 0, slalom = 1, spir = 0;
   /* les mots courts du bandeau : écrits par le script, donc tenus à la main */
   var LEX = {
-    vague: { fr:'vague', en:'wave', de:'Welle', it:'ondata', zh:'波次', ar:'موجة', ja:'ウェーブ' },
-    coque: { fr:'coque', en:'hull', de:'Hülle', it:'scafo', zh:'船体', ar:'الهيكل', ja:'船体' }
+    vague: { fr:'vague', en:'wave', de:'Welle', it:'ondata', zh:'波次', ar:'موجة', ja:'ウェーブ', 'de-CH':'Welle' },
+    coque: { fr:'coque', en:'hull', de:'Hülle', it:'scafo', zh:'船体', ar:'الهيكل', ja:'船体', 'de-CH':'Hülle' }
   };
   function mot(k){
     var l = 'fr';
@@ -4302,7 +4441,7 @@ var VOICE = (function(){
   function setMap(i){
     mapI = ((i % MAPS.length) + MAPS.length) % MAPS.length;
     var m = MAPS[mapI];
-    if(mapEl) setTR(mapEl, m.nom);
+    vif(mapEl, function(){ return TR(m.nom); });
     if(!built) return;
     scene.background.setHex(m.bg);
     scene.fog.color.setHex(m.bg);
@@ -4543,18 +4682,21 @@ var VOICE = (function(){
     deb.forEach(function(d){ d.live = 0; d.m.visible = false; });
     api.gate.z = -240; api.gate.m.visible = false;
     hud();
-    setTR(startBtn, 'EN VOL');
-    if(hint) hint.textContent = TR('flèches ou souris · espace pour tirer · évitez les rouges');
+    setTR(marque(startBtn), 'EN VOL');
+    /* au doigt, ni flèches, ni souris, ni barre d'espace : la consigne dit le
+       geste qui marche sur l'appareil qu'on tient */
+    if(hint) vif(hint, function(){ return TR(TOUCH ? 'gardez le doigt posé : la sonde suit et tire · évitez les rouges'
+                                         : 'flèches ou souris · espace pour tirer · évitez les rouges'); });
   }
   function hud(){
     /* le gain est plafonné à six : afficher davantage promettait des points
        que le score ne donnait pas */
     if(scoreEl) scoreEl.textContent = score + (combo > 1 ? ' ×' + Math.min(6, combo) : '');
     if(hullEl){
-      hullEl.textContent = mot('coque') + ' ' + Math.max(0, Math.round(hull)) + ' %';
+      vif(hullEl, function(){ return mot('coque') + ' ' + Math.max(0, Math.round(hull)) + ' %'; });
       hullEl.style.color = hull > 55 ? '#048B9A' : hull > 28 ? '#F5A524' : '#FF5C4D';
     }
-    if(waveEl) waveEl.textContent = mot('vague') + ' ' + wave;
+    if(waveEl) vif(waveEl, function(){ return mot('vague') + ' ' + wave; });
     if(spdEl) spdEl.textContent = Math.round(speed * 12) + ' u/s';
   }
   /* la langue change : le bandeau et le nom de secteur se réécrivent */
@@ -4677,9 +4819,9 @@ var VOICE = (function(){
   function end(){
     run = false; over = true;
     if(score > best){ best = score; try{ localStorage.setItem('ad2026.sonde.best', String(best)); }catch(e){} }
-    setTR(startBtn, 'REJOUER');
-    if(hint) hint.textContent = TR('sonde perdue à la vague # — # points · record #')
-      .replace('#', wave).replace('#', score).replace('#', best);
+    setTR(marque(startBtn), 'REJOUER');
+    if(hint) vif(hint, function(){ return TR('sonde perdue à la vague # — # points · record #')
+      .replace('#', wave).replace('#', score).replace('#', best); });
     if(wave >= 4) TROPHY.win('g4');
   }
 
@@ -4713,7 +4855,7 @@ var VOICE = (function(){
       api.gate.z = -230;
       api.gate.m.visible = true;
       setMap(wave - 1);
-      if(hint) hint.textContent = TR('vague ') + wave + ' — ' + TR(MAP().nom);
+      if(hint) vif(hint, function(){ return TR('vague ') + wave + ' — ' + TR(MAP().nom); });
       hud();
     }
     var adv = speed * dt;
@@ -4928,10 +5070,21 @@ var VOICE = (function(){
   startBtn.addEventListener('click', function(){
     if(!build()){
       cv.style.display = 'none'; startBtn.style.display = 'none';
-      if(hint) hint.textContent = TR('la 3D n\'est pas disponible sur cet appareil');
+      if(hint) vif(hint, function(){ return TR('la 3D n\'est pas disponible sur cet appareil'); });
       return;
     }
-    resize(); reset();
+    /* « EN VOL » reste sous le doigt pendant la partie : une seconde tape
+       repartait de zéro sans prévenir */
+    if(run) return;
+    resize();
+    /* sortir le jeu de l'écran le met en pause et le bouton annonce
+       REPRENDRE : il rendait pourtant une partie neuve, score et vague à zéro */
+    if(paused && !over){
+      paused = false; run = true;
+      setTR(marque(startBtn), 'EN VOL');
+      if(hint) vif(hint, function(){ return TR('vague ') + wave + ' — ' + TR(MAP().nom); });
+    }else reset();
+    if(relance) relance();
     cv.focus && cv.focus();
   });
   cv.setAttribute('tabindex', '0');
@@ -4950,17 +5103,24 @@ var VOICE = (function(){
     }
     if(!built) return;
     if(!api.vis){
-      if(run){ run = false; startBtn.textContent = TR('REPRENDRE'); }
+      if(run){
+        run = false; paused = true;
+        /* les touches et le doigt restaient « enfoncés » pendant la pause */
+        keys.left = keys.right = keys.up = keys.down = keys.fire = 0; firing = false; touch = null; aim = null;
+        setTR(marque(startBtn), 'REPRENDRE');
+      }
       return;
     }
     if(run) step(Math.min(.04, dt));
     draw(Math.min(.04, dt));
   };
   PIPES.push(api);
+  var relance = boucleFigee(function(dt, t){ api.frame(dt, t); }, function(){ return run; });
   if(window.IntersectionObserver){
     new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; }, { threshold: .2 }).observe(cv);
   }else api.vis = true;
-  if(hint) hint.textContent = TR('flèches ou souris · espace pour tirer · récupérez les données');
+  if(hint) vif(hint, function(){ return TR(TOUCH ? 'gardez le doigt posé : la sonde suit et tire · récupérez les données'
+                                       : 'flèches ou souris · espace pour tirer · récupérez les données'); });
 })();
 
 (function(){ /* JEU 05 — LA SALLE SANS LUMIÈRE : silhouettes, saut, chute */
@@ -4974,7 +5134,7 @@ var VOICE = (function(){
   var multBtn = qs('[data-g5-mult]');
   var P = { y: 0, vy: 0, jumps: 0, run: 0 };
   try{ best = parseFloat(localStorage.getItem('ad2026.salle.best')) || 0; }catch(e){}
-  if(bestEl) bestEl.textContent = TR('record ') + Math.round(best) + ' m';
+  if(bestEl) vif(bestEl, function(){ return TR('record ') + Math.round(best) + ' m'; });
 
   function layout(){
     var r = cv.getBoundingClientRect();
@@ -4992,8 +5152,8 @@ var VOICE = (function(){
   function reset(){
     run = true; dead = 0; dist = 0; spd = 132; obs = []; gaps = [];
     P.y = 0; P.vy = 0; P.jumps = 0; P.coyote = 0;
-    startBtn.textContent = TR('EN COURS');
-    if(hint) hint.textContent = TR('espace, clic ou doigt pour sauter · deux fois pour un saut long');
+    setTR(marque(startBtn), 'EN COURS');
+    if(hint) vif(hint, function(){ return TR('espace, clic ou doigt pour sauter · deux fois pour un saut long'); });
     /* la salle restait vide une dizaine de secondes après le départ : on pose
        la première caisse à portée de vue, elle dit à elle seule quoi faire */
     obs.push({ x: Math.min(W * .95, 460) * mult, w: 16, h: 22, k: 0 });
@@ -5003,7 +5163,8 @@ var VOICE = (function(){
      recommencer à zéro */
   function go(){
     layout();
-    if(!run && !dead && dist > 0){ run = true; startBtn.textContent = TR('EN COURS'); return; }
+    if(relance) relance();
+    if(!run && !dead && dist > 0){ run = true; setTR(marque(startBtn), 'EN COURS'); return; }
     reset();
   }
   function jump(){
@@ -5017,9 +5178,9 @@ var VOICE = (function(){
     SFX.perd();
     run = false; dead = 1;
     if(dist > best){ best = dist; try{ localStorage.setItem('ad2026.salle.best', String(Math.round(best))); }catch(e){} }
-    if(bestEl) bestEl.textContent = TR('record ') + Math.round(best) + ' m';
-    startBtn.textContent = TR('REPARTIR');
-    if(hint) hint.textContent = TR('# m — la salle est plus longue qu\'elle n\'en a l\'air').replace('#', Math.round(dist));
+    if(bestEl) vif(bestEl, function(){ return TR('record ') + Math.round(best) + ' m'; });
+    setTR(marque(startBtn), 'REPARTIR');
+    if(hint) vif(hint, function(){ return TR('# m — la salle est plus longue qu\'elle n\'en a l\'air').replace('#', Math.round(dist)); });
     if(dist >= 400) TROPHY.win('g5');
   }
   function step(dt){
@@ -5247,7 +5408,7 @@ var VOICE = (function(){
   try{ var sv = parseFloat(localStorage.getItem('ad2026.salle.mult')); if(sv > 0) mult = sv; }catch(e){}
   function paintMult(){
     if(!multBtn) return;
-    multBtn.textContent = TR('VITESSE ×#').replace('#', String(mult).replace('.', ','));
+    vif(multBtn, function(){ return TR('VITESSE ×#').replace('#', String(mult).replace('.', ',')); });
     var hot = mult >= 2;
     multBtn.style.color = hot ? '#F5A524' : '#048B9A';
     multBtn.style.borderColor = hot ? '#F5A524' : '#048B9A';
@@ -5259,7 +5420,7 @@ var VOICE = (function(){
       mult = MULTS[(i + 1) % MULTS.length];
       try{ localStorage.setItem('ad2026.salle.mult', String(mult)); }catch(e){}
       paintMult();
-      if(hint) hint.textContent = mult > 1 ? TR('vitesse ×# — les distances comptent double').replace('#', String(mult).replace('.', ',')) : TR('vitesse normale');
+      if(hint) vif(hint, function(){ return mult > 1 ? TR('vitesse ×# — les distances comptent double').replace('#', String(mult).replace('.', ',')) : TR('vitesse normale'); });
     });
   }
   startBtn.addEventListener('click', function(){ api.vis = true; go(); });
@@ -5271,22 +5432,29 @@ var VOICE = (function(){
     var rr = cv.getBoundingClientRect();
     if(Math.abs(rr.width - W) < 1 && Math.abs(rr.height - H) < 1) return;
     layout();
-    if(!api.frame) draw(0);
+    /* figé, ou partie arrêtée : rien ne repeint la toile qu'on vient de vider */
+    if(RM && !run) draw(0);
   }, { passive: true });
-  if(RM) return;
+  var relance = null;
   api.always = true;
   api.frame = function(dt, t){
-    if(!api.vis){ if(run){ run = false; startBtn.textContent = TR('REPRENDRE'); } return; }
+    if(!api.vis){ if(run){ run = false; setTR(marque(startBtn), 'REPRENDRE'); } return; }
     /* sur une machine lente à ×2 ou ×3, le décor avance de plus de vingt
        pixels par image : une caisse mince traversait le robot sans le toucher */
     var d = Math.min(.033, dt), n = (run && spd * d > 12) ? 3 : 1, s;
     for(s = 0; s < n; s++){ step(d / n); if(!run) break; }
     draw(t);
   };
-  PIPES.push(api);
   if(window.IntersectionObserver){
     new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; }, { threshold: .3 }).observe(cv);
   }else{ api.vis = true; }
+  if(RM){
+    /* la boucle s'arrête avec la partie : la dernière image (pause, chute)
+       est encore peinte, puis plus rien ne bouge */
+    relance = boucleFigee(api.frame, function(){ return run; });
+    return;
+  }
+  PIPES.push(api);
 })();
 
 (function(){ /* JEU 06 — ÉLEVEZ VOTRE MODÈLE : un LLM local en tamagotchi */
@@ -5364,19 +5532,19 @@ var VOICE = (function(){
       for(var it = 0; it < TIERS.length; it++) if(M.xp < TIERS[it][0]){ suiv = TIERS[it][1]; break; }
       sizeEl.textContent = suiv ? t[1] + ' → ' + suiv : t[1];
     }
-    if(ageEl) ageEl.textContent = TR('âge # j').replace('#', Math.max(0, Math.floor((Date.now() - M.born) / 86400000)));
+    if(ageEl) vif(ageEl, function(){ return TR('âge # j').replace('#', Math.max(0, Math.floor((Date.now() - M.born) / 86400000))); });
     var mo = mood();
-    if(stateEl){ stateEl.textContent = TR(LBL[mo]); stateEl.style.color = mo === 'heureux' ? '#048B9A' : (mo === 'nominal' ? '#7C8791' : '#FF5C4D'); }
+    if(stateEl){ vif(stateEl, function(){ return TR(LBL[mo]); }); stateEl.style.color = mo === 'heureux' ? '#048B9A' : (mo === 'nominal' ? '#7C8791' : '#FF5C4D'); }
     if(sayEl && mo !== lastMood){
       lastMood = mo;
       var l = SAY[mo][(Math.random() * SAY[mo].length) | 0];
       /* la réplique passait dans le document sans jamais toucher la fiche :
          neuf des dix phrases y sont pourtant déjà */
       var lt = TR(l);
-      if(RM) sayEl.textContent = lt;
+      if(RM) vif(sayEl, function(){ return TR(l); });
       else{
         g.killTweensOf(sayEl);
-        g.to(sayEl, { opacity: 0, duration: .15, onComplete: function(){ sayEl.textContent = lt; g.to(sayEl, { opacity: 1, duration: .4 }); } });
+        g.to(sayEl, { opacity: 0, duration: .15, onComplete: function(){ vif(sayEl, function(){ return TR(l); }); g.to(sayEl, { opacity: 1, duration: .4 }); } });
       }
     }
   }
@@ -5393,6 +5561,8 @@ var VOICE = (function(){
       M.trust = clamp(M.trust - 3, 0, 100);
     }
     poke = 1; lastMood = ''; save(); paint();
+    /* mouvement figé : le visage ne changeait plus, aucune boucle ne le repeint */
+    if(RM) draw(0);
   }
   qsa('[data-g6-act]').forEach(function(b){ b.addEventListener('click', function(){ act(b.getAttribute('data-g6-act')); }); });
   if(resetBtn) resetBtn.addEventListener('click', function(){
@@ -5510,7 +5680,9 @@ var VOICE = (function(){
     }
     c2.font = '9px "IBM Plex Mono", ui-monospace, monospace';
     c2.fillStyle = '#39424A';
-    var lab = 'modèle local · ' + tier()[1] + ' · ' + Math.round(M.temp) + ' °C';
+    /* la phrase entière ne correspondait à aucune clé — la taille du modèle
+       change à chaque palier : seul le préfixe se traduit, il est dans la table */
+    var lab = TR('modèle local ·') + ' ' + tier()[1] + ' · ' + Math.round(M.temp) + ' °C';
     c2.fillText(lab, 12, H - 12);
   }
   layout(); paint(); draw(0);
@@ -8310,7 +8482,10 @@ var VOICE = (function(){
   var KB = [
     { id:'identite', c:'Anas Dine, qui est-ce ?',
       t:'anas dine identité nom prénom qui profil portfolio administrateur systèmes réseaux suisse romande consultant métier présentation moi je auteur page site',
-      a:"Anas Dine, administrateur systèmes et réseaux en Suisse romande, spécialisé en automatisation et en IA hébergée en local. Huit ans de terrain : parcs PME, horlogerie, énergie, salle machine. C'est son portfolio que vous lisez." },
+      a:"Anas Dine, administrateur systèmes et réseaux en Suisse romande, spécialisé en automatisation et en IA hébergée en local. Huit ans de terrain : parcs PME, horlogerie, énergie, salle machine. C'est son portfolio que vous lisez. Depuis le 12 septembre 2026, il travaille en freelance : IA, sites et applications." },
+    { id:'freelance', c:'Le freelance',
+      t:'freelance indépendant offre mission prestation site web vitrine application outil sur mesure ia agent assistant orchestration démo client',
+      a:"Depuis le 12 septembre 2026, je travaille en indépendant sur trois domaines : l'IA (assistants, agents, IA locale), les sites web (des vitrines en ligne, comme one-cars.fr ou vtc-liberty.fr) et les applications sur mesure. D'abord une démo cliquable, puis la version finale. La section Freelance, en haut de page, montre des exemples concrets." },
     { id:'infra', c:'Sécuriser mon infrastructure',
       t:'infrastructure serveur virtualisation vmware proxmox réseau vlan sauvegarde veeam restauration disponibilité onduleur socle tenir panne matériel',
       a:"Serveurs, virtualisation, réseau, sauvegarde. Sur un parc de 42 baies : 99,95 % de disponibilité tenue et coût télécom en baisse de 35 %. Sur un parc PME : RPO de 15 minutes, RTO de 2 heures, incidents en baisse de 40 %. Je parle de méthode et de résultats, jamais de ce qui se passe chez un client." },
@@ -8327,14 +8502,14 @@ var VOICE = (function(){
       t:'leonhard outil production soc rmm supervision alerte incident cockpit filtre bruit python collecteur fiche équipement suivi rapport parc ticket',
       a:"L'outil en production : mini-SOC, RMM et suivi de parc, hébergé en local. 81 modules Python, 13 collecteurs d'API en lecture seule, aucun nom réel qui sort de la machine. Il va du bruit des consoles jusqu'au rapport, en passant par la fiche équipement au tiroir près." },
     { id:'parcours', c:'Le parcours',
-      t:'parcours expérience carrière poste année renault catra infoeco nettici wilight neuchâtel horlogerie énergie infogérance support niveau',
-      a:"Huit ans : administrateur systèmes chez Renault Trucks CATRA, fondateur d'InfoEco, responsable réseau et télécoms chez Nettici, technicien en câblage structuré dans l'horlogerie et l'énergie, spécialiste réseau et chef de projet chez Wilight Telecoms, et aujourd'hui infogérance PME en Suisse romande." },
+      t:'parcours expérience carrière poste année renault catra infoeco nettici wilight gatexinfo neuchâtel horlogerie énergie infogérance support niveau autodidacte',
+      a:"Autodidacte depuis l'enfance, puis huit ans de terrain : administrateur systèmes chez Renault Trucks CATRA, fondateur d'InfoEco, responsable réseau et télécoms chez Nettici, technicien en câblage structuré dans l'horlogerie et l'énergie, spécialiste réseau et chef de projet chez Wilight Telecoms, puis un stage d'administrateur systèmes chez Gatexinfo. Depuis le 12 septembre 2026 : freelance en orchestration d'IA, sites et applications." },
     { id:'diplome', c:'Le diplôme',
       t:'diplôme bts ciel informatique réseaux vae validation acquis expérience jury dossier formation étude',
       a:"BTS CIEL option A — Informatique et Réseaux, obtenu par validation des acquis de l'expérience : un dossier de six activités, soutenu devant jury." },
     { id:'dispo', c:'Disponibilité',
       t:'contact disponible disponibilité embauche recrutement mission mail linkedin whatsapp tarif prix devis budget joindre',
-      a:"Disponible immédiatement, en Suisse romande. Le plus simple : LinkedIn ou WhatsApp, les deux boutons sont en bas de page. Pour un devis, la réponse arrive avec la méthode de calcul." },
+      a:"Disponible immédiatement, en freelance : Suisse romande, Alsace ou à distance. Le plus simple : LinkedIn ou WhatsApp, les deux boutons sont en bas de page. Pour un devis, la réponse arrive avec la méthode de calcul." },
     { id:'reseau', c:'Réseau & câblage',
       t:'réseau câblage cuivre fibre cat6a fluke lantek certification vlan commutateur pare-feu cluster port jurassien baie brassage',
       a:"Cuivre et fibre certifiés à l'appareil — Fluke DSX, LanTek — pendant deux ans dans l'horlogerie et l'énergie. Côté actif : VLAN, routage, piles de commutateurs, pare-feu en cluster actif/passif dont la bascule est rejouée chaque trimestre." },
@@ -10570,7 +10745,7 @@ var VOICE = (function(){
     new IntersectionObserver(function(en){
       if(!en[0].isIntersecting || done2 || A.open) return;
       done2 = true;
-      say('On joue ? Six jeux ici, et si vous préférez : un morpion ou une coupe de cartes avec moi — deux clics.', 8600);
+      say('On joue ? Treize jeux ici, et si vous préférez : un morpion ou une coupe de cartes avec moi — deux clics.', 8600);
     }, { threshold: .25 }).observe(jx);
   })();
   /* clic droit sur le robot : la voix s'éteint ou se rallume */
@@ -11093,12 +11268,12 @@ var VOICE = (function(){
     triage:      "Triage : quarante secondes pour classer des alertes. L'assistante joue avec vous.",
     'pare-feu':  "Pare-feu : bloquez le rouge, laissez passer le cyan. On se partage le mur.",
     rack:        "Montage de baie : placez les équipements en respectant poids, énergie et ventilation.",
-    vaisseau:    "Un vrai jeu de vol en 3D, écrit pour cette page. Trois vaisseaux, quatre secteurs.",
+    vaisseau:    "Un vrai jeu de vol en 3D, écrit pour cette page. Trois vaisseaux, six secteurs.",
     salle:       "Une traversée de salle machine dans le noir : sautez les obstacles, gardez le rythme.",
     modele:      "Un modèle local à élever. Il continue de vivre quand vous fermez la page.",
     paquet:      "Collecte de paquets : la sonde traverse le réseau et ramasse ce qui y circule.",
     filtre:      "Renvoyer les attaques : la raquette est le filtre, chaque tentative bloquée est un point.",
-    deduction:   "Trouver l'intrusion : des indices, une seule machine compromise. À vous de déduire.",
+    deduction:   "Trouver l'intrusion : huit machines compromises. Chaque chiffre compte celles qui l'entourent.",
     inventaire:  "Inventaire du parc : retrouvez les paires d'équipements. Le recensement, en jeu.",
     reflexe:     "Temps de réaction : le délai entre l'alerte et le geste. En vrai, c'est lui qui coûte.",
     sequence:    "Séquence de démarrage : l'ordre de remise en route après une coupure. L'onduleur d'abord.",
@@ -12096,6 +12271,20 @@ window.__ditAuDoigt.cache = function(){
     '@media (max-height:560px) and (orientation:landscape){' +
       '[data-game] [data-cursor]{min-height:220px!important}}' +
     '@media (max-height:460px){[data-jeux-grid] [data-cursor]{min-height:180px!important}}' +
+    /* AU DOIGT, LES JEUX (5 octobre). Trois commandes restaient sous la cible
+       tactile de 44 px : le choix du vaisseau du jeu 04 (36 px) et « REPARTIR
+       DE ZÉRO » du jeu 06 (36 px). */
+    '@media (pointer:coarse){[data-g4-ship],[data-g6-reset]{min-height:44px!important}' +
+      /* le champ du terminal était en 12,5 px : Safari iOS agrandit la page
+         au toucher de tout champ sous 16 px, et il fallait la repincer */
+      '[data-g13-in]{font-size:16px!important}}' +
+    /* « touches 1 · 2 · 3 · 0 » sous le jeu 01 : sans clavier, la consigne ne
+       désigne rien. Les quatre boutons disent déjà tout. */
+    '@media (hover:none) and (pointer:coarse){[data-g1-start] + span{display:none!important}}' +
+    /* un bouton de jeu ne se coupe pas : en japonais, « もう一度 » passait sur
+       deux lignes (« もう一 / 度 »), comprimé par la consigne posée à côté.
+       C'est la consigne, du texte courant, qui revient à la ligne. */
+    '[data-game] button{white-space:nowrap}' +
     /* LES DEUX BARRES DU HAUT. `[data-nav]` est fixe et haut de 56px, mais son
        contenu passe en `flex-wrap:wrap` sous ~470px et occupe alors 96px sur
        deux lignes. Centré dans 56px, il débordait de 20px en haut — logo et
@@ -12351,7 +12540,7 @@ window.__ditAuDoigt.cache = function(){
   var snake = [], dir = [1, 0], nxt = [1, 0], food = null, run = false, over = false;
   var score = 0, best = 0, acc = 0, step = .13;
   try{ best = parseInt(localStorage.getItem('ad2026.g7.best'), 10) || 0; }catch(e){}
-  if(bestEl) bestEl.textContent = TR('record ') + best;
+  if(bestEl) vif(bestEl, function(){ return TR('record ') + best; });
   function layout(){
     var r = cv.getBoundingClientRect();
     W = Math.max(2, r.width); H = Math.max(2, r.height);
@@ -12374,24 +12563,31 @@ window.__ditAuDoigt.cache = function(){
     snake = [[3, 6], [2, 6], [1, 6]];
     dir = [1, 0]; nxt = [1, 0]; score = 0; step = .13; run = true; over = false;
     if(scoreEl) scoreEl.textContent = '0';
-    if(hint) hint.textContent = TR('flèches ou glissé du doigt');
-    startBtn.textContent = TR('EN COURS');
+    if(hint) vif(hint, function(){ return TR('flèches ou glissé du doigt'); });
+    setTR(marque(startBtn), 'EN COURS');
     place();
+    if(relance) relance();
   }
-  function die(){
+  function die(cause){
     SFX.perd();
     run = false; over = true;
     if(score > best){ best = score; try{ localStorage.setItem('ad2026.g7.best', String(best)); }catch(e){} }
-    if(bestEl) bestEl.textContent = TR('record ') + best;
-    setTR(startBtn, 'REJOUER');
-    if(hint) hint.textContent = score + ' paquets collectés — la sonde s\'est recoupée';
+    if(bestEl) vif(bestEl, function(){ return TR('record ') + best; });
+    setTR(marque(startBtn), 'REJOUER');
+    /* le bilan comptait les POINTS comme des paquets (dix par paquet : « 10
+       paquets » pour un seul), et annonçait « recoupée » même quand la sonde
+       avait heurté le bord. Le nombre est celui des paquets, la cause la vraie. */
+    var n = Math.round(score / 10), un = n === 1;
+    if(hint) vif(hint, function(){ return n + ' ' + TR(cause === 'bord'
+      ? (un ? 'paquet collecté — la sonde a heurté le bord' : 'paquets collectés — la sonde a heurté le bord')
+      : (un ? 'paquet collecté — la sonde s\'est recoupée' : 'paquets collectés — la sonde s\'est recoupée')); });
     if(score >= 150) TROPHY.win('g7');
   }
   function step1(){
     dir = nxt;
     var hx = snake[0][0] + dir[0], hy = snake[0][1] + dir[1];
-    if(hx < 0 || hy < 0 || hx >= CW || hy >= CH){ die(); return; }
-    for(var i = 0; i < snake.length - 1; i++) if(snake[i][0] === hx && snake[i][1] === hy){ die(); return; }
+    if(hx < 0 || hy < 0 || hx >= CW || hy >= CH){ die('bord'); return; }
+    for(var i = 0; i < snake.length - 1; i++) if(snake[i][0] === hx && snake[i][1] === hy){ die('soi'); return; }
     snake.unshift([hx, hy]);
     if(food && hx === food[0] && hy === food[1]){
       score += 10;
@@ -12473,6 +12669,10 @@ window.__ditAuDoigt.cache = function(){
   startBtn.addEventListener('click', function(){ layout(); reset(); });
   layout(); snake = [[3, 6], [2, 6], [1, 6]]; place(); draw(0);
   if(window.ResizeObserver) new ResizeObserver(function(){ layout(); draw(0); }).observe(cv);
+  var relance = boucleFigee(function(dt, t){
+    if(run){ acc += dt; if(acc >= step){ acc = 0; step1(); } }
+    draw(t);
+  }, function(){ return run; });
   if(RM) return;
   var api = { vis: false };
   api.frame = function(dt, t){
@@ -12496,6 +12696,14 @@ window.__ditAuDoigt.cache = function(){
   var hold = 0, hurt = 0, dirty = 1;
   var pad = { x: 0, w: 74 }, ball = { x: 0, y: 0, vx: 0, vy: 0, r: 4.6 };
   var LBL = ['scan de ports', 'force brute', 'hameçonnage', 'injection', 'rançongiciel'];
+  /* libellés traduits une fois par langue, pas une fois par image */
+  var lblMem = {}, lblLg = '';
+  function lbl(k){
+    var lg = 'fr';
+    try{ lg = window.I18N.get() || 'fr'; }catch(e){}
+    if(lg !== lblLg){ lblMem = {}; lblLg = lg; }
+    return lblMem[k] || (lblMem[k] = TR(LBL[k]));
+  }
   function layout(){
     var r = cv.getBoundingClientRect();
     W = Math.max(2, r.width); H = Math.max(2, r.height);
@@ -12504,16 +12712,28 @@ window.__ditAuDoigt.cache = function(){
     c2.textBaseline = 'middle';
     pad.w = Math.max(56, W * .16);
     if(!pad.x) pad.x = W * .5;
-    build();
+    /* la barre d'adresse d'un téléphone se replie au défilement et la toile
+       est remesurée en pleine partie : reconstruire le mur faisait revenir
+       toutes les tentatives déjà bloquées. En partie, on ne fait que replacer. */
+    if(run && bricks.length) place();
+    else build();
   }
   function build(){
     bricks = [];
     var cols = Math.max(5, Math.min(9, Math.floor(W / 68))), rows = 4;
-    var bw = (W - 24) / cols, bh = 17;
     for(var r2 = 0; r2 < rows; r2++) for(var c = 0; c < cols; c++){
-      bricks.push({ x: 12 + c * bw, y: 30 + r2 * (bh + 5), w: bw - 5, h: bh,
-        live: 1, k: (r2 + c) % LBL.length, hp: r2 === 0 ? 2 : 1 });
+      bricks.push({ c: c, r: r2, n: cols, live: 1, k: (r2 + c) % LBL.length, hp: r2 === 0 ? 2 : 1 });
     }
+    place();
+  }
+  function place(){
+    for(var i = 0; i < bricks.length; i++){
+      var b = bricks[i], bw = (W - 24) / b.n, bh = 17;
+      b.x = 12 + b.c * bw; b.y = 30 + b.r * (bh + 5); b.w = bw - 5; b.h = bh;
+    }
+    pad.x = clamp(pad.x, pad.w * .5, W - pad.w * .5);
+    ball.x = clamp(ball.x, ball.r, Math.max(ball.r, W - ball.r));
+    if(ball.y > H - 30) ball.y = H - 42;
   }
   function reset(){
     run = true; score = 0; lives = 3;
@@ -12525,20 +12745,21 @@ window.__ditAuDoigt.cache = function(){
     pad.x = W * .5;
     ball.x = W * .5; ball.y = H - 42; ball.vx = 150; ball.vy = -190;
     if(scoreEl) scoreEl.textContent = '0';
-    if(livesEl){ livesEl.textContent = TR('3 vies'); livesEl.style.color = '#048B9A'; }
-    startBtn.textContent = TR('EN COURS');
-    if(hint) hint.textContent = TR('renvoyez le paquet sur les tentatives');
+    if(livesEl){ vif(livesEl, function(){ return TR('3 vies'); }); livesEl.style.color = '#048B9A'; }
+    setTR(marque(startBtn), 'EN COURS');
+    if(hint) vif(hint, function(){ return TR('renvoyez le paquet sur les tentatives'); });
+    if(relance) relance();
   }
   function lose(){
     lives--;
     if(livesEl){
-      livesEl.textContent = TR(lives === 1 ? '# vie' : '# vies').replace('#', Math.max(0, lives));
+      vif(livesEl, function(){ return TR(lives === 1 ? '# vie' : '# vies').replace('#', Math.max(0, lives)); });
       livesEl.style.color = lives > 1 ? '#048B9A' : '#FF5C4D';
     }
     if(lives <= 0){
       run = false;
-      setTR(startBtn, 'REJOUER');
-      if(hint) hint.textContent = TR('pare-feu percé — # points').replace('#', score);
+      setTR(marque(startBtn), 'REJOUER');
+      if(hint) vif(hint, function(){ return TR('pare-feu percé — # points').replace('#', score); });
       /* le paquet finissait sa course hors du cadre et la toile restait vide :
          on le repose sur la raquette, prêt pour la partie suivante */
       ball.x = pad.x; ball.y = H - 42;
@@ -12600,8 +12821,8 @@ window.__ditAuDoigt.cache = function(){
     for(var j = 0; j < bricks.length; j++) if(bricks[j].live) left++;
     if(!left){
       run = false;
-      setTR(startBtn, 'REJOUER');
-      if(hint) hint.textContent = TR('toutes les tentatives bloquées — # points').replace('#', score);
+      setTR(marque(startBtn), 'REJOUER');
+      if(hint) vif(hint, function(){ return TR('toutes les tentatives bloquées — # points').replace('#', score); });
       TROPHY.win('g8');
     }
   }
@@ -12623,9 +12844,12 @@ window.__ditAuDoigt.cache = function(){
       c2.strokeRect(b.x, b.y, b.w, b.h);
       if(b.w > 72){
         c2.fillStyle = 'rgba(255,138,126,.85)';
-        var tx = LBL[b.k], max = b.w - 12;
+        /* on raccourcit le libellé TRADUIT : rogné en français puis remis au
+           traducteur, le mot amputé ne correspondait plus à aucune clé et
+           restait en français dans les sept autres langues */
+        var full = lbl(b.k), tx = full, max = b.w - 12;
         while(tx.length > 3 && c2.measureText(tx).width > max) tx = tx.slice(0, -1);
-        if(tx !== LBL[b.k]) tx += '…';
+        if(tx !== full) tx += '…';
         c2.fillText(tx, b.x + 6, b.y + b.h * .5);
       }
     });
@@ -12669,6 +12893,9 @@ window.__ditAuDoigt.cache = function(){
   startBtn.addEventListener('click', function(){ layout(); reset(); });
   layout(); draw(0);
   if(window.ResizeObserver) new ResizeObserver(function(){ layout(); draw(0); }).observe(cv);
+  var relance = boucleFigee(function(dt, t){ step(Math.min(.032, dt)); draw(t); }, function(){ return run; });
+  /* figé : la raquette suit le doigt avant le coup d'envoi, on la repeint */
+  if(RM) cv.addEventListener('pointermove', function(){ if(!run) draw(0); }, {passive:true});
   if(RM) return;
   var api = { vis: false };
   api.frame = function(dt, t){ if(!api.vis) return; step(Math.min(.032, dt)); draw(t); };
@@ -12696,13 +12923,29 @@ window.__ditAuDoigt.cache = function(){
     cell = Math.max(16, Math.min((W - 20) / CW, (H - 30) / CH));
     ox = (W - cell * CW) * .5; oy = (H - cell * CH) * .5 + 4;
   }
-  function gen(){
+  /* la première machine ouverte ne peut pas être compromise : une partie
+     sur huit se perdait au premier appui, sans le moindre indice à lire.
+     Les huit intrusions sont donc posées au premier appui, hors de la case
+     touchée et de ses voisines — ce premier appui dégage une zone. */
+  var arme = false;
+  function gen(boot){
     G2 = [];
     for(var i = 0; i < CW * CH; i++) G2.push({ m: 0, open: 0, flag: 0, n: 0 });
+    arme = false;
+    run = true; won = false; lost = false; flags = 0;
+    if(flagsEl) flagsEl.textContent = '0 / ' + MINES;
+    if(stEl){ vif(stEl, function(){ return TR('analyse en cours'); }); stEl.style.color = '#56606A'; }
+    if(hint) vif(hint, function(){ return TR(TOUCH ? 'toucher : ouvrir · maintien : marquer' : 'clic : ouvrir · maintien : marquer'); });
+    /* au chargement, la grille n'est qu'un décor : le bouton garde son
+       intitulé, « RECOMMENCER » avant toute partie ne voulait rien dire */
+    if(!boot) setTR(marque(startBtn), 'RECOMMENCER');
+  }
+  function plant(sx, sy){
     var placed = 0;
     while(placed < MINES){
       var k = (Math.random() * G2.length) | 0;
       if(G2[k].m) continue;
+      if(Math.abs(k % CW - sx) <= 1 && Math.abs(((k / CW) | 0) - sy) <= 1) continue;
       G2[k].m = 1; placed++;
     }
     for(var y = 0; y < CH; y++) for(var x = 0; x < CW; x++){
@@ -12715,23 +12958,20 @@ window.__ditAuDoigt.cache = function(){
       }
       G2[idx(x, y)].n = n;
     }
-    run = true; won = false; lost = false; flags = 0;
-    if(flagsEl) flagsEl.textContent = '0 / ' + MINES;
-    if(stEl){ stEl.textContent = TR('analyse en cours'); stEl.style.color = '#56606A'; }
-    if(hint) hint.textContent = TR('clic : ouvrir · maintien : marquer');
-    startBtn.textContent = TR('RECOMMENCER');
+    arme = true;
   }
   function open(x, y){
     if(x < 0 || y < 0 || x >= CW || y >= CH) return;
     var c = G2[idx(x, y)];
     if(c.open || c.flag) return;
+    if(!arme) plant(x, y);
     c.open = 1;
     if(c.m){
       lost = true; run = false;
       for(var i = 0; i < G2.length; i++) if(G2[i].m) G2[i].open = 1;
-      if(stEl){ stEl.textContent = TR('machine compromise ouverte'); stEl.style.color = '#FF5C4D'; }
-      if(hint) hint.textContent = TR('la machine était infectée — relancez l\'analyse');
-      startBtn.textContent = TR('NOUVELLE ANALYSE');
+      if(stEl){ vif(stEl, function(){ return TR('machine compromise ouverte'); }); stEl.style.color = '#FF5C4D'; }
+      if(hint) vif(hint, function(){ return TR('la machine était infectée — relancez l\'analyse'); });
+      setTR(marque(startBtn), 'NOUVELLE ANALYSE');
       return;
     }
     if(!c.n){
@@ -12746,10 +12986,10 @@ window.__ditAuDoigt.cache = function(){
     for(var i = 0; i < G2.length; i++) if(!G2[i].open) closed++;
     if(closed === MINES){
       won = true; run = false;
-      if(stEl){ stEl.textContent = TR('parc assaini'); stEl.style.color = '#50C878'; }
-      if(hint) hint.textContent = TR('les huit machines compromises sont isolées');
+      if(stEl){ vif(stEl, function(){ return TR('parc assaini'); }); stEl.style.color = '#50C878'; }
+      if(hint) vif(hint, function(){ return TR('les huit machines compromises sont isolées'); });
       TROPHY.win('g9');
-      startBtn.textContent = TR('NOUVELLE ANALYSE');
+      setTR(marque(startBtn), 'NOUVELLE ANALYSE');
     }
   }
   var NCOL = ['#39424A', '#5FD3E3', '#048B9A', '#4169E1', '#F5A524', '#FF8A6E', '#FF5C4D', '#FF5C4D', '#FF5C4D'];
@@ -12816,40 +13056,48 @@ window.__ditAuDoigt.cache = function(){
     cv.style.cursor = p && run ? 'pointer' : 'crosshair';
   }, {passive:true});
   cv.addEventListener('pointerleave', function(){ hover = -1; });
-  var hold = null, held = false;
-  cv.addEventListener('pointerdown', function(e){
-    if(!run) return;
-    held = false;
-    var p = at(e);
-    if(!p) return;
-    hold = setTimeout(function(){
-      held = true;
-      var c = G2[idx(p[0], p[1])];
-      if(c.open) return;
-      c.flag = c.flag ? 0 : 1;
-      flags += c.flag ? 1 : -1;
-      if(flagsEl) flagsEl.textContent = flags + ' / ' + MINES;
-    }, 320);
-  });
-  cv.addEventListener('pointerup', function(e){
-    if(hold){ clearTimeout(hold); hold = null; }
-    if(!run || held) return;
-    var p = at(e);
-    if(p) open(p[0], p[1]);
-  });
-  cv.addEventListener('contextmenu', function(e){
-    e.preventDefault();
-    if(!run) return;
-    var p = at(e);
-    if(!p) return;
+  /* l'appui long ne doit ouvrir ni la loupe ni le menu de l'image sur iPhone */
+  cv.style.webkitTouchCallout = 'none'; cv.style.webkitUserSelect = 'none'; cv.style.userSelect = 'none';
+  /* mouvement figé : aucune boucle ne repeint la grille, le jeu paraissait
+     mort au premier appui. On repeint sur le geste, sans rien animer. */
+  function peint(){ if(RM) draw(0); }
+  var hold = null, held = false, doigt = false;
+  function drapeau(p){
     var c = G2[idx(p[0], p[1])];
     if(c.open) return;
     c.flag = c.flag ? 0 : 1;
     flags += c.flag ? 1 : -1;
     if(flagsEl) flagsEl.textContent = flags + ' / ' + MINES;
+    peint();
+  }
+  cv.addEventListener('pointerdown', function(e){
+    doigt = e.pointerType !== 'mouse';
+    /* le clic droit passait aussi par ici, et sous Windows le menu contextuel
+       n'arrive qu'après le relâchement : la case visée était OUVERTE avant
+       d'être marquée. Seul le bouton principal ouvre. */
+    if(!run || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    held = false;
+    var p = at(e);
+    if(!p) return;
+    hold = setTimeout(function(){ hold = null; held = true; drapeau(p); }, 320);
   });
-  startBtn.addEventListener('click', function(){ layout(); gen(); });
-  layout(); gen(); run = false; draw(0);
+  cv.addEventListener('pointerup', function(e){
+    if(hold){ clearTimeout(hold); hold = null; }
+    if(!run || held || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    var p = at(e);
+    if(p){ open(p[0], p[1]); peint(); }
+  });
+  cv.addEventListener('pointercancel', function(){ if(hold){ clearTimeout(hold); hold = null; } });
+  cv.addEventListener('contextmenu', function(e){
+    e.preventDefault();
+    /* au doigt, l'appui long a déjà marqué la case : Android envoie ensuite
+       ce même menu, qui la démarquait aussitôt */
+    if(!run || doigt) return;
+    var p = at(e);
+    if(p) drapeau(p);
+  });
+  startBtn.addEventListener('click', function(){ layout(); gen(); peint(); });
+  layout(); gen(true); run = false; draw(0);
   if(window.ResizeObserver) new ResizeObserver(function(){ layout(); draw(0); }).observe(cv);
   if(RM) return;
   var api = { vis: false };
@@ -12884,7 +13132,7 @@ window.__ditAuDoigt.cache = function(){
     var c = i % COLS, r = Math.floor(i / COLS);
     return { x: ox + c * (cw + 6), y: oy + r * (ch + 6), w: cw, h: ch };
   }
-  function gen(){
+  function gen(boot){
     var deck = [];
     for(var i = 0; i < 8; i++){ deck.push(i); deck.push(i); }
     for(var j = deck.length - 1; j > 0; j--){
@@ -12894,9 +13142,12 @@ window.__ditAuDoigt.cache = function(){
     cards = deck.map(function(v){ return { v: v, up: 0, done: 0, a: 0 }; });
     open = []; pairs = 0; moves = 0; run = true; lock = 0;
     if(pairsEl) pairsEl.textContent = '0 / 8';
-    if(movesEl) movesEl.textContent = '0 coup';
-    if(hint) hint.textContent = TR('retournez deux cartes');
-    startBtn.textContent = TR('RECOMMENCER');
+    if(movesEl) vif(movesEl, function(){ return TR('# coup').replace('#', '0'); });
+    /* au chargement le jeu n'est qu'un décor : le bouton garde son « JOUER »
+       et la consigne entière du gabarit reste affichée */
+    if(boot) return;
+    if(hint) vif(hint, function(){ return TR('retournez deux cartes'); });
+    setTR(marque(startBtn), 'RECOMMENCER');
   }
   function flip(i){
     if(!run || lock > 0) return;
@@ -12907,7 +13158,7 @@ window.__ditAuDoigt.cache = function(){
     open.push(i);
     if(open.length === 2){
       moves++;
-      if(movesEl) movesEl.textContent = TR(moves > 1 ? '# coups' : '# coup').replace('#', moves);
+      if(movesEl) vif(movesEl, function(){ return TR(moves > 1 ? '# coups' : '# coup').replace('#', moves); });
       var a = cards[open[0]], b = cards[open[1]];
       if(a.v === b.v){
         a.done = b.done = 1;
@@ -12920,15 +13171,27 @@ window.__ditAuDoigt.cache = function(){
         if(pairs === 8){
           run = false;
           SFX.gagne();
-          setTR(startBtn, 'REJOUER');
-          if(hint) hint.textContent = TR('inventaire complet en # coups').replace('#', moves);
+          setTR(marque(startBtn), 'REJOUER');
+          if(hint) vif(hint, function(){ return TR('inventaire complet en # coups').replace('#', moves); });
           TROPHY.win('g10');
         }
-      }else{ SFX.bad(); lock = .85; }
+      }else{
+        SFX.bad(); lock = .85;
+        /* mouvement figé : pas de boucle pour décompter le temps de lecture,
+           c'est un minuteur qui retourne la paire ratée */
+        if(RM) setTimeout(function(){
+          if(open.length === 2){ cards[open[0]].up = 0; cards[open[1]].up = 0; }
+          open = []; lock = 0; peint();
+        }, 850);
+      }
     }
+    peint();
   }
+  /* mouvement figé : aucune boucle ne repeint, la carte retournée ne se
+     montrait jamais. On repeint sur le geste, la face d'un coup. */
+  function peint(){ if(RM) draw(0, 1); }
   function draw(t, dt){
-    if(lock > 0){
+    if(lock > 0 && !RM){
       lock -= dt || .016;
       if(lock <= 0){
         cards[open[0]].up = 0; cards[open[1]].up = 0;
@@ -12989,8 +13252,8 @@ window.__ditAuDoigt.cache = function(){
     var i = at(e);
     if(i >= 0) flip(i);
   });
-  startBtn.addEventListener('click', function(){ layout(); gen(); });
-  layout(); gen(); run = false; draw(0, .016);
+  startBtn.addEventListener('click', function(){ layout(); gen(); peint(); });
+  layout(); gen(true); run = false; draw(0, .016);
   if(window.ResizeObserver) new ResizeObserver(function(){ layout(); draw(0, .016); }).observe(cv);
   if(RM) return;
   var api = { vis: false };
@@ -13249,7 +13512,7 @@ window.__ditAuDoigt.cache = function(){
   var DPR2 = CDPR(), W = 0, H = 0;
   var state = 'idle', wait = 0, t0 = 0, last = 0, best = 0, tries = 0, sum = 0, ph = 0;
   try{ best = parseInt(localStorage.getItem('ad2026.g11.best'), 10) || 0; }catch(e){}
-  if(bestEl && best) bestEl.textContent = TR('record ') + best + ' ms';
+  if(bestEl && best) vif(bestEl, function(){ return TR('record ') + best + ' ms'; });
   function layout(){
     var r = cv.getBoundingClientRect();
     W = Math.max(2, r.width); H = Math.max(2, r.height);
@@ -13267,16 +13530,16 @@ window.__ditAuDoigt.cache = function(){
   function alerte(){
     stopT();
     state = 'go'; t0 = performance.now();
-    if(hint) hint.textContent = TR('coupez !');
+    if(hint) vif(hint, function(){ return TR('coupez !'); });
     draw();
   }
   function arm(){
     stopT();
     state = 'wait'; lent = false; wait = .9 + Math.random() * 2.6;
     armAt = performance.now();
-    if(hint) hint.textContent = TR('attendez le rouge…');
+    if(hint) vif(hint, function(){ return TR('attendez le rouge…'); });
     if(msEl) msEl.textContent = '— ms';
-    if(startBtn) startBtn.textContent = TR('EN COURS');
+    if(startBtn) setTR(marque(startBtn), 'EN COURS');
     /* la remise en page vient d'effacer la toile et seule la boucle la
        repeignait : entre les deux le cadre restait vide */
     draw();
@@ -13285,8 +13548,8 @@ window.__ditAuDoigt.cache = function(){
   function fire(){
     if(state === 'wait'){
       state = 'early';
-      if(hint) hint.textContent = TR('trop tôt — c\'est un faux positif');
-      startBtn.textContent = TR('REESSAYER');
+      if(hint) vif(hint, function(){ return TR('trop tôt — c\'est un faux positif'); });
+      setTR(marque(startBtn), 'REESSAYER');
       return;
     }
     if(state === 'go'){
@@ -13296,12 +13559,12 @@ window.__ditAuDoigt.cache = function(){
       if(!best || last < best){
         best = last;
         try{ localStorage.setItem('ad2026.g11.best', String(best)); }catch(e){}
-        if(bestEl) bestEl.textContent = TR('record ') + best + ' ms';
+        if(bestEl) vif(bestEl, function(){ return TR('record ') + best + ' ms'; });
       }
       state = 'done';
-      if(hint) hint.textContent = TR('# ms · moyenne # ms sur #')
-        .replace('#', last).replace('#', Math.round(sum / tries)).replace('#', tries);
-      startBtn.textContent = TR('RELANCER');
+      if(hint) vif(hint, function(){ return TR('# ms · moyenne # ms sur #')
+        .replace('#', last).replace('#', Math.round(sum / tries)).replace('#', tries); });
+      setTR(marque(startBtn), 'RELANCER');
       if(tries >= 3 && sum / tries < 420) TROPHY.win('g11');
       return;
     }
@@ -13311,7 +13574,7 @@ window.__ditAuDoigt.cache = function(){
     ph += dt;
     if(state === 'wait'){
       wait -= dt;
-      if(wait <= 0){ state = 'go'; t0 = performance.now(); if(hint) hint.textContent = TR('coupez !'); }
+      if(wait <= 0){ state = 'go'; t0 = performance.now(); if(hint) vif(hint, function(){ return TR('coupez !'); }); }
     }
   }
   function draw(){
@@ -13385,7 +13648,7 @@ window.__ditAuDoigt.cache = function(){
      montrer, ce que le tirage produit une fois sur six. */
   function pas(){ return Math.max(.34, .66 - lvl * .022); }
   try{ best = parseInt(localStorage.getItem('ad2026.g12.best'), 10) || 0; }catch(e){}
-  if(bestEl) bestEl.textContent = TR('record ') + best;
+  if(bestEl) vif(bestEl, function(){ return TR('record ') + best; });
   function layout(){
     var r = cv.getBoundingClientRect();
     W = Math.max(2, r.width); H = Math.max(2, r.height);
@@ -13402,32 +13665,34 @@ window.__ditAuDoigt.cache = function(){
     lvl++;
     seq.push((Math.random() * 6) | 0);
     input = [];
-    if(lvlEl) lvlEl.textContent = TR('palier #').replace('#', lvl);
+    if(lvlEl) vif(lvlEl, function(){ return TR('palier #').replace('#', lvl); });
     state = 'show'; showing = 0; showT = 0;
-    if(hint) hint.textContent = TR('regardez la séquence…');
+    if(hint) vif(hint, function(){ return TR('regardez la séquence…'); });
+    if(relance) relance();
   }
   function reset(){
     seq = []; input = []; lvl = 0;
-    startBtn.textContent = TR('EN COURS');
+    setTR(marque(startBtn), 'EN COURS');
     next();
   }
   function fail(){
     state = 'idle';
     if(lvl - 1 > best){ best = lvl - 1; try{ localStorage.setItem('ad2026.g12.best', String(best)); }catch(e){} }
-    if(bestEl) bestEl.textContent = TR('record ') + best;
-    if(hint) hint.textContent = TR('ordre rompu au palier # — l\'onduleur passe toujours en premier')
-      .replace('#', lvl);
-    setTR(startBtn, 'REJOUER');
+    if(bestEl) vif(bestEl, function(){ return TR('record ') + best; });
+    if(hint) vif(hint, function(){ return TR('ordre rompu au palier # — l\'onduleur passe toujours en premier')
+      .replace('#', lvl); });
+    setTR(marque(startBtn), 'REJOUER');
   }
   function tap(i){
     if(state !== 'play') return;
     SFX.note(i);
     flash = i; flashT = .32;
+    if(relance) relance();
     input.push(i);
     if(seq[input.length - 1] !== i){ fail(); return; }
     if(input.length === seq.length){
       if(lvl >= 5) TROPHY.win('g12');
-      if(hint) hint.textContent = TR('palier # réussi').replace('#', lvl);
+      if(hint) vif(hint, function(){ return TR('palier # réussi').replace('#', lvl); });
       state = 'wait';
       setTimeout(function(){ if(state === 'wait') next(); }, 700);
     }
@@ -13445,7 +13710,7 @@ window.__ditAuDoigt.cache = function(){
       showT = 0; showing++;
       if(showing >= seq.length){
         showing = -1; state = 'play';
-        if(hint) hint.textContent = TR('à vous — reproduisez l\'ordre');
+        if(hint) vif(hint, function(){ return TR('à vous — reproduisez l\'ordre'); });
       }
     }
   }
@@ -13491,6 +13756,10 @@ window.__ditAuDoigt.cache = function(){
   startBtn.addEventListener('click', function(){ layout(); reset(); });
   layout(); draw(0);
   if(window.ResizeObserver) new ResizeObserver(function(){ layout(); draw(0); }).observe(cv);
+  /* figé : la séquence ne s'affichait jamais, il n'y avait rien à reproduire.
+     La boucle vit tant que la manche est en cours, ou qu'une touche brille. */
+  var relance = boucleFigee(function(dt, t){ step(dt); draw(t); },
+    function(){ return state !== 'idle' || flashT > 0; });
   if(RM) return;
   var api = { vis: false };
   api.frame = function(dt, t){ if(!api.vis) return; step(dt); draw(t); };
@@ -13540,26 +13809,79 @@ window.__ditAuDoigt.cache = function(){
       : 'Vous jouez la défense. Objectif : garder la base de données douze tours.', '#5FD3E3');
     ligne('Tapez help pour la liste des commandes.', '#56606A');
     paintHud();
+    verbes();
+  }
+  /* LES VERBES À PORTÉE DE DOIGT. Au téléphone, il fallait taper
+     « exploit poste-12 » au clavier virtuel pour chacun des douze tours, et la
+     bande prévue sous la carte restait vide. On touche une machine sur la
+     carte, puis un verbe — le champ reste là pour qui préfère taper. Seuls les
+     verbes du camp joué sont proposés. */
+  var helpEl = qs('[data-g13-help]');
+  var VERBES = { rouge: ['scan', 'exploit', 'logs', 'status'], bleu: ['scan', 'patch', 'isolate', 'logs', 'status'] };
+  var VCOL = { scan: '#5FD3E3', logs: '#5FD3E3', status: '#5FD3E3', exploit: '#FF5C4D', patch: '#4169E1', isolate: '#4169E1' };
+  var VBRD = { '#5FD3E3': 'rgba(95,211,227,.4)', '#FF5C4D': 'rgba(255,92,77,.45)', '#4169E1': 'rgba(65,105,225,.55)' };
+  function verbes(){
+    if(!helpEl) return;
+    helpEl.innerHTML = '';
+    helpEl.style.display = 'flex'; helpEl.style.flexWrap = 'wrap'; helpEl.style.gap = '6px';
+    (VERBES[G.camp] || VERBES.rouge).forEach(function(v){
+      var b = doc.createElement('button');
+      b.type = 'button';
+      b.textContent = v;
+      b.setAttribute('data-i18n-skip', '1');   /* une commande ne se traduit pas */
+      b.style.cssText = 'background:none;border:1px solid ' + VBRD[VCOL[v]] + ';color:' + VCOL[v] + ';' +
+        "font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.06em;" +
+        'padding:0 13px;min-height:44px;cursor:pointer;touch-action:manipulation';
+      b.addEventListener('click', function(){ verbe(v); });
+      helpEl.appendChild(b);
+    });
+  }
+  function verbe(v){
+    if(G.fini || v === 'status' || v === 'help'){ jouer(v); peint(); return; }
+    if(G.sel < 0){ ligne('Touchez d\'abord une machine sur la carte.', '#F5A524'); return; }
+    jouer(v + ' ' + NET[G.sel].id);
+    /* le champ gardait « scan web-01 » après un « patch » joué au doigt :
+       ENTRÉE aurait rejoué autre chose que ce qu'on venait de faire */
+    if(inp) inp.value = '';
+    peint();
   }
   function paintHud(){
-    if(turnEl) turnEl.textContent = TR('tour # / #').replace('#', G.tour).replace('#', G.max);
+    if(turnEl) vif(turnEl, function(){ return TR('tour # / #').replace('#', G.tour).replace('#', G.max); });
     if(sideEl){
-      sideEl.textContent = TR(G.camp === 'rouge' ? 'rôle : attaque' : 'rôle : défense');
+      vif(sideEl, function(){ return TR(G.camp === 'rouge' ? 'rôle : attaque' : 'rôle : défense'); });
       sideEl.style.color = G.camp === 'rouge' ? '#FF5C4D' : '#4169E1';
     }
     if(scoreEl) scoreEl.textContent = String(G.score);
+  }
+  /* Une ligne du journal. Les phrases qui portent un nom de machine étaient
+     assemblées en français AVANT la traduction : « scan poste-12 → faille :
+     session laissée ouverte » ne correspondait à aucune clé, et la partie se
+     jouait en français dans les sept autres langues — alors que chaque
+     morceau (« → faille : », « session laissée ouverte »…) est dans la table.
+     Une ligne est donc une suite de morceaux : une chaîne se traduit, r(x)
+     passe tel quel (nom de machine, nombre, commande tapée). */
+  function r(x){ return { r: String(x) }; }
+  function rend(parts){
+    if(typeof parts === 'string') return TRn(parts);
+    var o = '';
+    for(var i = 0; i < parts.length; i++){
+      var q = parts[i];
+      o += typeof q === 'string' ? TR(q) : (typeof q === 'function' ? q() : q.r);
+    }
+    return o;
   }
   function ligne(txt, col){
     if(!logEl) return;
     var d = doc.createElement('div');
     d.style.cssText = 'margin-bottom:5px;color:' + (col || '#7C8791') + ';word-break:break-word';
-    d.textContent = TR(txt);
-    d.setAttribute('data-i18n-fr', txt);
+    vif(d, function(){ return rend(txt); });
     logEl.appendChild(d);
     while(logEl.childNodes.length > 90) logEl.removeChild(logEl.firstChild);
     logEl.scrollTop = logEl.scrollHeight;
-    askRescan();
   }
+  /* la version d'une phrase gravée pour db-01 vaut pour toutes les machines :
+     on la traduit, puis on remet le bon nom */
+  function pourDb(fr, id){ return function(){ return TR(fr).split('db-01').join(id); }; }
   function trouve(nom){
     if(!nom) return null;
     nom = nom.toLowerCase().trim();
@@ -13592,7 +13914,7 @@ window.__ditAuDoigt.cache = function(){
       ligne('isolate <machine> — coupe la machine du réseau (défense)', '#4169E1');
       ligne('logs <machine>    — lit les traces laissées', '#5FD3E3');
       ligne('status            — état du parc', '#5FD3E3');
-      ligne('Machines : ' + NET.map(function(n){ return n.id; }).join(', '), '#56606A');
+      ligne(['Machines :', r(' ' + NET.map(function(n){ return n.id; }).join(', '))], '#56606A');
       return false;   /* la lecture d'aide ne consomme pas de tour */
     },
     status: function(){
@@ -13602,7 +13924,7 @@ window.__ditAuDoigt.cache = function(){
         if(s.isole) et.push('isolée');
         if(s.patche) et.push('corrigée');
         if(!et.length) et.push('saine');
-        ligne(n.id + ' — ' + et.join(', ') + (s.vu ? ' · faille : ' + s.faille : ''),
+        ligne([r(n.id + ' — '), function(){ return et.map(TR).join(', '); }].concat(s.vu ? [r(' '), '· faille :', r(' '), s.faille] : []),
           s.pris ? '#FF5C4D' : (s.patche ? '#50C878' : '#7C8791'));
       });
       return false;
@@ -13614,14 +13936,15 @@ window.__ditAuDoigt.cache = function(){
          des points à chaque fois : le score gonflait tout seul */
       if(!s.vu) G.score += 2;
       s.vu = true; s.bruit += G.camp === 'rouge' ? 2 : 0;
-      ligne('scan ' + n.id + ' → faille : ' + s.faille, '#5FD3E3');
-      ligne('  voisins : ' + voisins(n.id).join(', '), '#56606A');
+      ligne([r('scan ' + n.id + ' '), '→ faille :', r(' '), s.faille], '#5FD3E3');
+      ligne([r('  '), 'voisins :', r(' ' + voisins(n.id).join(', '))], '#56606A');
       return true;
     },
     logs: function(n){
       if(!n) return ligne('logs : indiquez une machine.', '#F5A524'), false;
       var s = ST[n.id];
-      ligne('logs ' + n.id + ' → ' + (s.bruit > 3 ? s.bruit + ' tentatives relevées' : s.bruit > 0 ? 'trace faible (' + s.bruit + ')' : 'rien à signaler'),
+      ligne([r('logs ' + n.id + ' → ')].concat(s.bruit > 3 ? [r(s.bruit + ' '), 'tentatives relevées']
+        : s.bruit > 0 ? ['trace faible (', r(s.bruit + ')')] : ['rien à signaler']),
         s.bruit > 3 ? '#F5A524' : '#7C8791');
       return true;
     },
@@ -13629,21 +13952,21 @@ window.__ditAuDoigt.cache = function(){
       if(G.camp !== 'rouge') return ligne('exploit : réservé à l\'attaque.', '#F5A524'), false;
       if(!n) return ligne('exploit : indiquez une machine.', '#F5A524'), false;
       var s = ST[n.id];
-      if(s.pris) return ligne(n.id + ' est déjà à vous.', '#7C8791'), false;
-      if(s.isole) return ligne(n.id + ' est coupée du réseau : injoignable.', '#F5A524'), true;
-      if(!s.vu) return ligne('Vous ne connaissez pas encore sa faille. scan ' + n.id + ' d\'abord.', '#F5A524'), false;
-      if(!atteignable(n.id)) return ligne(n.id + ' n\'est voisine d\'aucune machine que vous tenez.', '#F5A524'), true;
+      if(s.pris) return ligne([r(n.id + ' '), 'est déjà à vous.'], '#7C8791'), false;
+      if(s.isole) return ligne([r(n.id + ' '), 'est coupée du réseau : injoignable.'], '#F5A524'), true;
+      if(!s.vu) return ligne(['Vous ne connaissez pas encore sa faille. scan', r(' ' + n.id + ' '), 'd\'abord.'], '#F5A524'), false;
+      if(!atteignable(n.id)) return ligne([r(n.id + ' '), 'n\'est voisine d\'aucune machine que vous tenez.'], '#F5A524'), true;
       if(s.patche){
         /* Un correctif fermait la partie sans le dire : deux scans sur la même
            machine suffisaient à la faire corriger par la défense, et la cible
            devenait inatteignable pour les dix tours restants. La tentative use
            le tour, elle n'est plus perdue d'avance. */
-        if(Math.random() < .4){ s.patche = false; s.bruit += 2; return ligne(n.id + ' : le correctif est contourné, la faille se rouvre.', '#F5A524'), true; }
-        return ligne(n.id + ' a été corrigée : la faille ne répond plus.', '#4169E1'), true;
+        if(Math.random() < .4){ s.patche = false; s.bruit += 2; return ligne([pourDb('db-01 : le correctif est contourné, la faille se rouvre.', n.id)], '#F5A524'), true; }
+        return ligne([r(n.id + ' '), 'a été corrigée : la faille ne répond plus.'], '#4169E1'), true;
       }
       s.pris = true; s.bruit += 4;
       G.score += n.id === CIBLE ? 40 : 12;
-      ligne('exploit ' + n.id + ' → accès obtenu.', '#FF5C4D');
+      ligne([r('exploit ' + n.id + ' '), '→ accès obtenu.'], '#FF5C4D');
       if(n.id === CIBLE) fin(true);
       return true;
     },
@@ -13651,11 +13974,11 @@ window.__ditAuDoigt.cache = function(){
       if(G.camp !== 'bleu') return ligne('patch : réservé à la défense.', '#F5A524'), false;
       if(!n) return ligne('patch : indiquez une machine.', '#F5A524'), false;
       var s = ST[n.id];
-      if(s.patche) return ligne(n.id + ' est déjà corrigée.', '#7C8791'), false;
+      if(s.patche) return ligne([r(n.id + ' '), 'est déjà corrigée.'], '#7C8791'), false;
       s.patche = true;
-      if(s.pris && Math.random() < .6){ s.pris = false; ligne('L\'accès en place sur ' + n.id + ' est tombé avec le correctif.', '#50C878'); }
+      if(s.pris && Math.random() < .6){ s.pris = false; ligne(['L\'accès en place sur', r(' ' + n.id + ' '), 'est tombé avec le correctif.'], '#50C878'); }
       G.score += 10;
-      ligne('patch ' + n.id + ' → faille refermée.', '#50C878');
+      ligne([r('patch ' + n.id + ' '), '→ faille refermée.'], '#50C878');
       return true;
     },
     isolate: function(n){
@@ -13664,7 +13987,7 @@ window.__ditAuDoigt.cache = function(){
       var s = ST[n.id];
       s.isole = !s.isole;
       G.score += s.isole ? 6 : 0;
-      ligne('isolate ' + n.id + ' → ' + (s.isole ? 'coupée du réseau' : 'remise en service'), '#4169E1');
+      ligne([r('isolate ' + n.id + ' → '), s.isole ? 'coupée du réseau' : 'remise en service'], '#4169E1');
       return true;
     }
   };
@@ -13677,14 +14000,14 @@ window.__ditAuDoigt.cache = function(){
       if(pris.length && Math.random() < .55){
         var v = pris[(Math.random() * pris.length) | 0];
         ST[v.id].isole = true;
-        ligne('· la défense isole ' + v.id, '#4169E1');
+        ligne(['· la défense isole', r(' ' + v.id)], '#4169E1');
         return;
       }
       var chaud = NET.filter(function(n){ return ST[n.id].bruit > 2 && !ST[n.id].patche; });
       if(chaud.length){
         var w = chaud[(Math.random() * chaud.length) | 0];
         ST[w.id].patche = true;
-        ligne('· la défense corrige ' + w.id, '#4169E1');
+        ligne(['· la défense corrige', r(' ' + w.id)], '#4169E1');
       }else ligne('· la défense relit ses journaux', '#39424A');
     }else{
       /* l'attaque progresse de voisin en voisin vers la base */
@@ -13701,14 +14024,14 @@ window.__ditAuDoigt.cache = function(){
         if(coupe.length){
           var q = coupe[(Math.random() * coupe.length) | 0];
           ST[q.id].isole = false; ST[q.id].fige = true;
-          ligne('· ' + q.id + ' est réclamée par l\'exploitation : remise en service.', '#F5A524');
+          ligne([pourDb('· db-01 est réclamée par l\'exploitation : remise en service.', q.id)], '#F5A524');
           return;
         }
         var mur = NET.filter(function(n){ return ST[n.id].patche && !ST[n.id].pris && atteignable(n.id); });
         if(mur.length && Math.random() < .4){
           var m = mur[(Math.random() * mur.length) | 0];
           ST[m.id].patche = false; ST[m.id].bruit += 2;
-          ligne('· ' + m.id + ' : le correctif est contourné.', '#FF5C4D');
+          ligne([pourDb('· db-01 : le correctif est contourné.', m.id)], '#FF5C4D');
           return;
         }
         ligne('· l\'attaque cherche une entrée', '#39424A');
@@ -13717,7 +14040,7 @@ window.__ditAuDoigt.cache = function(){
       cand.sort(function(a, b){ return (a.id === CIBLE ? -1 : 0) - (b.id === CIBLE ? -1 : 0); });
       var t = cand[0];
       ST[t.id].pris = true; ST[t.id].bruit += 3;
-      ligne('· l\'attaque prend ' + t.id, '#FF5C4D');
+      ligne(['· l\'attaque prend', r(' ' + t.id)], '#FF5C4D');
       if(t.id === CIBLE) fin(false);
     }
   }
@@ -13736,11 +14059,11 @@ window.__ditAuDoigt.cache = function(){
     var p = String(txt).trim().split(/\s+/);
     var verbe = (p[0] || '').toLowerCase();
     if(!verbe) return;
-    ligne('$ ' + txt, '#E4E8EA');
+    ligne([r('$ ' + txt)], '#E4E8EA');
     var f = CMD[verbe];
-    if(!f){ ligne('Commande inconnue : ' + verbe + '. Tapez help.', '#F5A524'); return; }
+    if(!f){ ligne(['Commande inconnue :', r(' ' + verbe + '. '), 'Tapez help pour la liste des commandes.'], '#F5A524'); return; }
     var n = p[1] ? trouve(p[1]) : null;
-    if(p[1] && !n){ ligne('Machine inconnue : ' + p[1], '#F5A524'); return; }
+    if(p[1] && !n){ ligne(['Machine inconnue :', r(' ' + p[1])], '#F5A524'); return; }
     var coute = f(n);
     paintHud();
     if(!coute || G.fini) return;
@@ -13827,21 +14150,30 @@ window.__ditAuDoigt.cache = function(){
       var p = pos(NET[i]);
       if((x - p.x) * (x - p.x) + (y - p.y) * (y - p.y) < 260){
         G.sel = i;
-        if(inp){ inp.value = (inp.value.trim().split(/\s+/)[0] || 'scan') + ' ' + NET[i].id; inp.focus(); }
+        /* au doigt, pas de focus : il ouvrait le clavier par-dessus la carte
+           alors que les verbes sont juste dessous */
+        if(inp){ inp.value = (inp.value.trim().split(/\s+/)[0] || 'scan') + ' ' + NET[i].id; if(!TOUCH) inp.focus(); }
+        peint();
         return;
       }
     }
     G.sel = -1;
+    peint();
   });
   if(form) form.addEventListener('submit', function(ev){
     ev.preventDefault();
     var v = inp ? inp.value : '';
     if(inp) inp.value = '';
     if(v.trim()) jouer(v);
+    peint();
   });
-  if(startBtn) startBtn.addEventListener('click', function(){ layout(); reset(); if(inp) inp.focus(); });
-  if(swapBtn) swapBtn.addEventListener('click', function(){ reset(G.camp === 'rouge' ? 'bleu' : 'rouge'); });
-  if(hintEl) hintEl.textContent = TR('tapez help pour la liste des commandes');
+  /* mouvement figé : la carte ne se repeignait plus après une commande,
+     les machines prises ou corrigées n'y changeaient jamais de couleur */
+  function peint(){ if(RM) draw(0); }
+  if(startBtn) startBtn.addEventListener('click', function(){ layout(); reset(); peint(); if(inp && !TOUCH) inp.focus(); });
+  if(swapBtn) swapBtn.addEventListener('click', function(){ reset(G.camp === 'rouge' ? 'bleu' : 'rouge'); peint(); });
+  if(hintEl) vif(hintEl, function(){ return TR(TOUCH ? 'touchez une machine, puis un verbe — ou tapez la commande'
+                                           : 'tapez help pour la liste des commandes'); });
   layout(); reset(); draw(0);
   if(window.ResizeObserver) new ResizeObserver(function(){ layout(); draw(0); }).observe(cv);
   if(RM) return;
@@ -13871,9 +14203,22 @@ window.__ditAuDoigt.cache = function(){
     });
   }catch(e){}
 
+  /* le haut de la zone libre : sous la barre fixe, qui fait 56 px au bureau
+     mais 113 sur un téléphone (deux rangées) — la fenêtre se posait dessous */
+  function hautLibre(){
+    var nv = qs('[data-nav]');
+    var bas = nv ? nv.getBoundingClientRect().bottom : 56;
+    /* sa seconde rangée (langue, 3D, contact) dépasse de la boîte : on la mesure */
+    if(nv) qsa('*', nv).forEach(function(e){
+      var re = e.getBoundingClientRect();
+      if(re.height && re.bottom > bas && re.top < innerHeight * .4) bas = re.bottom;
+    });
+    return Math.round(Math.max(58, Math.min(bas + 6, innerHeight * .4)));
+  }
   function mkBtn(label, aria, w){
     var b = doc.createElement('button');
     b.type = 'button';
+    b.setAttribute('data-win-btn', '1');
     setTR(b, aria, 'aria-label');
     winBtns.push(b);
     b.style.cssText = "flex:0 0 auto;background:rgba(11,14,17,.7);border:1px solid rgba(228,232,234,.16);" +
@@ -13910,7 +14255,9 @@ window.__ditAuDoigt.cache = function(){
       dot.style.top = 'auto';
       dot.style.right = 'auto';
       dot.style.flex = '0 0 auto';
-      dot.style.marginLeft = '2px';
+      /* son halo clignotant déborde d'une dizaine de pixels : collé au score
+         (2 px), il passait sur « 0 / 7 » à chaque battement */
+      dot.style.marginLeft = '10px';
       head.insertBefore(dot, bar);
     }
 
@@ -13939,15 +14286,24 @@ window.__ditAuDoigt.cache = function(){
       W.ph.style.cssText = 'height:' + Math.round(r.height) + 'px';
       art.parentNode.insertBefore(W.ph, art);
       W.w = Math.round(Math.min(r.width, innerWidth - 40));
-      W.h = Math.round(Math.min(r.height, innerHeight - 80));
+      var haut0 = hautLibre();
+      W.h = Math.round(Math.min(r.height, innerHeight - haut0 - 12));
       W.x = Math.round(clamp(r.left, 12, Math.max(12, innerWidth - W.w - 12)));
-      W.y = Math.round(clamp(r.top, 64, Math.max(64, innerHeight - W.h - 12)));
+      W.y = Math.round(clamp(r.top, haut0, Math.max(haut0, innerHeight - W.h - 12)));
       art.style.position = 'fixed';
       art.style.zIndex = String(++Z);
       art.style.margin = '0';
       art.style.boxShadow = '0 24px 70px rgba(0,0,0,.7)';
+      /* la carte a un fond translucide (60 %) : posée en fenêtre par-dessus la
+         page, elle laissait voir l'en-tête et le jeu suivant au travers de son
+         propre texte. La fenêtre prend la même teinte, opaque — celle du thème
+         en cours, lue sur la carte elle-même. */
+      W.bg0 = art.style.backgroundColor;
+      var bgc = (getComputedStyle(art).backgroundColor || '').match(/rgba?\(([^)]+)\)/);
+      if(bgc){ var pc = bgc[1].split(','); art.style.backgroundColor = 'rgb(' + pc[0] + ',' + pc[1] + ',' + pc[2] + ')'; }
       art.style.borderColor = 'rgba(4,139,154,.5)';
       art.style.resize = 'none';
+      art.style.setProperty('--haut-libre', hautLibre() + 'px');
       art.setAttribute('data-win', '1');
       head.style.cursor = 'grab';
       head.style.userSelect = 'none';
@@ -13963,6 +14319,7 @@ window.__ditAuDoigt.cache = function(){
       art.style.position = ''; art.style.left = ''; art.style.top = '';
       art.style.width = ''; art.style.height = ''; art.style.zIndex = '';
       art.style.margin = ''; art.style.boxShadow = ''; art.style.borderColor = '';
+      if(W.bg0 != null){ art.style.backgroundColor = W.bg0; W.bg0 = null; }
       head.style.cursor = ''; head.style.userSelect = '';
       grip.style.display = 'none';
       bOpen.style.display = 'grid';
@@ -13977,7 +14334,7 @@ window.__ditAuDoigt.cache = function(){
       W.w = Math.round(clamp(W.w * f, 300, innerWidth - 24));
       W.h = Math.round(clamp(W.h * f, 220, innerHeight - 24));
       W.x = Math.round(clamp(cx - W.w * .5, 8, Math.max(8, innerWidth - W.w - 8)));
-      W.y = Math.round(clamp(cy - W.h * .5, 60, Math.max(60, innerHeight - W.h - 8)));
+      W.y = Math.round(clamp(cy - W.h * .5, hautLibre(), Math.max(hautLibre(), innerHeight - W.h - 8)));
       apply();
     }
     bOpen.addEventListener('click', function(e){ e.stopPropagation(); open(); });
@@ -13994,7 +14351,7 @@ window.__ditAuDoigt.cache = function(){
         bMax.textContent = '□';
       }else{
         W.max = true;
-        W.x = 8; W.y = 58; W.w = innerWidth - 16; W.h = innerHeight - 66;
+        W.x = 8; W.y = hautLibre(); W.w = innerWidth - 16; W.h = innerHeight - W.y - 8;
         bMax.textContent = '❐';
       }
       apply();
@@ -14047,7 +14404,7 @@ window.__ditAuDoigt.cache = function(){
     /* la fenêtre reste dans l'écran quand on redimensionne le navigateur */
     addEventListener('resize', function(){
       if(!W.on) return;
-      if(W.max){ W.x = 8; W.y = 58; W.w = innerWidth - 16; W.h = innerHeight - 66; }
+      if(W.max){ W.x = 8; W.y = hautLibre(); W.w = innerWidth - 16; W.h = innerHeight - W.y - 8; }
       else{
         W.w = Math.min(W.w, innerWidth - 16);
         W.h = Math.min(W.h, innerHeight - 24);
@@ -14071,7 +14428,21 @@ window.__ditAuDoigt.cache = function(){
     '[data-win] > *:first-child{flex:0 0 auto}' +
     '[data-win] > *:last-of-type{flex:0 0 auto}' +
     '[data-win] [data-cursor]{flex:1 1 auto!important;min-height:0!important}' +
-    '[data-win] canvas{width:100%!important;height:100%!important}';
+    '[data-win] canvas{width:100%!important;height:100%!important}' +
+    /* au doigt, les commandes de fenêtre ne faisaient que 30 px de large :
+       la cible s'étend vers la droite jusqu'à 44 px, sans toucher au dessin
+       ni empiéter sur le haut-parleur jaune posé à leur gauche */
+    '@media (pointer:coarse){[data-win-btn]{position:relative}' +
+      '[data-win-btn]::after{content:"";position:absolute;left:0;right:-14px;top:50%;height:44px;margin-top:-22px}}' +
+    /* fenêtre détachée : au doigt, la barre de titre défilait la page au lieu
+       de déplacer la fenêtre */
+    '[data-win] > *:first-child{touch-action:none}' +
+    /* au téléphone, le gabarit pose la fenêtre à 56 px du haut : c'était la
+       hauteur de la barre au bureau. Sur deux rangées (113 px), la fenêtre
+       recouvrait la langue, « 3D » et CONTACT. Elle part sous la barre mesurée. */
+    '@media (max-width:820px){article[data-win]{top:var(--haut-libre,56px)!important;' +
+      'height:calc(100vh - var(--haut-libre,56px) - 12px)!important;' +
+      'height:calc(100dvh - var(--haut-libre,56px) - 12px)!important}}';
   doc.head.appendChild(st);
 })();
 
@@ -14185,12 +14556,13 @@ var TROPHY = (function(){
     ['[data-g1-start]', '[data-g1-alert]', 'Triage des alertes', '40 secondes pour classer'],
     ['[data-g2-start]', '[data-g2]', 'Tenir le pare-feu',  'rouge : bloquer · cyan : laisser'],
     ['[data-g3-new]',   '[data-g3]', 'Monter la baie',     'placez chaque appareil'],
-    ['[data-g4-start]', '[data-g4]', 'Sonde AD·2026',      'vol 3D · flèches et espace'],
+    ['[data-g4-start]', '[data-g4]', 'Sonde AD·2026',      TOUCH ? 'souris, flèches ou doigt' : 'vol 3D · flèches et espace'],
     ['[data-g5-start]', '[data-g5]', 'La salle machine',   'sautez les obstacles'],
-    ['[data-g6-act="train"]', '[data-g6]', 'Élevez un modèle', 'nourrir, refroidir, aligner'],
+    /* cinquième case : les autres commandes qui, elles aussi, lèvent le voile */
+    ['[data-g6-act="train"]', '[data-g6]', 'Élevez un modèle', 'nourrir, refroidir, aligner', '[data-g6-act]'],
     ['[data-g7-start]', '[data-g7]', 'Collecte de paquets', 'flèches ou glissé du doigt'],
     ['[data-g8-start]', '[data-g8]', 'Renvoyer les attaques', 'souris, flèches ou doigt'],
-    ['[data-g9-start]', '[data-g9]', 'Trouver l\'intrusion', 'clic : ouvrir · maintien : marquer'],
+    ['[data-g9-start]', '[data-g9]', 'Trouver l\'intrusion', TOUCH ? 'toucher : ouvrir · maintien : marquer' : 'clic : ouvrir · maintien : marquer'],
     ['[data-g10-start]', '[data-g10]', 'Inventaire du parc', 'retrouvez les huit paires'],
     ['[data-g11-start]', '[data-g11]', 'Temps de réaction', 'coupez dès que le voyant rougit'],
     ['[data-g12-start]', '[data-g12]', 'Séquence de démarrage', 'reproduisez l\'ordre d\'allumage']
@@ -14276,22 +14648,50 @@ var TROPHY = (function(){
       ariaJouer();
     }, 'cover-' + row[0]);
     cover.appendChild(sub);
+    /* Le jeu 01 n'a pas de toile : sous sa couverture, ce sont l'alerte, la
+       consigne et les quatre touches — du TEXTE. Le voile les masquait à
+       98,5 %, mais ils restaient posés dessous, mesurables et « à l'écran » :
+       l'étiquette « en pause » et le titre se lisaient comme écrasés sur eux
+       dans six langues sur huit, et les touches comme injoignables. Rien ne
+       s'en voyait. On les retire du rendu tant que la couverture est là —
+       l'image ne change pas d'un pixel, la place reste réservée. Par une
+       feuille et non par le style de l'élément : i18n.js remet
+       « visibility: visible » sur tout texte qu'il retraduit. */
+    if(!host.querySelector('canvas')){
+      host.setAttribute('data-sous-voile', '1');
+      if(!qs('style[data-sous-voile-css]')){
+        var sv = doc.createElement('style');
+        sv.setAttribute('data-sous-voile-css', '1');
+        /* les descendants aussi : un libellé retraduit (« RAUSCHEN ») reçoit
+           « visible » en propre et ressortait seul de sous le voile */
+        sv.textContent = '[data-sous-voile] > :not([data-cover]),' +
+          '[data-sous-voile] > :not([data-cover]) *{visibility:hidden!important}';
+        doc.head.appendChild(sv);
+      }
+    }
+    function devoile(){ host.removeAttribute('data-sous-voile'); }
     host.appendChild(cover);
     /* un clic n'importe où sur la couverture démarre la partie */
     function launch(e){
       if(e) e.preventDefault();
+      devoile();
       cover.style.opacity = '0';
       setTimeout(function(){ cover.style.display = 'none'; }, 360);
       btn.click();
     }
     cover.addEventListener('click', launch);
     /* le bouton d'origine reste la commande de reprise */
-    btn.addEventListener('click', function(){
+    function leve(){
+      devoile();
       if(cover.style.display !== 'none'){
         cover.style.opacity = '0';
         setTimeout(function(){ cover.style.display = 'none'; }, 360);
       }
-    });
+    }
+    btn.addEventListener('click', leve);
+    /* Jeu 06 : nourrir, refroidir ou aligner, c'est déjà jouer. Seul
+       ENTRAÎNER levait le voile : on soignait le robot sous « EN PAUSE ». */
+    if(row[4]) qsa(row[4]).forEach(function(b){ if(b !== btn) b.addEventListener('click', leve); });
   });
 })();
 

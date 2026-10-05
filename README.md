@@ -1,7 +1,8 @@
 # Portfolio — Anas Dine
 
 Portfolio d'un administrateur systèmes et réseaux en Suisse romande, spécialisé
-en automatisation et en IA hébergée en local.
+en automatisation et en IA hébergée en local — et, depuis le 12 septembre 2026,
+freelance : IA, sites web et applications.
 
 **Site :** https://anasdine.github.io/Portfolio/
 
@@ -19,6 +20,7 @@ logo-ad.svg         icône d'onglet
 apercu.jpg          image de partage
 leap57.mp4          repli vidéo du boîtier LEAP 57, pour les appareils sans 3D
 leap57-poster.jpg   première image de ce repli
+braise/             Braise, mon jeu (un seul fichier), avec sa copie de Three.js r128 et sa police
 ```
 
 Déposé tel quel sur GitHub Pages, Netlify ou n'importe quel hébergeur statique,
@@ -29,7 +31,7 @@ le dossier fonctionne. Il n'y a rien à construire, rien à installer.
 - **Aucun cookie, aucun traceur, aucune mesure d'audience.** Ni Google
   Analytics, ni pixel, ni bannière de consentement — il n'y a rien à consentir.
 - **Aucune requête vers un tiers.** Polices, bibliothèques et visuels sont
-  dans la page : rien n'est chargé depuis un réseau de diffusion, et l'adresse
+  dans la page (et dans `braise/` pour le jeu) : rien n'est chargé depuis un réseau de diffusion, et l'adresse
   IP du visiteur n'est transmise à personne.
 - **Aucun formulaire, aucun compte, aucun envoi.** Rien de ce que fait le
   visiteur ne quitte son navigateur.
@@ -43,10 +45,10 @@ le dossier fonctionne. Il n'y a rien à construire, rien à installer.
 - L'hébergeur journalise les accès comme tout serveur web ; cette page n'y
   ajoute rien.
 
-## Sept langues
+## Huit langues
 
-Français, anglais, allemand, italien, chinois, arabe (avec mise en page de
-droite à gauche) et japonais. Une table de traduction statique couvre le texte
+Français, anglais, allemand, allemand de Suisse, italien, chinois, arabe (avec
+mise en page de droite à gauche) et japonais. Une table de traduction statique couvre le texte
 de la page, y compris les libellés dessinés sur les toiles d'animation.
 
 ## Sous le capot
