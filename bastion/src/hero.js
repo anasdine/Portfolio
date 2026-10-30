@@ -88,7 +88,7 @@ function preparer() {
       if (mode === 'live') ecrireLegende();
       // dix secondes pour s'installer après le passage en 3D, puis huit secondes d'affilée sous 14 images : on arrête de forcer
       if (mode === 'live' && document.visibilityState === 'visible' && performance.now() - lancement > 10000) {
-        lentes = n < 14 ? lentes + 1 : 0;
+        lentes = n >= 14 ? 0 : lentes + (n < 3 ? 0.4 : 1);   // 1 ou 2 images par seconde : souvent une fenêtre recouverte, on laisse vingt secondes
         if (lentes >= 8) passerLeger();
       } else if (mode !== 'live') lancement = performance.now();
     } })
