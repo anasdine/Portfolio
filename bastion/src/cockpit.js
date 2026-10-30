@@ -2,7 +2,7 @@
 // commandement en bandeau. Aucune donnée réelle. Des textures fixes, animées dans le shader : rien à renvoyer à la carte
 // graphique à chaque image, donc aucun coût par image quel que soit le navigateur.
 import * as THREE from 'three/webgpu';
-import { Fn, uv, time, texture, positionWorld, length, fract, pow, vec2, float, smoothstep } from 'three/tsl';
+import { Fn, uv, time, texture, positionWorld, cameraPosition, uniform, length, fract, pow, vec2, float, smoothstep } from 'three/tsl';
 import { SIMPLE } from './qualite.js';
 
 // Les îles suivent les canaux de lumière du sol : huit directions, en commençant derrière la table.
@@ -139,12 +139,13 @@ export function creerCockpit(salle, { SOL, RAYON, HAUT }) {
   table.position.y = SOL + 0.06;
   salle.add(table);
 
+  const voile = uniform(1);
   // Les noms flottent au-dessus de leur île : posés au sol, on ne les lirait pas sous cet angle.
   ILES.forEach((ile, i) => {
     const mat = new THREE.SpriteNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
     const t = etiquette(ile);
     mat.colorNode = texture(t).rgb;
-    mat.opacityNode = texture(t).a;
+    mat.opacityNode = texture(t).a.mul(voile).mul(smoothstep(5, 11, length(positionWorld.sub(cameraPosition))));   // un nom ne passe jamais devant l'œil
     const s = new THREE.Sprite(mat);
     s.scale.set(4.4, 1.375, 1);
     const a = angleIle(i);
@@ -172,4 +173,5 @@ export function creerCockpit(salle, { SOL, RAYON, HAUT }) {
   const anneau = new THREE.Mesh(new THREE.CylinderGeometry(RAYON - 0.5, RAYON - 0.5, 1.55, 128, 1, true), matChaine);
   anneau.position.y = SOL + 15.1;
   salle.add(anneau);
+  return { voile };
 }

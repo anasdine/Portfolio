@@ -119,6 +119,8 @@ async function basculer(vers) {
     setTimeout(() => mode === 'video' && tour?.arreter(), 1300);
   }
   mode = vers;
+  racine.classList.add('balaye');
+  setTimeout(() => racine.classList.remove('balaye'), 1000);
   for (const b of boutons) b.setAttribute('aria-pressed', String(b.dataset.vers === mode));
   ecrireLegende();
 }
@@ -177,7 +179,7 @@ let horsChamp = false, arcadeAtteinte = false, pPrecedent = 0, dernierY = 0;
 
 document.querySelector('[data-remonter]')?.addEventListener('click', () => scrollTo({ top: 0, behavior: 'smooth' }));
 const PERIODE = (1 - DEBUT_FRACTALE) / PERIODES;
-const FIN_ACCUEIL = 0.09;                  // le titre vient de disparaître
+const FIN_ACCUEIL = 0.07;                  // le titre a presque disparu
 function suivreDefilement() {
   if (leger) {
     branches.classList.add('visible');
@@ -193,11 +195,11 @@ function suivreDefilement() {
   niveau.style.opacity = fondu(DEBUT_FRACTALE - 0.02, DEBUT_FRACTALE, p);
   titre.style.opacity = 1 - fondu(0.02, 0.09, p);
   titre.style.transform = `translate3d(0, ${-90 * fondu(0.02, 0.09, p)}px, 0)`;
-  bas.style.opacity = 1 - fondu(0.12, 0.2, p);
+  bas.style.opacity = 1 - fondu(0.1, 0.16, p);
   indice.style.opacity = 1 - fondu(0, 0.03, p);
-  contact.style.opacity = fondu(0.77, 0.8, p) * (1 - fondu(0.84, 0.865, p));
-  contact.style.pointerEvents = p > 0.77 && p < 0.86 ? 'auto' : 'none';
-  branches.classList.toggle('visible', p > FIN_TRAJET - 0.01 && p < FIN_PANNEAUX + 0.02);
+  contact.style.opacity = fondu(0.73, 0.76, p) * (1 - fondu(0.765, 0.785, p));
+  contact.style.pointerEvents = p > 0.73 && p < 0.77 ? 'auto' : 'none';
+  branches.classList.toggle('visible', p > DEBUT_PANNEAUX - 0.02 && p < FIN_PANNEAUX + 0.012);
   // Bam : au bout du tunnel, on ne remonte pas doucement vers l'arcade, on y tombe. Seulement en descendant.
   if (p > 0.996 && pPrecedent <= 0.996 && scrollY >= dernierY && !arcadeAtteinte) {
     arcadeAtteinte = true;
@@ -247,6 +249,7 @@ document.querySelector('[data-faille-fermer]').addEventListener('click', () => f
 
 // Les branches : depuis la table, chaque panneau ouvre son univers, avec le contenu complet du portfolio.
 // Le détail n'est pas recopié : c'est la vraie page, ses huit langues et son parcours « réglage de calibre ».
+const pPanneau = (i) => DEBUT_PANNEAUX + (FIN_PANNEAUX - DEBUT_PANNEAUX) * (i / 4);
 const BRANCHES = [
   ['Offre', 0, 'freelance'], ['Projets', 1, 'pieces'], ['Méthode', 2, 'strates'], ['Parcours', 3, 'reglage'], ['Contact', 4, 'contact'],
 ];
@@ -257,21 +260,27 @@ const titreUnivers = univers.querySelector('[data-univers-titre]');
 const SOURCE = location.hostname.endsWith('github.io') ? '../' : 'https://anasdine.github.io/Portfolio/';
 let dernierBouton = null;
 
+let entree = 0;                              // un retour pendant la plongée annule tout ce qui restait à faire
 async function entrer(nom, i, ancre, bouton) {
+  const ce = ++entree;
   dernierBouton = bouton;
-  const H = parcours.offsetHeight - innerHeight;
-  if (!leger) scrollTo(0, (DEBUT_PANNEAUX + (FIN_PANNEAUX - DEBUT_PANNEAUX) * (i / (BRANCHES.length - 1))) * H);
-  if (!calme && !leger) await new Promise((ok) => setTimeout(ok, 450));   // la caméra rejoint le panneau…
+  const pause = (ms) => (calme || leger ? null : new Promise((ok) => setTimeout(ok, ms)));
   titreUnivers.textContent = nom;
   univers.querySelector('[data-univers-nom]').textContent = nom;
-  tour?.plonger(true);                                                     // …plonge dedans, et le panneau devient la page
-  if (!calme && !leger) await new Promise((ok) => setTimeout(ok, 180));
+  if (!leger) {
+    if (Math.abs(scrollY / hauteur() - pPanneau(i)) > 0.002) await glisser(pPanneau(i));
+    // on traverse le verre du panneau : sa teinte est celle de la page, il n'y a pas de coupure
+    document.documentElement.classList.add('plonge');
+    tour?.plonger(true);
+    await pause(760);
+    if (ce !== entree) return;
+  }
   univers.classList.remove('pret');
   univers.classList.add('ouvert');
   document.documentElement.classList.add('jeu-ouvert');
   retour.focus();
-  // La page ne se charge qu'une fois la transition finie : rien ne doit disputer ces 900 ms à l'image.
-  if (!calme && !leger) await new Promise((ok) => setTimeout(ok, 900));
+  await pause(420);
+  if (ce !== entree) return;
   tour?.arreter();                                                         // la 3D se tait : la page a toute la machine
   // Un cadre neuf à chaque entrée : changer seulement l'ancre d'une page déjà chargée ne déclencherait aucun chargement.
   const neuf = document.createElement('iframe');
@@ -284,12 +293,13 @@ async function entrer(nom, i, ancre, bouton) {
   // La page est un paquet qui réécrit son document au démarrage : une pose unique peut être effacée. On surveille donc
   // pendant dix secondes, et on repose l'isolation chaque fois qu'elle a disparu.
   const cadre = cadreUnivers;
-  let essais = 0;
+  let essais = 0, stable = 0;
   const isoler = setInterval(() => {
     if (cadre !== cadreUnivers || ++essais > 66) { clearInterval(isoler); univers.classList.add('pret'); return; }
     try {
       const w = cadre.contentWindow, d = w.document, s = d.getElementById(ancre);
       if (!s || !s.offsetHeight) return;
+      stable = d.getElementById('bastion-seul') && d.readyState === 'complete' ? stable + 1 : 0;
       if (!d.getElementById('bastion-seul')) {
         const st = d.createElement('style');
         st.id = 'bastion-seul';
@@ -305,7 +315,7 @@ async function entrer(nom, i, ancre, bouton) {
         w.ScrollTrigger?.refresh();
         w.scrollTo(0, 0);
       }
-      if (!univers.classList.contains('pret') && essais > 6) {
+      if (!univers.classList.contains('pret') && stable >= 6) {
         setTimeout(() => { if (essais < 30) w.scrollTo(0, 0); univers.classList.add('pret'); }, 200);
       }
     } catch { clearInterval(isoler); univers.classList.add('pret'); }   // autre origine, en local : page entière
@@ -313,12 +323,14 @@ async function entrer(nom, i, ancre, bouton) {
   cadreUnivers.src = SOURCE + '#' + ancre;
 }
 function revenir() {
+  entree++;
   univers.classList.remove('ouvert');
   document.documentElement.classList.remove('jeu-ouvert');
   cadreUnivers.onload = null;
   if (mode === 'live') tour?.demarrer();
   tour?.plonger(false);
-  setTimeout(() => { if (!univers.classList.contains('ouvert')) cadreUnivers.src = 'about:blank'; }, 950);   // décharge la page une fois refermée
+  document.documentElement.classList.remove('plonge');
+  setTimeout(() => { if (!univers.classList.contains('ouvert')) cadreUnivers.src = 'about:blank'; }, 500);   // décharge la page une fois refermée
   dernierBouton?.focus();
 }
 for (const [nom, i, ancre] of BRANCHES) {
@@ -333,8 +345,8 @@ addEventListener('keydown', (e) => { if (e.key === 'Escape' && univers.classList
 
 // Le défilement assisté : un cran, un glissé ou une flèche lance le trajet jusqu'à l'étape suivante. Tout le monde vit la
 // même mise en scène, à la même vitesse, quelle que soit sa molette ou son pavé tactile. Dans l'arcade, le défilement est libre.
-const ETAPES_GUIDE = [0, 0.13, 0.31, 0.44, ...BRANCHES.map(([, i]) => DEBUT_PANNEAUX + (FIN_PANNEAUX - DEBUT_PANNEAUX) * (i / (BRANCHES.length - 1))), 0.84, 1];
-const courbe = (x) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2);
+const ETAPES_GUIDE = [0, 0.09, 0.345, ...BRANCHES.map(([, i]) => pPanneau(i)), 0.84, 1];
+const courbe = (x) => (1 - Math.cos(x * Math.PI)) / 2;   // une seule courbe de vitesse pour tout le parcours : douce, sans à-coup
 const plongeon = (x) => x ** 2.4;                // le tunnel ne fait qu'accélérer, jusqu'au bam
 let enGlisse = false, trajet = 0, dernierCran = 0, doigt = null;
 const hauteur = () => Math.max(1, parcours.offsetHeight - innerHeight);
@@ -344,22 +356,33 @@ const occupe = () => document.documentElement.classList.contains('jeu-ouvert') |
 
 function glisser(vers) {
   const depart = scrollY / hauteur();
-  if (calme) { scrollTo(0, vers * hauteur()); tour?.poser(vers); return; }
+  if (calme) { scrollTo(0, vers * hauteur()); tour?.poser(vers); return Promise.resolve(); }
   const tunnel = vers === 1;
-  const duree = tunnel ? 4600 : Math.min(2800, 1100 + Math.abs(vers - depart) * 7000);
+  const duree = tunnel ? 5200 : vers === 0.84 ? 3400 : Math.min(4200, 1400 + Math.abs(vers - depart) * 13000);   // le virage vers LEONHARD est le plus large : on lui laisse le temps
   const t0 = performance.now();
   enGlisse = true;
   const ce = ++trajet;
-  const pas = (t) => {
-    if (ce !== trajet) return;
-    const x = Math.min(1, (t - t0) / duree);
-    scrollTo(0, (depart + (vers - depart) * (tunnel ? plongeon(x) : courbe(x))) * hauteur());
-    if (x < 1 && scrollY < hauteur() - 1) requestAnimationFrame(pas);
-    else enGlisse = false;
-  };
-  requestAnimationFrame(pas);
+  return new Promise((fini) => {
+    const pas = (t) => {
+      if (ce !== trajet) return fini();
+      const x = Math.min(1, (t - t0) / duree);
+      const p = depart + (vers - depart) * (tunnel ? plongeon(x) : courbe(x));
+      tour?.poser(p);                            // le trajet est déjà lissé : la caméra le suit sans retard
+      scrollTo(0, p * hauteur());
+      if (x < 1 && scrollY < hauteur() - 1) requestAnimationFrame(pas);
+      else { enGlisse = false; fini(); }
+    };
+    requestAnimationFrame(pas);
+  });
 }
-function avancer(sens) {
+async function avancer(sens) {
+  // La tour vidéo et la tour 3D ont le même cadrage à l'arrêt : on change d'abord d'image, sur place, et seulement ensuite on part.
+  if (mode === 'video' && sens > 0) {
+    enGlisse = true;
+    await basculer('live');
+    await new Promise((ok) => setTimeout(ok, 1000));
+    enGlisse = false;
+  }
   const p = scrollY / hauteur();
   const suivante = sens > 0 ? ETAPES_GUIDE.find((e) => e > p + 0.004) : ETAPES_GUIDE.findLast((e) => e < p - 0.004);
   if (suivante !== undefined) glisser(suivante);

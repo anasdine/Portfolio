@@ -212,7 +212,7 @@ export async function creerBureau(scene) {
   plafond.rotation.x = Math.PI / 2;
   plafond.position.y = SOL + HAUT;
   salle.add(plafond);
-  creerCockpit(salle, { SOL, RAYON, HAUT });
+  const cockpit = creerCockpit(salle, { SOL, RAYON, HAUT });
 
   // La charpente : nervures le long de la coque, poutres rayonnantes, coursive haute.
   const matAcier = new THREE.MeshBasicNodeMaterial();
@@ -415,17 +415,19 @@ export async function creerBureau(scene) {
       ecran.lookAt(0, SOL + 3, 0);
       salle.add(ecran);
     }
-    return { force, angle, position: panneau.position.clone() };
+    return { force, base: 0.35, angle, position: panneau.position.clone() };
   });
 
   return {
     salle,
     panneaux: affichages,
-    actualiser(foyer, t) {
+    actualiser(foyer, t, plongee = 0) {
       for (const f of fleurs) f.rotation.z = t * 0.06;
+      cockpit.voile.value = 1 - plongee;
       for (const [i, a] of affichages.entries()) {
         const cible = 0.18 + 0.82 * Math.max(0, 1 - Math.abs(foyer - i));
-        a.force.value += (cible - a.force.value) * 0.08;
+        a.base += (cible - a.base) * 0.08;
+        a.force.value = a.base * (1 - plongee);       // en traversant le verre, le texte s'efface : il ne reste que sa teinte
       }
     },
   };

@@ -49,11 +49,14 @@
   .hero { --teinte: #ff5c4d; position: fixed; inset: 0; height: 100svh; overflow: hidden; isolation: isolate; }
   .hero video, .hero canvas {
     position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block;
-    transition: opacity 1.2s cubic-bezier(.4, 0, .2, 1);
+    transition: opacity .7s ease;
   }
-  .hero canvas { opacity: 0; }
-  .hero[data-mode="live"] canvas { opacity: 1; }
-  .hero[data-mode="live"] video { opacity: 0; }
+  /* vidéo et temps réel : un balayage franc, comme un filtre qu'on passe sur l'image */
+  .hero canvas { clip-path: inset(0 0 0 100%); transition: clip-path .95s cubic-bezier(.65, 0, .35, 1); }
+  .hero[data-mode="live"] canvas { clip-path: inset(0); }
+  .balayage { position: absolute; z-index: 1; top: 0; bottom: 0; left: 0; width: 2px; background: var(--sain); box-shadow: 0 0 22px 3px var(--sain); opacity: 0; pointer-events: none; transform: translate3d(100vw, 0, 0); transition: transform .95s cubic-bezier(.65, 0, .35, 1); }
+  .hero[data-mode="live"] .balayage { transform: translate3d(0, 0, 0); }
+  .hero.balaye .balayage { opacity: 1; }
 
   .hud { position: absolute; inset: 0; z-index: 2; pointer-events: none; padding: var(--marge); display: grid; grid-template-rows: auto 1fr auto; }
   /* Le texte reste lisible sur la glace claire : un voile outremer, seulement là où il se pose. */
@@ -167,15 +170,17 @@
   .branches::before { content: 'Entrer :'; align-self: center; padding: 0 8px 0 6px; font-size: 11px; letter-spacing: .08em; color: var(--sain); white-space: nowrap; }
   .branches button { flex: none; min-height: 44px; padding: 0 15px; font: 500 12px var(--mono); letter-spacing: .06em; color: var(--texte); background: none; border: 1px solid transparent; cursor: pointer; }
   .branches button:hover, .branches button:focus-visible { color: #050818; background: var(--sain); outline: 0; }
-  .univers { position: fixed; inset: 0; z-index: 25; display: flex; flex-direction: column; background: #050818; visibility: hidden; opacity: 0; clip-path: inset(24% 24% 30% 24%); will-change: clip-path; transition: clip-path .85s cubic-bezier(.76, 0, .24, 1), opacity .3s .55s, visibility 0s .85s; }
-  .univers.ouvert { visibility: visible; opacity: 1; clip-path: inset(0); transition: clip-path .85s cubic-bezier(.76, 0, .24, 1), opacity .25s, visibility 0s; }
+  .univers { position: fixed; inset: 0; z-index: 25; display: flex; flex-direction: column; background: #040a18; visibility: hidden; opacity: 0; transition: opacity .42s ease, visibility 0s .42s; }
+  .univers.ouvert { visibility: visible; opacity: 1; transition: opacity .42s ease, visibility 0s; }
+  .hud, .branches, .rail { transition: opacity .3s; }
+  html.plonge .hud, html.plonge .branches, html.plonge .rail { opacity: 0 !important; pointer-events: none; }
   .univers__barre { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px clamp(10px, 2vw, 22px); background: #050818; border-bottom: 1px solid rgba(63, 211, 198, .35); font-size: 12px; color: var(--sain); }
   .univers__barre button { min-height: 44px; padding: 0 15px; font: 500 12px var(--mono); letter-spacing: .05em; color: #050818; background: var(--sain); border: 0; cursor: pointer; }
-  .univers iframe { flex: 1; width: 100%; border: 0; background: #07090b; opacity: 0; transition: opacity .45s; }
+  .univers iframe { flex: 1; width: 100%; border: 0; background: #040a18; opacity: 0; transition: opacity .6s ease; }
   .univers.pret iframe { opacity: 1; }
   .univers__charge { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; font-size: 12px; letter-spacing: .1em; color: var(--sain); }
   .univers__nom { display: block; margin-bottom: 10px; font: 600 clamp(44px, 9vw, 120px)/1 var(--titre); letter-spacing: -.01em; text-transform: uppercase; color: var(--texte); }
-  .univers .univers__nom { opacity: 0; transform: translate3d(0, 24px, 0); transition: opacity .5s .3s, transform .7s .3s cubic-bezier(.16, 1, .3, 1); }
+  .univers .univers__nom { opacity: 0; transform: translate3d(0, 18px, 0); transition: opacity .5s .1s, transform .8s .1s cubic-bezier(.16, 1, .3, 1); }
   .univers.ouvert .univers__nom { opacity: 1; transform: none; }
   .eclair { position: fixed; inset: 0; z-index: 7; background: #fff5dc; opacity: 0; pointer-events: none; }
   .eclair.part { animation: eclair .75s cubic-bezier(.3, 0, .2, 1); }
@@ -240,6 +245,7 @@
 <main class="hero" data-hero data-mode="video">
   <video src="media/tour.mp4" poster="media/tour.jpg" muted loop playsinline autoplay preload="auto" aria-hidden="true"></video>
   <canvas aria-hidden="true"></canvas>
+  <i class="balayage" aria-hidden="true"></i>
 
   <div class="hud">
     <i class="coin hg"></i><i class="coin hd"></i><i class="coin bg"></i><i class="coin bd"></i>

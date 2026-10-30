@@ -21,7 +21,7 @@ export const FIN_TRAJET = 0.46;           // on entre dans la salle
 export const DEBUT_PANNEAUX = 0.52;       // l'œil a fini d'arriver : le premier panneau est cadré
 export const FIN_PANNEAUX = 0.76;         // le dernier panneau a été lu
 export const DEBUT_FRACTALE = 0.82;  // on est devant LEONHARD, le zoom commence
-export const PERIODES = 6;         // la plongée compte six niveaux, puis elle débouche sur l'arcade
+export const PERIODES = 3;         // la plongée compte trois niveaux, puis elle débouche sur l'arcade
 
 const COMPROMIS = new THREE.Color(0xff5c4d);   // accent rouge du portfolio
 const RESTAURE = new THREE.Color(0x3fd3c6);    // trait du logo AD
@@ -367,9 +367,11 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
   const feux = new THREE.InstancedMesh(new THREE.BoxGeometry(0.3, 0.14, 0.3), matFeu, NB_LAMPES * 2);
   for (let i = 0; i < NB_LAMPES * 2; i++) {
     const cote = i % 2 ? 1 : -1, z = 84 + Math.floor(i / 2) * 15;
-    m.makeTranslation(cote * 4.2, 2.2, z);
+    // côté droit, la caméra coupe la rangée en s'approchant : aucune lampe ne doit lui passer sous le nez
+    const ecarte = cote > 0 && z < 240 ? -40 : 0;
+    m.makeTranslation(cote * 4.2, 2.2 + ecarte, z);
     fuTs.setMatrixAt(i, m);
-    m.makeTranslation(cote * 4.2, 3.8, z);
+    m.makeTranslation(cote * 4.2, 3.8 + ecarte, z);
     feux.setMatrixAt(i, m);
   }
   dehors.add(fuTs, feux);
@@ -522,8 +524,8 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     const centre = screenUV.sub(0.5).mul(vec2(1, 0.8));
     const vignette = float(1).sub(smoothstep(0.42, 1, length(centre))).mul(0.32).add(0.68);
     const grain = fract(sin(dot(screenUV.add(fract(time)), vec2(12.9898, 78.233))).mul(43758.5453)).sub(0.5);
-    const bord = ouverture.mul(1.5);
-    const dansTunnel = float(1).sub(smoothstep(bord.sub(0.22), bord, length(screenUV.sub(0.5).mul(vec2(format, 1))))).mul(step(0.001, ouverture));
+    const bord = ouverture.mul(1.9);
+    const dansTunnel = float(1).sub(smoothstep(bord.sub(0.5), bord, length(screenUV.sub(0.5).mul(vec2(format, 1))))).mul(step(0.001, ouverture));
     const vue = mix(c.mul(vignette), tunnel, dansTunnel).add(grain.mul(0.014));
     // la sortie : la rosace s'ouvre en iris jusqu'à remplir l'écran, le relais est pris par l'éclair de l'arcade
     const irisR = fondu.mul(1.5);
@@ -546,15 +548,24 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
   const vise = new THREE.Vector3(), cibleVue = new THREE.Vector3(), pos = new THREE.Vector3(), sommet = new THREE.Vector3(), orbite = new THREE.Vector3(), vise2 = new THREE.Vector3();
   const devant = new THREE.Vector3(0, SOL + 4.3, 4);
   let roulis = 0, presence = 1;
-  const plongee = { cible: 0, valeur: 0 }, visePanneau = new THREE.Vector3(), devantPanneau = new THREE.Vector3();
+  const plongee = { cible: 0, temps: 0, valeur: 0 }, devantPanneau = new THREE.Vector3();
   const souris = { x: 0, y: 0, lx: 0, ly: 0 };
   addEventListener('pointermove', (e) => { souris.x = e.clientX / innerWidth - 0.5; souris.y = e.clientY / innerHeight - 0.5; }, { passive: true });
   const defilement = { cible: 0, valeur: 0 };
   let foyer = -1, champ = CHAMP;
 
+  // Dans la salle, l'œil tourne autour de l'hologramme : en ligne droite, il le traverserait.
+  function enArc(de, vers, x) {
+    const r0 = Math.hypot(de.x, de.z), r1 = Math.hypot(vers.x, vers.z);
+    const a0 = Math.atan2(de.z, de.x);
+    const a1 = a0 + THREE.MathUtils.euclideanModulo(Math.atan2(vers.z, vers.x) - a0 + Math.PI, Math.PI * 2) - Math.PI;
+    const r = THREE.MathUtils.lerp(r0, r1, x), a = THREE.MathUtils.lerp(a0, a1, x);
+    de.set(Math.cos(a) * r, THREE.MathUtils.lerp(de.y, vers.y, x), Math.sin(a) * r);
+  }
+
   function placerCamera(p, t, dt) {
     if (p < FIN_TRAJET) {
-      CHEMIN.getPoint(adoucir(0, FIN_TRAJET, p), pos);
+      CHEMIN.getPoint(p / FIN_TRAJET, pos);
       const vers = adoucir(0.08, 0.34, p);
       vise.set(0, THREE.MathUtils.lerp(106, 25, vers), THREE.MathUtils.lerp(0, 8, vers));
       if (p > 0.34) vise.lerp(cibleVue.set(0, SOL + 3.2, 0), adoucir(0.34, FIN_TRAJET, p));
@@ -562,7 +573,7 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     } else {
       // dans la salle : l'œil se place de biais, le panneau occupe la droite du cadre et l'hologramme la gauche
       const e = Math.min(1, Math.max(0, p - DEBUT_PANNEAUX) / (FIN_PANNEAUX - DEBUT_PANNEAUX)) * (bureau.panneaux.length - 1);
-      const i = Math.floor(e), f = adoucir(0.15, 0.85, e - i);
+      const i = Math.floor(e), f = e - i;
       const dernier = bureau.panneaux.length - 1;
       const a0 = bureau.panneaux[Math.min(i, dernier)], a1 = bureau.panneaux[Math.min(i + 1, dernier)];
       const vertical = camera.aspect < 1;
@@ -571,21 +582,25 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
       orbite.set(Math.cos(angle) * recul, SOL + 3.4, Math.sin(angle) * recul);
       vise2.lerpVectors(a0.position, a1.position, f).multiplyScalar(0.95);
       vise2.y = SOL + 7.2;
-      const arrivee = adoucir(FIN_TRAJET, DEBUT_PANNEAUX, p);
+      const arrivee = THREE.MathUtils.clamp((p - FIN_TRAJET) / (DEBUT_PANNEAUX - FIN_TRAJET), 0, 1);
       CHEMIN.getPoint(1, pos);
-      pos.lerp(orbite, arrivee);
+      enArc(pos, orbite, arrivee);
       vise.set(0, SOL + 3.2, 0).lerp(vise2, arrivee);
       foyer = p < FIN_PANNEAUX ? i + f : -1;
       // puis l'œil revient face à la mini-tour, et s'en approche
-      pos.lerp(devant, adoucir(FIN_PANNEAUX, DEBUT_FRACTALE, p));
-      vise.lerp(CENTRE, adoucir(FIN_PANNEAUX, DEBUT_FRACTALE, p));
+      const retour = THREE.MathUtils.clamp((p - FIN_PANNEAUX) / (DEBUT_FRACTALE - FIN_PANNEAUX), 0, 1);
+      enArc(pos, devant, retour);
+      vise.lerp(CENTRE, retour);
     }
-    plongee.valeur += (plongee.cible - plongee.valeur) * (1 - Math.exp(-dt * 5));
+    plongee.temps = THREE.MathUtils.clamp(plongee.temps + (plongee.cible ? dt : -dt) / 0.85, 0, 1);
+    plongee.valeur = (1 - Math.cos(plongee.temps * Math.PI)) / 2;
     if (plongee.valeur > 0.001 && foyer >= 0) {
       const a = bureau.panneaux[Math.round(foyer)];
-      visePanneau.copy(a.position);
-      pos.lerp(devantPanneau.copy(a.position).multiplyScalar(0.72), plongee.valeur);
-      vise.lerp(visePanneau, plongee.valeur);
+      devantPanneau.copy(a.position);
+      devantPanneau.x *= 1 - 2.4 / 24;
+      devantPanneau.z *= 1 - 2.4 / 24;
+      pos.lerp(devantPanneau, plongee.valeur);
+      vise.lerp(a.position, plongee.valeur);
     }
     const poidsDehors = 1 - adoucir(0.3, FIN_TRAJET, p);
     camera.position.set(pos.x + souris.lx * (poidsDehors * 24 + 1.2) + Math.sin(t * 0.07) * 3 * poidsDehors, pos.y - souris.ly * 0.8, pos.z);
@@ -598,7 +613,7 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     // devant un panneau, l'hologramme se retire pour laisser lire
     const viseePresence = foyer >= 0 ? (camera.aspect < 1 ? 0.05 : 0.18) : 1;
     presence += (viseePresence - presence) * 0.08;
-    fractale.regler(phi, t, presence);
+    fractale.regler(phi, t, presence * (1 - plongee.valeur));
     nuit.value = adoucir(DEBUT_FRACTALE, DEBUT_FRACTALE + (1 - DEBUT_FRACTALE) / PERIODES, p);
     bureau.salle.visible = nuit.value < 0.995 && p > 0.22;   // inutile de rendre la salle (et son miroir) depuis l'extérieur
     for (const { b } of battants) b.visible = nuit.value < 0.995;
@@ -662,7 +677,7 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     souris.ly += (souris.y - souris.ly) * (1 - Math.exp(-dt * 1.6));
     defilement.valeur += (defilement.cible - defilement.valeur) * (1 - Math.exp(-dt * 3.2));
     placerCamera(defilement.valeur, t, dt);
-    bureau.actualiser(foyer, t);
+    bureau.actualiser(foyer, t, plongee.valeur);
     if (dehors.visible) peuple.actualiser(t);
     surFoyer(foyer);
     if (dehors.visible) for (const [i, f] of flottants.entries()) f.position.y = f.userData.base + Math.sin(t * 0.18 + i * 1.7) * 3;
