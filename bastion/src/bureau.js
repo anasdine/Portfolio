@@ -5,6 +5,8 @@ import {
   Fn, Discard, uniform, uv, time, positionWorld, normalWorld, cameraPosition, reflector, reflect, instanceIndex, texture, positionLocal, smoothstep, mix,
   vec2, vec3, color, float, fract, floor, abs, sin, cos, length, atan, step, hash, pow, fwidth, dot, normalize, max,
 } from 'three/tsl';
+import { creerCockpit } from './cockpit.js';
+import { SIMPLE } from './qualite.js';
 
 export const SOL = 21.05;          // le dessus de l'assise, là où la porte débouche
 export const RAYON = 29.4;
@@ -165,10 +167,12 @@ export async function creerBureau(scene) {
   })();
 
   // Le sol : des dalles d'acier poli, qui reflètent toute la salle, et des canaux de lumière vers la table.
-  const miroir = reflector({ resolutionScale: 0.5 });
-  miroir.target.rotateX(-Math.PI / 2);
-  miroir.target.position.y = SOL + 0.03;
-  salle.add(miroir.target);
+  const miroir = SIMPLE ? null : reflector({ resolutionScale: 0.35 });
+  if (miroir) {
+    miroir.target.rotateX(-Math.PI / 2);
+    miroir.target.position.y = SOL + 0.03;
+    salle.add(miroir.target);
+  }
   const matSol = new THREE.MeshBasicNodeMaterial();
   matSol.colorNode = Fn(() => {
     const p = positionWorld.xz;
@@ -187,7 +191,7 @@ export async function creerBureau(scene) {
     const onde = pow(fract(d.div(30).sub(time.mul(0.12))), 8);
     const lueur = float(1).sub(smoothstep(2, 15, d));
     const base = color(0x070c16).mul(ton).mul(float(1).sub(joint.max(jointR).mul(0.65)));
-    return mix(base, miroir.rgb, fresnel.mul(0.5).add(0.14))
+    return mix(base, miroir ? miroir.rgb : color(0x0b1f3a), fresnel.mul(0.5).add(0.14))
       .add(TEAL.mul(joint.mul(onde).mul(1.3)))
       .add(TEAL.mul(canal.mul(flux.mul(2.4).add(0.1))).mul(smoothstep(5, 7, d)))
       .add(BLEU.mul(lueur.mul(0.2)));
@@ -208,6 +212,7 @@ export async function creerBureau(scene) {
   plafond.rotation.x = Math.PI / 2;
   plafond.position.y = SOL + HAUT;
   salle.add(plafond);
+  creerCockpit(salle, { SOL, RAYON, HAUT });
 
   // La charpente : nervures le long de la coque, poutres rayonnantes, coursive haute.
   const matAcier = new THREE.MeshBasicNodeMaterial();
@@ -298,7 +303,7 @@ export async function creerBureau(scene) {
   matPoussiere.colorNode = color(0xa8e4f0).mul(0.9);
   matPoussiere.opacityNode = float(1).sub(smoothstep(0.1, 0.5, length(uv().sub(0.5))));
   const poussiere = new THREE.Sprite(matPoussiere);
-  poussiere.count = 700;
+  poussiere.count = SIMPLE ? 220 : 700;
   poussiere.frustumCulled = false;
   salle.add(poussiere);
 

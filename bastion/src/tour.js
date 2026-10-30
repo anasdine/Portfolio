@@ -12,11 +12,13 @@ import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { chromaticAberration } from 'three/addons/tsl/display/ChromaticAberrationNode.js';
 import { radialBlur } from 'three/addons/tsl/display/radialBlur.js';
 import { creerBureau, SOL } from './bureau.js';
+import { SIMPLE, WEBGL_SEUL } from './qualite.js';
 import { creerFractale } from './fractale.js';
 import { creerPeuple } from './peuple.js';
 
 // Le calendrier du défilement, de 0 à 1.
 export const FIN_TRAJET = 0.46;           // on entre dans la salle
+export const DEBUT_PANNEAUX = 0.52;       // l'œil a fini d'arriver : le premier panneau est cadré
 export const FIN_PANNEAUX = 0.76;         // le dernier panneau a été lu
 export const DEBUT_FRACTALE = 0.82;  // on est devant LEONHARD, le zoom commence
 export const PERIODES = 6;         // la plongée compte six niveaux, puis elle débouche sur l'arcade
@@ -93,7 +95,7 @@ function geoPlateau(graine, largeur, profondeur, epaisseur) {
 }
 
 export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, surFoyer = () => {} } = {}) {
-  const renderer = new THREE.WebGPURenderer({ canvas: toile, antialias: true });
+  const renderer = new THREE.WebGPURenderer({ canvas: toile, antialias: true, forceWebGL: WEBGL_SEUL });
   await renderer.init();
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1.25));
   renderer.toneMapping = THREE.NeutralToneMapping;   // garde la saturation des bleus, qu'ACES délave
@@ -309,10 +311,10 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
   matFumee.opacityNode = Fn(() => {
     const c = uv().sub(0.5);
     const rond = float(1).sub(smoothstep(0.12, 0.5, length(c)));
-    const n = mx_fractal_noise_float(vec3(c.mul(3.2), time.mul(0.05)), 4, 2.1, 0.55).mul(0.5).add(0.5);
+    const n = mx_fractal_noise_float(vec3(c.mul(3.2), time.mul(0.05)), SIMPLE ? 2 : 4, 2.1, 0.55).mul(0.5).add(0.5);
     return rond.mul(smoothstep(0.42, 0.8, n)).mul(0.3);
   })();
-  for (let i = 0; i < 34; i++) {
+  for (let i = 0; i < (SIMPLE ? 12 : 34); i++) {
     const a = alea(i + 3) * Math.PI * 2, r = R * (0.95 + alea(i + 9) * 0.34), y = 205 + alea(i + 17) * 112;
     const fumee = new THREE.Sprite(matFumee);
     const taille = 38 + alea(i + 23) * 58;
@@ -332,7 +334,7 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
   matCendres.colorNode = mix(teinte, color(0xcfe6ff), h1).mul(1.4);
   matCendres.opacityNode = float(1).sub(smoothstep(0.1, 0.5, length(uv().sub(0.5))));
   const cendres = new THREE.Sprite(matCendres);
-  cendres.count = 5000;
+  cendres.count = SIMPLE ? 1200 : 5000;
   cendres.frustumCulled = false;
   dehors.add(cendres);
 
@@ -340,7 +342,7 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
   matBrume.colorNode = color(0xa8d8ff);
   matBrume.opacityNode = Fn(() => {
     const c = uv().sub(0.5);
-    const n = mx_fractal_noise_float(vec3(c.mul(vec2(4, 1.6)), time.mul(0.03)), 3, 2, 0.5).mul(0.5).add(0.5);
+    const n = mx_fractal_noise_float(vec3(c.mul(vec2(4, 1.6)), time.mul(0.03)), SIMPLE ? 1 : 3, 2, 0.5).mul(0.5).add(0.5);
     return float(1).sub(smoothstep(0.1, 0.5, length(c.mul(vec2(1, 1.8))))).mul(smoothstep(0.35, 0.8, n)).mul(0.13);
   })();
   for (let i = 0; i < 26; i++) {
@@ -382,11 +384,13 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
   dehors.add(corps, tete);
 
   // ── La glace : un miroir poli, fracturé, parcouru des pistes qui s'échappent de la tour ────────────────────────────
-  const miroir = reflector({ resolutionScale: 0.6 });
-  miroir.target.rotateX(-Math.PI / 2);
-  dehors.add(miroir.target);
+  const miroir = SIMPLE ? null : reflector({ resolutionScale: 0.35 });
+  if (miroir) {
+    miroir.target.rotateX(-Math.PI / 2);
+    dehors.add(miroir.target);
+  }
   const pSol = positionWorld.xz;
-  miroir.uvNode = miroir.uvNode.add(vec2(
+  if (miroir) miroir.uvNode = miroir.uvNode.add(vec2(
     mx_noise_float(vec3(pSol.mul(0.018), 1.3)).mul(0.006),
     mx_noise_float(vec3(pSol.mul(0.018), 7.1)).mul(0.004),
   ));
@@ -396,8 +400,8 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     const v = normalize(positionWorld.sub(cameraPosition));
     const fresnel = pow(float(1).sub(max(v.y.negate(), 0)), 4);
 
-    const nappe = mx_fractal_noise_float(vec3(p.mul(0.006), 0), 3, 2, 0.5).mul(0.5).add(0.5);
-    const givre = smoothstep(0.52, 0.8, mx_fractal_noise_float(vec3(p.mul(0.03), 4), 3, 2, 0.5).mul(0.5).add(0.5));
+    const nappe = mx_fractal_noise_float(vec3(p.mul(0.006), 0), SIMPLE ? 1 : 3, 2, 0.5).mul(0.5).add(0.5);
+    const givre = smoothstep(0.52, 0.8, mx_fractal_noise_float(vec3(p.mul(0.03), 4), SIMPLE ? 1 : 3, 2, 0.5).mul(0.5).add(0.5));
     const fond = mix(color(0x1468d0), color(0x4cb6f8), nappe).add(color(0xbfe8ff).mul(givre.mul(0.3)));
 
     const w = mx_worley_noise_vec2(p.mul(0.014));
@@ -426,7 +430,7 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     const profondes = float(1).sub(smoothstep(0, 0.05, w3.y.sub(w3.x))).mul(0.2).add(float(1).sub(smoothstep(0, 0.07, w4.y.sub(w4.x))).mul(0.12));
     const assise = float(1).sub(smoothstep(64, 112, d)).mul(0.62);
     const glace = fond.add(color(0xc8ecff).mul(fissures.add(fines).mul(0.3))).add(color(0x7ecbff).mul(profondes)).mul(assise.oneMinus());
-    return mix(glace, miroir.rgb, fresnel.mul(0.66).add(0.14)).add(teinte.mul(reseau).mul(1.25));
+    return mix(glace, miroir ? miroir.rgb : color(0x1c4fb8), fresnel.mul(0.66).add(0.14)).add(teinte.mul(reseau).mul(1.25));
   })();
   const sol = new THREE.Mesh(new THREE.PlaneGeometry(9000, 9000), matGlace);
   sol.rotation.x = -Math.PI / 2;
@@ -461,50 +465,76 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
 
   // ── Image finale : bloom réservé aux vraies lumières, vignettage léger, grain ─────────────────────────────────────
   const pipeline = new THREE.RenderPipeline(renderer);
-  const image = pass(scene, camera, { samples: 4 }).getTextureNode('output');
+  const image = pass(scene, camera, { samples: SIMPLE ? 0 : 2 }).getTextureNode('output');
   const centreRayons = uniform(new THREE.Vector2(0.5, 0.05));
   const forceRayons = uniform(1);
   const lumiere = image.rgb.mul(smoothstep(0.75, 1.3, luminance(image.rgb)));
-  const rayons = radialBlur(vec4(lumiere, 1), { center: centreRayons, weight: float(0.9), decay: float(0.94), count: int(14), exposure: float(1.1), stride: float(1), radius: float(0.8) });
-  const nette = chromaticAberration(image, 0.1, vec2(0.5, 0.5), 1.1);
+  const rayons = SIMPLE ? null : radialBlur(vec4(lumiere, 1), { center: centreRayons, weight: float(0.9), decay: float(0.94), count: int(14), exposure: float(1.1), stride: float(1), radius: float(0.8) });
+  const nette = SIMPLE ? image : chromaticAberration(image, 0.1, vec2(0.5, 0.5), 1.1);
   const eclat = bloom(image, 0.42, 0.55, 0.82);
+  eclat.setResolutionScale(SIMPLE ? 0.25 : 0.5);
   const fondu = uniform(0);
-  // Le tunnel : calculé plein écran en coordonnées polaires. La profondeur est l'inverse du rayon, la spirale vient de
-  // l'angle décalé par cette profondeur. Il s'ouvre depuis le centre et avale la fractale.
-  const ouverture = uniform(0), avance = uniform(0), format = uniform(16 / 9);
+  // Le tunnel : on vole à l'intérieur de la grille de LEONHARD. Calculé plein écran en coordonnées polaires : la profondeur
+  // est l'inverse du rayon. La finesse des lignes suit la taille du pixel à cet endroit, sans dérivée : le raccord de
+  // l'angle reste invisible, et le fond ne fourmille pas. Il s'ouvre depuis le centre et avale la fractale.
+  const ouverture = uniform(0), avance = uniform(0), format = uniform(16 / 9), elanTunnel = uniform(0);
   const tunnel = Fn(() => {
+    const PIXEL = 0.0017;
     const q = screenUV.sub(0.5).mul(vec2(format, 1));
-    const rayon = max(length(q), 0.001);
-    const prof = float(0.32).div(rayon).add(avance);
-    const vrille = atan(q.y, q.x).add(prof.mul(0.9));
-    const nappes = mx_fractal_noise_float(vec3(cos(vrille).mul(2.3), sin(vrille).mul(2.3), prof.mul(1.5)), 2, 2.2, 0.55).mul(0.5).add(0.5);
-    const bras = sin(vrille.mul(6).add(nappes.mul(4))).mul(0.5).add(0.5);
-    const filaments = pow(sin(vrille.mul(26).add(nappes.mul(9))).mul(0.5).add(0.5), 10);
-    const matiere = smoothstep(0.32, 0.72, nappes.mul(0.75).add(bras.mul(0.4)));
-    const fond = mix(color(0x020523), color(0x0b4fc4), matiere);
-    const parois = mix(fond, color(0x3fd3c6), pow(matiere, 3));
-    const braises = mix(parois, color(0xff5c4d), smoothstep(0.68, 0.84, nappes).mul(0.9));
-    // des anneaux symétriques : une coupure nette dessinerait des cercles durs
-    const anneaux = pow(sin(fract(prof.mul(0.8)).mul(Math.PI)), 26).mul(0.42);
-    const coeur = pow(float(1).sub(smoothstep(0, 0.2, rayon)), 3).mul(2.2);
-    const loin = smoothstep(0.02, 0.14, rayon).mul(0.75).add(0.25);
-    return braises.mul(loin).add(vec3(0.75, 0.95, 1).mul(filaments.mul(0.75).add(anneaux)).mul(loin)).add(vec3(0.85, 0.97, 1).mul(coeur));
+    const rayon = max(length(q), 0.012);
+    const prof = float(0.3).div(rayon).add(avance);
+    const pasProf = float(0.3 * PIXEL).div(rayon.mul(rayon));
+    const pasAngle = float(PIXEL).div(rayon.mul(Math.PI * 2));
+    const tour = atan(q.y, q.x).div(Math.PI * 2).add(0.5);
+    const vrille = tour.add(prof.mul(0.035));
+    // un trait de largeur constante à l'écran : il reste fin au premier plan, et s'efface au lieu de scintiller au loin
+    const trait = (u, pas, largeur) => {
+      const demi = pas.mul(largeur);
+      return float(1).sub(smoothstep(demi, demi.add(pas), abs(fract(u).sub(0.5)))).mul(float(1).sub(smoothstep(0.14, 0.38, pas)));
+    };
+    const mer = trait(vrille.mul(48), pasAngle.mul(48), float(1.1));
+    const parallele = trait(prof.mul(2.2), pasProf.mul(2.2), float(1.1));
+    // les étages : des anneaux entiers, chacun découpé en arcs différents, et leur halo
+    const etage = floor(prof.mul(0.55));
+    const arcs = step(0.38, hash(floor(vrille.mul(12)).add(etage.mul(17.3))));
+    const anneau = trait(prof.mul(0.55), pasProf.mul(0.55), float(3)).mul(arcs);
+    const halo = pow(float(1).sub(abs(fract(prof.mul(0.55)).sub(0.5)).mul(2)), 9);
+    // les filets : de fines traînées de vitesse, qui s'allongent quand on accélère
+    const couloir = floor(tour.mul(180));
+    const filet = pow(fract(prof.mul(0.09).add(hash(couloir).mul(7))), mix(float(30), float(8), elanTunnel)).mul(step(0.62, hash(couloir.add(3.3))))
+      .mul(trait(tour.mul(180), pasAngle.mul(180), float(1)));
+    const hauteur = smoothstep(0.03, 0.62, rayon);
+    const paroi = mix(color(0x0a2c86), color(0x040a22), hauteur);
+    const grille = color(0x3fd3c6).mul(mer.add(parallele).mul(0.42));
+    const or = color(0xffc24a);
+    const lueurs = mix(color(0x5c8dff), or, step(0.78, hash(etage))).mul(anneau.mul(1.9).add(halo.mul(0.22)));
+    const pointe = mix(color(0xcfe6ff), or, step(0.7, hash(couloir.add(9.1)))).mul(filet.mul(2.6));
+    // le fond du tunnel : la rosace à huit pétales, qui grandit jusqu'au bam
+    const petales = pow(abs(cos(atan(q.y, q.x).mul(4).add(avance.mul(0.08)))), 6);
+    const portee = mix(float(0.05), float(0.26), elanTunnel);
+    const coeur = smoothstep(portee.mul(1.25).add(petales.mul(portee).mul(0.5)), float(0), rayon);
+    const brume = smoothstep(0.45, 0, rayon).mul(0.34);
+    const lumiere = mix(color(0xffc24a), color(0xfff5dc), smoothstep(0.2, 0.9, coeur));
+    return paroi.add(grille).add(lueurs).add(pointe).mul(smoothstep(0.015, 0.1, rayon).mul(0.8).add(0.2)).add(or.mul(brume)).add(lumiere.mul(coeur.mul(2.4)));
   })();
   pipeline.outputNode = Fn(() => {
-    const c = nette.rgb.add(eclat.rgb).add(rayons.rgb.mul(forceRayons).mul(0.45));
+    const c = rayons ? nette.rgb.add(eclat.rgb).add(rayons.rgb.mul(forceRayons).mul(0.45)) : nette.rgb.add(eclat.rgb);
     const centre = screenUV.sub(0.5).mul(vec2(1, 0.8));
     const vignette = float(1).sub(smoothstep(0.42, 1, length(centre))).mul(0.32).add(0.68);
     const grain = fract(sin(dot(screenUV.add(fract(time)), vec2(12.9898, 78.233))).mul(43758.5453)).sub(0.5);
     const bord = ouverture.mul(1.5);
     const dansTunnel = float(1).sub(smoothstep(bord.sub(0.22), bord, length(screenUV.sub(0.5).mul(vec2(format, 1))))).mul(step(0.001, ouverture));
     const vue = mix(c.mul(vignette), tunnel, dansTunnel).add(grain.mul(0.014));
-    return vec4(mix(vue, vec3(0.92, 0.99, 1), fondu), 1);
+    // la sortie : la rosace s'ouvre en iris jusqu'à remplir l'écran, le relais est pris par l'éclair de l'arcade
+    const irisR = fondu.mul(1.5);
+    const iris = float(1).sub(smoothstep(irisR.sub(0.2), irisR, length(screenUV.sub(0.5).mul(vec2(format, 1))))).mul(step(0.001, fondu));
+    return vec4(mix(vue, vec3(1, 0.96, 0.86), iris), 1);
   })();
 
   const peuple = creerPeuple(dehors, metal);
   const bureau = await creerBureau(scene);
   const CENTRE = new THREE.Vector3(0, SOL + 4.3, 0);
-  const fractale = await creerFractale(scene, CENTRE, { allege: matchMedia('(pointer: coarse)').matches || innerWidth < 820 });
+  const fractale = await creerFractale(scene, CENTRE, { allege: SIMPLE });
 
   // ── Le trajet : le défilement pilote tout. Dehors, la chaussée, l'escalier, les portes ; dedans, les panneaux ──────
   const CHEMIN = new THREE.CatmullRomCurve3([
@@ -516,6 +546,7 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
   const vise = new THREE.Vector3(), cibleVue = new THREE.Vector3(), pos = new THREE.Vector3(), sommet = new THREE.Vector3(), orbite = new THREE.Vector3(), vise2 = new THREE.Vector3();
   const devant = new THREE.Vector3(0, SOL + 4.3, 4);
   let roulis = 0, presence = 1;
+  const plongee = { cible: 0, valeur: 0 }, visePanneau = new THREE.Vector3(), devantPanneau = new THREE.Vector3();
   const souris = { x: 0, y: 0, lx: 0, ly: 0 };
   addEventListener('pointermove', (e) => { souris.x = e.clientX / innerWidth - 0.5; souris.y = e.clientY / innerHeight - 0.5; }, { passive: true });
   const defilement = { cible: 0, valeur: 0 };
@@ -530,7 +561,7 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
       foyer = -1;
     } else {
       // dans la salle : l'œil se place de biais, le panneau occupe la droite du cadre et l'hologramme la gauche
-      const e = Math.min(1, (p - FIN_TRAJET) / (FIN_PANNEAUX - FIN_TRAJET)) * (bureau.panneaux.length - 1);
+      const e = Math.min(1, Math.max(0, p - DEBUT_PANNEAUX) / (FIN_PANNEAUX - DEBUT_PANNEAUX)) * (bureau.panneaux.length - 1);
       const i = Math.floor(e), f = adoucir(0.15, 0.85, e - i);
       const dernier = bureau.panneaux.length - 1;
       const a0 = bureau.panneaux[Math.min(i, dernier)], a1 = bureau.panneaux[Math.min(i + 1, dernier)];
@@ -540,7 +571,7 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
       orbite.set(Math.cos(angle) * recul, SOL + 3.4, Math.sin(angle) * recul);
       vise2.lerpVectors(a0.position, a1.position, f).multiplyScalar(0.95);
       vise2.y = SOL + 7.2;
-      const arrivee = adoucir(FIN_TRAJET, FIN_TRAJET + 0.08, p);
+      const arrivee = adoucir(FIN_TRAJET, DEBUT_PANNEAUX, p);
       CHEMIN.getPoint(1, pos);
       pos.lerp(orbite, arrivee);
       vise.set(0, SOL + 3.2, 0).lerp(vise2, arrivee);
@@ -548,6 +579,13 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
       // puis l'œil revient face à la mini-tour, et s'en approche
       pos.lerp(devant, adoucir(FIN_PANNEAUX, DEBUT_FRACTALE, p));
       vise.lerp(CENTRE, adoucir(FIN_PANNEAUX, DEBUT_FRACTALE, p));
+    }
+    plongee.valeur += (plongee.cible - plongee.valeur) * (1 - Math.exp(-dt * 5));
+    if (plongee.valeur > 0.001 && foyer >= 0) {
+      const a = bureau.panneaux[Math.round(foyer)];
+      visePanneau.copy(a.position);
+      pos.lerp(devantPanneau.copy(a.position).multiplyScalar(0.72), plongee.valeur);
+      vise.lerp(visePanneau, plongee.valeur);
     }
     const poidsDehors = 1 - adoucir(0.3, FIN_TRAJET, p);
     camera.position.set(pos.x + souris.lx * (poidsDehors * 24 + 1.2) + Math.sin(t * 0.07) * 3 * poidsDehors, pos.y - souris.ly * 0.8, pos.z);
@@ -562,7 +600,7 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     presence += (viseePresence - presence) * 0.08;
     fractale.regler(phi, t, presence);
     nuit.value = adoucir(DEBUT_FRACTALE, DEBUT_FRACTALE + (1 - DEBUT_FRACTALE) / PERIODES, p);
-    bureau.salle.visible = nuit.value < 0.995 && p > 0.18;   // inutile de rendre la salle (et son miroir) depuis l'extérieur
+    bureau.salle.visible = nuit.value < 0.995 && p > 0.22;   // inutile de rendre la salle (et son miroir) depuis l'extérieur
     for (const { b } of battants) b.visible = nuit.value < 0.995;
     const fov = THREE.MathUtils.lerp(CHAMP, camera.aspect < 1 ? CHAMP : 52, adoucir(0.18, FIN_TRAJET, p));
     if (Math.abs(fov - champ) > 0.01) { champ = fov; redimensionner(); }
@@ -575,6 +613,7 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     fractale.groupe.visible = ouverture.value < 0.98;   // une fois le tunnel plein écran, rien ne sert de la dessiner
     const elan = adoucir(0.885, 1, p);
     avance.value = t * 0.35 + elan * elan * 26;
+    elanTunnel.value = elan;
     format.value = camera.aspect;
     fondu.value = adoucir(0.975, 0.998, p);
     camera.updateMatrixWorld();
@@ -600,7 +639,7 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
   // Comme igloo.inc : si l'image n'est plus tenue, on baisse la définition, puis on la remonte par petits pas. Après
   // plusieurs allers-retours, on s'arrête : une définition stable se remarque moins qu'une qui oscille.
   const PALIERS = [1.25, 1, 0.8, 0.65];
-  let palier = matchMedia('(pointer: coarse)').matches ? 1 : 0, basculements = 0, demarrage = performance.now();
+  let palier = SIMPLE ? 1 : 0, basculements = 0, demarrage = performance.now();
   const reglerDefinition = (fps) => {
     if (basculements >= 4 || performance.now() - demarrage < 9000) return;
     const vise = Math.min(devicePixelRatio, 1.25);
@@ -642,8 +681,18 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     defiler(p) { defilement.cible = p; },
     poser(p) { defilement.cible = p; defilement.valeur = p; },
     decaler(dp) { defilement.cible += dp; defilement.valeur += dp; },
+    plonger(oui) { plongee.cible = oui ? 1 : 0; },
     get etat() { return etat.valeur; },
     // pour le mode diagnostic : ce que le moteur fait vraiment à cet instant
+    lourds() {
+      const l = [];
+      scene.traverse((o) => {
+        if (!o.geometry) return;
+        const g = o.geometry, n = (g.index ? g.index.count : g.attributes.position?.count || 0) / 3 * (o.count ?? 1);
+        l.push([Math.round(n), o.type, g.type, o.count ?? 1, o.material?.transparent ? 't' : 'o', o.visible]);
+      });
+      return l.sort((a, b) => b[0] - a[0]).slice(0, 18);
+    },
     stats() {
       const i = renderer.info.render;
       return { backend, palier: PALIERS[palier], toile: toile.width + '×' + toile.height, appels: i.drawCalls, triangles: i.triangles, p: +defilement.valeur.toFixed(3), foyer: +foyer.toFixed(2) };

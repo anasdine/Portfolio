@@ -116,9 +116,9 @@ export async function creerFractale(scene, centre, { allege = false } = {}) {
     return mesh;
   };
 
-  const detail = allege ? 1 : 2;
-  instancier(new THREE.CylinderGeometry(RAYON, RAYON, HAUT, 18 * detail, 1, true), matFut);
-  instancier(new THREE.TubeGeometry(new Spirale(), 110 * detail, 0.007, 4, false), matTrait);
+  const detail = allege ? 1 : 2;   // chaque triangle est multiplié par le nombre d'exemplaires : on n'en garde aucun d'inutile
+  instancier(new THREE.CylinderGeometry(RAYON, RAYON, HAUT, 8 * detail, 1, true), matFut);
+  instancier(new THREE.TubeGeometry(new Spirale(), 20 * detail, 0.007, 3, false), matTrait);
   const socle = new THREE.TorusGeometry(1.25, 0.012, 4, 6);
   socle.rotateX(Math.PI / 2);
   socle.translate(0, -HAUT / 2, 0);

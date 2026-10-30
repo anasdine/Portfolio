@@ -1,7 +1,7 @@
-// L'en-tête : la même tour en deux versions. D'abord la vidéo générée par IA ; dès que le visiteur bouge la souris,
-// la scène three.js prend le relais au même cadrage. Sur tactile, ou si le système demande moins d'animations, la
-// vidéo reste, et le bouton « temps réel » permet de basculer à la main (comme le boîtier LEAP57 du portfolio).
-import { creerTour, DEBUT_FRACTALE, FIN_TRAJET, FIN_PANNEAUX, PERIODES } from './tour.js';
+// L'en-tête : la même tour en deux versions, pour que le visiteur voie la différence. La vidéo générée par IA reste à
+// l'écran tant qu'il ne choisit pas « temps réel » : elle ne réagit à rien. Le défilement ne la coupe qu'à la fin de
+// l'accueil, là où une vidéo ne peut plus suivre, et la scène three.js prend alors le relais pour tout le trajet.
+import { creerTour, DEBUT_FRACTALE, DEBUT_PANNEAUX, FIN_TRAJET, FIN_PANNEAUX, PERIODES } from './tour.js';
 import { PANNEAUX } from './bureau.js';
 import { chargerArcade } from './arcade.js';
 
@@ -43,8 +43,8 @@ const VIDEO_A_JOUR = true;
 
 function ecrireLegende() {
   legende.textContent = mode === 'video'
-    ? '↳ séquence générée par IA, sans caméra ni logiciel 3D'
-    : `↳ une tour de 300 m, calculée en direct par votre navigateur · ${tour.backend}${fps ? ` · ${fps} i/s` : ''}`;
+    ? '↳ vidéo générée par IA : une boucle, elle ne réagit à rien. Passez en temps réel pour comparer.'
+    : `↳ temps réel : rien n'est enregistré, votre navigateur calcule cette tour de 300 m${tactile ? '' : ' et suit votre souris'} · ${tour.backend}${fps ? ` · ${fps} i/s` : ''}`;
 }
 
 function surEtat(e) {
@@ -108,6 +108,8 @@ async function basculer(vers) {
     if (!(await preparer())) return;
     tour.demarrer();
     racine.dataset.mode = 'live';
+    // Aucune image au bout de 15 secondes : le moteur s'est figé, on ne laisse jamais le visiteur devant un écran mort.
+    setTimeout(() => { if (mode === 'live' && !fps && document.visibilityState === 'visible') passerLeger(); }, 15000);
     setTimeout(() => mode === 'live' && video.pause(), 1300);
   } else {
     racine.dataset.mode = 'video';
@@ -149,11 +151,10 @@ if (!VIDEO_A_JOUR) {
   basculer('live');
 }
 
-if ((navigator.deviceMemory || 8) < 4 || sansGL()) passerLeger();
+if ((navigator.deviceMemory || 8) < 2 || sansGL()) passerLeger();
 
-// L'accueil : sur ordinateur, la scène vivante prend le relais dès qu'elle est prête ; la vidéo sert d'affiche pendant le
-// chargement. Sur tactile, ou si le système demande moins d'animations, la vidéo reste jusqu'au premier défilement.
-if (VIDEO_A_JOUR && !leger && !tactile && !calme) preparer().then((t) => t && basculer('live'));
+// La scène se prépare en arrière-plan sur ordinateur, pour que le bouton réponde tout de suite. Elle ne s'affiche pas seule.
+if (VIDEO_A_JOUR && !leger && !tactile && !calme) preparer();
 
 // Débogage et captures : ?mode=live force le temps réel, ?etat=1 la tour restaurée.
 const q = new URLSearchParams(location.search);
@@ -174,6 +175,7 @@ let horsChamp = false, arcadeAtteinte = false, pPrecedent = 0, dernierY = 0;
 
 document.querySelector('[data-remonter]')?.addEventListener('click', () => scrollTo({ top: 0, behavior: 'smooth' }));
 const PERIODE = (1 - DEBUT_FRACTALE) / PERIODES;
+const FIN_ACCUEIL = 0.09;                  // le titre vient de disparaître
 function suivreDefilement() {
   if (leger) {
     branches.classList.add('visible');
@@ -182,16 +184,17 @@ function suivreDefilement() {
   }
   const H = Math.max(1, parcours.offsetHeight - innerHeight);
   const p = Math.min(1, scrollY / H);
-  if (p > 0.004 && mode === 'video') basculer('live');   // la vidéo ne sait pas avancer : le défilement réveille la scène
+  if (p > FIN_ACCUEIL && mode === 'video') basculer('live');   // la vidéo ne sait pas avancer : ici, seule la scène peut suivre
   tour?.defiler(p);
   const n = Math.min(PERIODES, Math.max(0, Math.floor((p - DEBUT_FRACTALE) / PERIODE)));
   niveau.textContent = `> leonhard · niveau ${n} / ${PERIODES}`;
   niveau.style.opacity = fondu(DEBUT_FRACTALE - 0.02, DEBUT_FRACTALE, p);
   titre.style.opacity = 1 - fondu(0.02, 0.09, p);
+  titre.style.transform = `translate3d(0, ${-90 * fondu(0.02, 0.09, p)}px, 0)`;
   bas.style.opacity = 1 - fondu(0.12, 0.2, p);
   indice.style.opacity = 1 - fondu(0, 0.03, p);
-  contact.style.opacity = fondu(0.77, 0.8, p) * (1 - fondu(0.97, 0.995, p));
-  contact.style.pointerEvents = p > 0.77 && p < 0.98 ? 'auto' : 'none';
+  contact.style.opacity = fondu(0.77, 0.8, p) * (1 - fondu(0.84, 0.865, p));
+  contact.style.pointerEvents = p > 0.77 && p < 0.86 ? 'auto' : 'none';
   branches.classList.toggle('visible', p > FIN_TRAJET - 0.01 && p < FIN_PANNEAUX + 0.02);
   // Bam : au bout du tunnel, on ne remonte pas doucement vers l'arcade, on y tombe. Seulement en descendant.
   if (p > 0.996 && pPrecedent <= 0.996 && scrollY >= dernierY && !arcadeAtteinte) {
@@ -200,6 +203,7 @@ function suivreDefilement() {
     const arrivee = parcours.offsetHeight + 2, fin = performance.now() + 650;
     const tenir = () => { scrollTo(0, arrivee); if (performance.now() < fin) requestAnimationFrame(tenir); };
     tenir();
+    if (!calme) { const e = document.querySelector('[data-eclair]'); e.classList.remove('part'); void e.offsetWidth; e.classList.add('part'); }
     if (!calme) { arcade.classList.remove('bam'); void arcade.offsetWidth; arcade.classList.add('bam'); }
   }
   if (p < 0.97) arcadeAtteinte = false;
@@ -221,7 +225,8 @@ function versChapitre(c) {
   if (c === 'arcade' || c === 'production') {
     chargerArcade();
     document.getElementById(c).scrollIntoView();
-  } else scrollTo(0, Number(c) * H);
+  } else if (!leger) glisser(Number(c));
+  else scrollTo(0, Number(c) * H);
 }
 for (const b of chapitres) b.addEventListener('click', () => versChapitre(b.dataset.chapitre));
 function marquerChapitre() {
@@ -253,9 +258,19 @@ let dernierBouton = null;
 async function entrer(nom, i, ancre, bouton) {
   dernierBouton = bouton;
   const H = parcours.offsetHeight - innerHeight;
-  if (!leger) scrollTo(0, (FIN_TRAJET + (FIN_PANNEAUX - FIN_TRAJET) * (i / (BRANCHES.length - 1))) * H);
-  await new Promise((ok) => setTimeout(ok, calme || leger ? 0 : 750));   // la caméra rejoint le panneau avant d'entrer
+  if (!leger) scrollTo(0, (DEBUT_PANNEAUX + (FIN_PANNEAUX - DEBUT_PANNEAUX) * (i / (BRANCHES.length - 1))) * H);
+  if (!calme && !leger) await new Promise((ok) => setTimeout(ok, 450));   // la caméra rejoint le panneau…
   titreUnivers.textContent = nom;
+  univers.querySelector('[data-univers-nom]').textContent = nom;
+  tour?.plonger(true);                                                     // …plonge dedans, et le panneau devient la page
+  if (!calme && !leger) await new Promise((ok) => setTimeout(ok, 180));
+  univers.classList.remove('pret');
+  univers.classList.add('ouvert');
+  document.documentElement.classList.add('jeu-ouvert');
+  retour.focus();
+  // La page ne se charge qu'une fois la transition finie : rien ne doit disputer ces 900 ms à l'image.
+  if (!calme && !leger) await new Promise((ok) => setTimeout(ok, 900));
+  tour?.arreter();                                                         // la 3D se tait : la page a toute la machine
   // Un cadre neuf à chaque entrée : changer seulement l'ancre d'une page déjà chargée ne déclencherait aucun chargement.
   const neuf = document.createElement('iframe');
   neuf.title = cadreUnivers.title;
@@ -294,17 +309,14 @@ async function entrer(nom, i, ancre, bouton) {
     } catch { clearInterval(isoler); univers.classList.add('pret'); }   // autre origine, en local : page entière
   }, 150);
   cadreUnivers.src = SOURCE + '#' + ancre;
-  univers.classList.add('ouvert');
-  document.documentElement.classList.add('jeu-ouvert');
-  retour.focus();
-  setTimeout(() => tour?.arreter(), 700);                       // la 3D se tait : la page a toute la machine
 }
 function revenir() {
   univers.classList.remove('ouvert');
   document.documentElement.classList.remove('jeu-ouvert');
   cadreUnivers.onload = null;
-  cadreUnivers.src = 'about:blank';     // décharge la page : sa boucle d'animation ne doit pas tourner derrière
   if (mode === 'live') tour?.demarrer();
+  tour?.plonger(false);
+  setTimeout(() => { if (!univers.classList.contains('ouvert')) cadreUnivers.src = 'about:blank'; }, 950);   // décharge la page une fois refermée
   dernierBouton?.focus();
 }
 for (const [nom, i, ancre] of BRANCHES) {
@@ -317,9 +329,80 @@ for (const [nom, i, ancre] of BRANCHES) {
 retour.addEventListener('click', revenir);
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && univers.classList.contains('ouvert')) revenir(); });
 
+// Le défilement assisté : un cran, un glissé ou une flèche lance le trajet jusqu'à l'étape suivante. Tout le monde vit la
+// même mise en scène, à la même vitesse, quelle que soit sa molette ou son pavé tactile. Dans l'arcade, le défilement est libre.
+const ETAPES_GUIDE = [0, 0.13, 0.31, 0.44, ...BRANCHES.map(([, i]) => DEBUT_PANNEAUX + (FIN_PANNEAUX - DEBUT_PANNEAUX) * (i / (BRANCHES.length - 1))), 0.84, 1];
+const courbe = (x) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2);
+const plongeon = (x) => x ** 2.4;                // le tunnel ne fait qu'accélérer, jusqu'au bam
+let enGlisse = false, trajet = 0, dernierCran = 0, doigt = null;
+const hauteur = () => Math.max(1, parcours.offsetHeight - innerHeight);
+const arrivee = () => parcours.offsetHeight + 2;
+const dansLeParcours = () => !leger && scrollY < hauteur() - 1;
+const occupe = () => document.documentElement.classList.contains('jeu-ouvert') || faille.open;
+
+function glisser(vers) {
+  const depart = scrollY / hauteur();
+  if (calme) { scrollTo(0, vers * hauteur()); tour?.poser(vers); return; }
+  const tunnel = vers === 1;
+  const duree = tunnel ? 4600 : Math.min(2800, 1100 + Math.abs(vers - depart) * 7000);
+  const t0 = performance.now();
+  enGlisse = true;
+  const ce = ++trajet;
+  const pas = (t) => {
+    if (ce !== trajet) return;
+    const x = Math.min(1, (t - t0) / duree);
+    scrollTo(0, (depart + (vers - depart) * (tunnel ? plongeon(x) : courbe(x))) * hauteur());
+    if (x < 1 && scrollY < hauteur() - 1) requestAnimationFrame(pas);
+    else enGlisse = false;
+  };
+  requestAnimationFrame(pas);
+}
+function avancer(sens) {
+  const p = scrollY / hauteur();
+  const suivante = sens > 0 ? ETAPES_GUIDE.find((e) => e > p + 0.004) : ETAPES_GUIDE.findLast((e) => e < p - 0.004);
+  if (suivante !== undefined) glisser(suivante);
+}
+// De l'arcade, on ne rembobine pas le tunnel : un éclair, et on est de retour à la table.
+function remonterALaTable() {
+  const e = document.querySelector('[data-eclair]');
+  e.classList.remove('part'); void e.offsetWidth; e.classList.add('part');
+  const p = ETAPES_GUIDE.at(-3);
+  scrollTo(0, p * hauteur());
+  tour?.poser(p);
+}
+function pousser(sens) {
+  if (occupe() || leger) return false;
+  if (dansLeParcours()) { if (!enGlisse) avancer(sens); return true; }
+  if (sens < 0 && scrollY <= arrivee() + 4) { remonterALaTable(); return true; }
+  return false;
+}
+addEventListener('wheel', (e) => {
+  const maintenant = performance.now(), isole = maintenant - dernierCran > 120;
+  dernierCran = maintenant;
+  if (occupe() || leger || !e.deltaY) return;
+  if (dansLeParcours() || enGlisse) { e.preventDefault(); if (isole) pousser(Math.sign(e.deltaY)); return; }
+  if (isole && e.deltaY < 0 && scrollY <= arrivee() + 4) { e.preventDefault(); pousser(-1); }
+}, { passive: false });
+addEventListener('touchstart', (e) => { doigt = e.touches[0].clientY; }, { passive: true });
+addEventListener('touchmove', (e) => { if (!occupe() && !leger && (dansLeParcours() || enGlisse)) e.preventDefault(); }, { passive: false });
+addEventListener('touchend', (e) => {
+  if (doigt === null) return;
+  const d = doigt - e.changedTouches[0].clientY;
+  doigt = null;
+  if (Math.abs(d) > 36) pousser(Math.sign(d));
+}, { passive: true });
+addEventListener('keydown', (e) => {
+  const sens = { ArrowDown: 1, PageDown: 1, ' ': 1, ArrowUp: -1, PageUp: -1 }[e.key];
+  if (!sens || (e.target.closest?.('button, a, input, textarea') && e.key === ' ')) return;
+  if (pousser(sens)) e.preventDefault();
+});
+addEventListener('scroll', () => document.documentElement.classList.toggle('guide', dansLeParcours()), { passive: true });
+document.documentElement.classList.toggle('guide', !leger);
+
 // ?diag : la page dit ce qu'elle fait. Rien ne sort du navigateur : c'est lu à l'écran, ou par les outils de test.
 if (q.has('diag')) {
   const d = (window.__diag = { erreurs: [], reseau: [], fps: 0 });
+  window.__lourds = () => tour?.lourds();
   addEventListener('error', (e) => d.erreurs.push(e.message || String(e.target?.src || e.target?.href)), true);
   addEventListener('unhandledrejection', (e) => d.erreurs.push(String(e.reason)));
   new PerformanceObserver((l) => { for (const e of l.getEntries()) if (e.responseStatus >= 400) d.reseau.push(e.responseStatus + ' ' + e.name); }).observe({ type: 'resource', buffered: true });
