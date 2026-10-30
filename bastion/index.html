@@ -169,7 +169,10 @@
   .univers.ouvert { opacity: 1; visibility: visible; }
   .univers__barre { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px clamp(10px, 2vw, 22px); background: #050818; border-bottom: 1px solid rgba(63, 211, 198, .35); font-size: 12px; color: var(--sain); }
   .univers__barre button { min-height: 44px; padding: 0 15px; font: 500 12px var(--mono); letter-spacing: .05em; color: #050818; background: var(--sain); border: 0; cursor: pointer; }
-  .univers iframe { flex: 1; width: 100%; border: 0; background: #07090b; }
+  .univers iframe { flex: 1; width: 100%; border: 0; background: #07090b; opacity: 0; transition: opacity .45s; }
+  .univers.pret iframe { opacity: 1; }
+  .univers__charge { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12px; letter-spacing: .1em; color: var(--sain); }
+  .univers.pret .univers__charge { display: none; }
   .production { margin-bottom: clamp(70px, 14vh, 140px); }
   .frise { list-style: none; max-width: 1320px; margin: 0 auto 34px; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; border-top: 1px solid rgba(63, 211, 198, .5); }
   .frise li { position: relative; padding: 16px 14px 0 0; font-size: 12px; color: #9aa4ac; }
@@ -306,6 +309,7 @@
 </section>
 <div class="univers" data-univers role="dialog" aria-label="Détail du portfolio">
   <div class="univers__barre"><span>&gt; bastion/<span data-univers-titre></span></span><button type="button" data-retour>← Retour à la table Ultron</button></div>
+  <span class="univers__charge" role="status">&gt; ouverture…</span>
   <iframe title="Détail du portfolio"></iframe>
 </div>
 <div class="scene-jeu" data-scene role="dialog" aria-label="Jeu">

@@ -255,16 +255,30 @@ async function entrer(nom, i, ancre, bouton) {
   await new Promise((ok) => setTimeout(ok, calme || leger ? 0 : 750));   // la caméra rejoint le panneau avant d'entrer
   titreUnivers.textContent = nom;
   cadreUnivers.src = SOURCE + '#' + ancre;
-  // La page chargée met du temps à se construire : on insiste jusqu'à ce que la section soit vraiment à l'écran.
+  // Une branche montre une seule section : le reste de la page est masqué, puis ses animations sont recalculées.
+  // Le cadre reste caché jusque-là : le visiteur ne voit jamais l'ancienne page se construire.
+  univers.classList.remove('pret');
   cadreUnivers.onload = () => {
     let essais = 0;
-    const viser = setInterval(() => {
+    const isoler = setInterval(() => {
       try {
-        const w = cadreUnivers.contentWindow, s = w.document.getElementById(ancre);
-        if (s && s.offsetHeight) w.scrollTo(0, s.getBoundingClientRect().top + w.scrollY - 40);
-      } catch { clearInterval(viser); }        // autre origine, en local : la page reste au début
-      if (++essais > 24 || !cadreUnivers.src) clearInterval(viser);
-    }, 250);
+        const w = cadreUnivers.contentWindow, d = w.document, s = d.getElementById(ancre);
+        const pret = s && s.offsetHeight && !(d.querySelector('[data-preloader]')?.offsetHeight > 0);
+        if (pret || essais > 40) {
+          clearInterval(isoler);
+          const st = d.createElement('style');
+          st.textContent = `main > section:not(#${ancre}), [data-nav], [data-up], [data-theme-btn], [data-preloader] { display: none !important; }
+            main > section#${ancre} { padding-top: clamp(30px, 6vh, 70px) !important; margin-top: 0 !important; }
+            html, body { overflow-x: hidden; }`;
+          d.head.append(st);
+          w.scrollTo(0, 0);
+          w.dispatchEvent(new Event('resize'));
+          w.ScrollTrigger?.refresh();
+          setTimeout(() => { w.scrollTo(0, 0); univers.classList.add('pret'); }, 250);
+        }
+      } catch { clearInterval(isoler); univers.classList.add('pret'); }   // autre origine, en local : page entière
+      essais++;
+    }, 150);
   };
   univers.classList.add('ouvert');
   document.documentElement.classList.add('jeu-ouvert');
@@ -274,6 +288,7 @@ async function entrer(nom, i, ancre, bouton) {
 function revenir() {
   univers.classList.remove('ouvert');
   document.documentElement.classList.remove('jeu-ouvert');
+  cadreUnivers.onload = null;
   cadreUnivers.removeAttribute('src');
   if (mode === 'live') tour?.demarrer();
   dernierBouton?.focus();
