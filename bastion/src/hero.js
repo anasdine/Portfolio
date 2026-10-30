@@ -18,6 +18,23 @@ const tactile = matchMedia('(pointer: coarse)').matches;
 const COMPROMIS = [0xff, 0x5c, 0x4d];
 const RESTAURE = [0x3f, 0xd3, 0xc6];
 
+// Le mode léger : sans 3D possible, ou si la machine ne suit pas, on garde la vidéo, les branches, la production et les
+// jeux. Le visiteur ne doit jamais tomber sur un écran noir.
+let leger = false;
+function passerLeger() {
+  if (leger) return;
+  leger = true;
+  tour?.arreter();
+  document.documentElement.classList.add('leger');
+  racine.dataset.mode = 'video';
+  mode = 'video';
+  video.style.visibility = '';
+  video.play().catch(() => {});
+  scrollTo(0, 0);
+  dispatchEvent(new Event('scroll'));
+}
+const sansGL = () => { try { return !navigator.gpu && !document.createElement('canvas').getContext('webgl2'); } catch { return true; } };
+
 let tour = null, preparation = null, mode = 'video', restaure = false, fps = 0;
 
 // À repasser à false si la vidéo ne correspond plus à la tour : la page part alors directement du temps réel, et on ne
@@ -66,11 +83,20 @@ function surFoyer(foyer) {
 }
 
 function preparer() {
-  preparation ??= creerTour(toile, { surEtat, surFoyer, surFps: (n) => { fps = n; if (mode === 'live') ecrireLegende(); } })
+  preparation ??= creerTour(toile, { surEtat, surFoyer, surFps: (n) => {
+      fps = n;
+      if (mode === 'live') ecrireLegende();
+      // dix secondes pour s'installer, puis six secondes d'affilée sous 20 images : on arrête de forcer
+      if (mode === 'live' && document.visibilityState === 'visible' && performance.now() - lancement > 10000) {
+        lentes = n < 20 ? lentes + 1 : 0;
+        if (lentes >= 6) passerLeger();
+      } else if (mode !== 'live') lancement = performance.now();
+    } })
     .then((t) => (tour = t))
     .catch((erreur) => {
       console.warn('BASTION : rendu temps réel indisponible, la vidéo reste.', erreur);
       boutons.find((b) => b.dataset.vers === 'live').disabled = true;
+      passerLeger();
       return null;
     });
   return preparation;
@@ -123,9 +149,11 @@ if (!VIDEO_A_JOUR) {
   basculer('live');
 }
 
+if ((navigator.deviceMemory || 8) < 4 || sansGL()) passerLeger();
+
 // L'accueil : sur ordinateur, la scène vivante prend le relais dès qu'elle est prête ; la vidéo sert d'affiche pendant le
 // chargement. Sur tactile, ou si le système demande moins d'animations, la vidéo reste jusqu'au premier défilement.
-if (VIDEO_A_JOUR && !tactile && !calme) preparer().then((t) => t && basculer('live'));
+if (VIDEO_A_JOUR && !leger && !tactile && !calme) preparer().then((t) => t && basculer('live'));
 
 // Débogage et captures : ?mode=live force le temps réel, ?etat=1 la tour restaurée.
 const q = new URLSearchParams(location.search);
@@ -141,11 +169,17 @@ const niveau = racine.querySelector('[data-niveau]');
 const branches = document.querySelector('[data-branches]');
 const parcours = document.querySelector('[data-parcours]');
 const arcade = document.querySelector('.arcade');
+let lancement = performance.now(), lentes = 0;
 let horsChamp = false, arcadeAtteinte = false, pPrecedent = 0, dernierY = 0;
 
 document.querySelector('[data-remonter]')?.addEventListener('click', () => scrollTo({ top: 0, behavior: 'smooth' }));
 const PERIODE = (1 - DEBUT_FRACTALE) / PERIODES;
 function suivreDefilement() {
+  if (leger) {
+    branches.classList.add('visible');
+    if (scrollY > 40) chargerArcade();
+    return;
+  }
   const H = Math.max(1, parcours.offsetHeight - innerHeight);
   const p = Math.min(1, scrollY / H);
   if (p > 0.004 && mode === 'video') basculer('live');   // la vidéo ne sait pas avancer : le défilement réveille la scène
@@ -175,19 +209,23 @@ function suivreDefilement() {
   if (scrollY > parcours.offsetHeight - innerHeight * 2.5) chargerArcade();
 }
 addEventListener('scroll', suivreDefilement, { passive: true });
-preparer().then(() => { suivreDefilement(); if (q.has('debug')) window.bastion = tour; });   // ?debug : position exacte, pour vérifier le raccord
+(leger ? Promise.resolve() : preparer()).then(() => { suivreDefilement(); if (q.has('debug')) window.bastion = tour; });   // ?debug : position exacte, pour vérifier le raccord
 suivreDefilement();
 
 // Le rail : on peut aller droit au but. Le saut est immédiat, le fondu de la caméra fait le reste.
 const chapitres = [...document.querySelectorAll('[data-chapitre]')];
 function versChapitre(c) {
   const H = parcours.offsetHeight - innerHeight;
-  if (c === 'arcade') { chargerArcade(); scrollTo(0, parcours.offsetHeight + 2); } else { scrollTo(0, Number(c) * H); }
+  if (c === 'arcade' || c === 'production') {
+    chargerArcade();
+    document.getElementById(c).scrollIntoView();
+  } else scrollTo(0, Number(c) * H);
 }
 for (const b of chapitres) b.addEventListener('click', () => versChapitre(b.dataset.chapitre));
 function marquerChapitre() {
   const H = parcours.offsetHeight - innerHeight, y = scrollY;
-  const i = y >= parcours.offsetHeight - innerHeight * 0.5 ? 3 : y >= 0.82 * H ? 2 : y >= 0.4 * H ? 1 : 0;
+  const arcadeHaut = document.getElementById('arcade').offsetTop - innerHeight * 0.5;
+  const i = y >= arcadeHaut ? 4 : y >= parcours.offsetHeight - innerHeight * 0.5 ? 3 : y >= 0.82 * H ? 2 : y >= 0.4 * H ? 1 : 0;
   chapitres.forEach((b, k) => b.setAttribute('aria-current', String(k === i)));
 }
 addEventListener('scroll', marquerChapitre, { passive: true });
@@ -213,10 +251,21 @@ let dernierBouton = null;
 async function entrer(nom, i, ancre, bouton) {
   dernierBouton = bouton;
   const H = parcours.offsetHeight - innerHeight;
-  scrollTo(0, (FIN_TRAJET + (FIN_PANNEAUX - FIN_TRAJET) * (i / (BRANCHES.length - 1))) * H);
-  await new Promise((ok) => setTimeout(ok, calme ? 0 : 750));   // la caméra rejoint le panneau avant d'entrer
+  if (!leger) scrollTo(0, (FIN_TRAJET + (FIN_PANNEAUX - FIN_TRAJET) * (i / (BRANCHES.length - 1))) * H);
+  await new Promise((ok) => setTimeout(ok, calme || leger ? 0 : 750));   // la caméra rejoint le panneau avant d'entrer
   titreUnivers.textContent = nom;
   cadreUnivers.src = SOURCE + '#' + ancre;
+  // La page chargée met du temps à se construire : on insiste jusqu'à ce que la section soit vraiment à l'écran.
+  cadreUnivers.onload = () => {
+    let essais = 0;
+    const viser = setInterval(() => {
+      try {
+        const w = cadreUnivers.contentWindow, s = w.document.getElementById(ancre);
+        if (s && s.offsetHeight) w.scrollTo(0, s.getBoundingClientRect().top + w.scrollY - 40);
+      } catch { clearInterval(viser); }        // autre origine, en local : la page reste au début
+      if (++essais > 24 || !cadreUnivers.src) clearInterval(viser);
+    }, 250);
+  };
   univers.classList.add('ouvert');
   document.documentElement.classList.add('jeu-ouvert');
   retour.focus();

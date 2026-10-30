@@ -597,9 +597,9 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
   // Comme igloo.inc : si l'image n'est plus tenue, on baisse la définition, puis on la remonte par petits pas. Après
   // plusieurs allers-retours, on s'arrête : une définition stable se remarque moins qu'une qui oscille.
   const PALIERS = [1.25, 1, 0.8, 0.65];
-  let palier = matchMedia('(pointer: coarse)').matches ? 1 : 0, basculements = 0;
+  let palier = matchMedia('(pointer: coarse)').matches ? 1 : 0, basculements = 0, demarrage = performance.now();
   const reglerDefinition = (fps) => {
-    if (basculements >= 4) return;
+    if (basculements >= 4 || performance.now() - demarrage < 9000) return;
     const vise = Math.min(devicePixelRatio, 1.25);
     if (fps < 42 && palier < PALIERS.length - 1) palier++;
     else if (fps > 57 && palier > 0 && PALIERS[palier - 1] <= vise) palier--;
@@ -633,7 +633,7 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
 
   return {
     backend,
-    demarrer() { renderer.setAnimationLoop(dessiner); },
+    demarrer() { demarrage = performance.now(); renderer.setAnimationLoop(dessiner); },
     arreter() { renderer.setAnimationLoop(null); },
     viser(v) { etat.cible = v; },
     defiler(p) { defilement.cible = p; },

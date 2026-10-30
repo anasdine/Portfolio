@@ -155,7 +155,7 @@
   .arcade::before { content: ''; position: fixed; inset: 0; z-index: 9; background: #ebfbff; opacity: 0; pointer-events: none; }
   .arcade.bam::before { animation: bam-flash .9s ease-out; }
   .arcade.bam .arcade__tete { animation: bam-titre .8s cubic-bezier(.16, 1, .3, 1); }
-  .arcade.bam .bornes, .arcade.bam .une { animation: bam-grille 1s cubic-bezier(.16, 1, .3, 1); }
+  .arcade.bam .frise, .arcade.bam .preuves { animation: bam-grille 1s cubic-bezier(.16, 1, .3, 1); }
   @keyframes bam-flash { from { opacity: 1; } to { opacity: 0; } }
   @keyframes bam-titre { from { transform: scale(1.5); filter: blur(10px); opacity: 0; } to { transform: none; filter: none; opacity: 1; } }
   @keyframes bam-grille { from { transform: translateY(90px); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -170,6 +170,33 @@
   .univers__barre { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px clamp(10px, 2vw, 22px); background: #050818; border-bottom: 1px solid rgba(63, 211, 198, .35); font-size: 12px; color: var(--sain); }
   .univers__barre button { min-height: 44px; padding: 0 15px; font: 500 12px var(--mono); letter-spacing: .05em; color: #050818; background: var(--sain); border: 0; cursor: pointer; }
   .univers iframe { flex: 1; width: 100%; border: 0; background: #07090b; }
+  .production { margin-bottom: clamp(70px, 14vh, 140px); }
+  .frise { list-style: none; max-width: 1320px; margin: 0 auto 34px; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; border-top: 1px solid rgba(63, 211, 198, .5); }
+  .frise li { position: relative; padding: 16px 14px 0 0; font-size: 12px; color: #9aa4ac; }
+  .frise li::before { content: ''; position: absolute; top: -5px; left: 0; width: 9px; height: 9px; background: var(--sain); transform: rotate(45deg); }
+  .frise b { display: block; margin-bottom: 4px; font: 600 19px/1.1 var(--titre); color: var(--texte); }
+  .frise li:last-child b { color: var(--sain); }
+  .preuves { max-width: 1320px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px; }
+  .preuve { display: flex; flex-direction: column; gap: 5px; padding-bottom: 15px; color: #9aa4ac; font-size: 12px; text-decoration: none; background: rgba(13, 26, 54, .55); border: 1px solid rgba(63, 211, 198, .2); overflow: hidden; transition: border-color .25s, transform .3s; }
+  a.preuve:hover, a.preuve:focus-visible { border-color: var(--sain); transform: translateY(-4px); outline: 0; }
+  .preuve img { width: 100%; height: auto; aspect-ratio: 16 / 8.5; object-fit: cover; object-position: top; margin-bottom: 8px; }
+  .preuve small, .preuve b, .preuve span { margin: 0 14px; }
+  .preuve small { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--sain); }
+  .preuve b { font: 600 20px/1.1 var(--titre); color: var(--texte); }
+  .preuve--outil { padding-top: 16px; }
+  /* Toutes les tailles : petit écran, paysage de téléphone, très grand écran. */
+  @media (max-width: 760px) { .frise { grid-template-columns: 1fr; border-top: 0; border-left: 1px solid rgba(63, 211, 198, .5); } .frise li { padding: 0 0 15px 18px; } .frise li::before { top: 4px; left: -5px; } .une { aspect-ratio: auto; min-height: 400px; } }
+  @media (max-height: 520px) { .titre { padding-bottom: 6px; } h1 { font-size: 40px; } .role, .legende, .indice { display: none; } .branches { bottom: 4px; } }
+  @media (min-width: 2200px) { .arcade__tete, .frise, .preuves, .une, .bornes, .arcade__pied { max-width: 1700px; } }
+  /* Le mode léger : une vraie page d'accueil, sans 3D. */
+  .leger .parcours { height: 100svh; }
+  .leger .hero { position: absolute; }
+  .leger .hero video { visibility: visible !important; opacity: 1 !important; }
+  .leger .hero canvas, .leger .bascule, .leger .restaurer, .leger .niveau, .leger .contact, .leger .rail { display: none; }
+  .leger .branches { position: absolute; }
+  html, body { overflow-x: clip; }
+  .arcade { overflow-x: clip; }
+  @media (max-width: 640px) { .branches { left: 8px; right: 8px; max-width: none; transform: translateY(16px); } .branches.visible { transform: none; } .branches::before { display: none; } .hud { padding-bottom: 56px; } }
   .journal { margin: 0 0 14px; font-size: 12px; color: var(--teinte); letter-spacing: .04em; transition: color .4s; min-height: 1.5em; }
   h1 { margin: 0; font: 600 clamp(44px, 7.4vw, 104px)/.92 var(--titre); letter-spacing: -.01em; text-shadow: 0 2px 30px rgba(0, 0, 0, .6); }
   .role { margin: 14px 0 0; color: var(--texte); opacity: .78; font-size: clamp(12px, 1.05vw, 14px); }
@@ -232,11 +259,35 @@
   <button type="button" data-chapitre="0"><span>La tour</span><i></i></button>
   <button type="button" data-chapitre="0.47"><span>La salle</span><i></i></button>
   <button type="button" data-chapitre="0.82"><span>Leonhard</span><i></i></button>
+  <button type="button" data-chapitre="production"><span>Production</span><i></i></button>
   <button type="button" data-chapitre="arcade"><span>L'arcade</span><i></i></button>
 </nav>
 <section class="arcade" id="arcade" aria-labelledby="titre-arcade">
-  <header class="arcade__tete">
-    <p>&gt; bastion · fin de la plongée · [ OK ]</p>
+  <section class="production" id="production" aria-labelledby="titre-production">
+    <header class="arcade__tete">
+      <p>&gt; bastion · fin de la plongée · [ OK ]</p>
+      <h2 id="titre-production">La production</h2>
+      <p class="arcade__sous">Depuis juin, ça ne s'arrête pas : chaque mois, des outils et des réalisations de plus. Tout ce qui suit existe et s'ouvre.</p>
+    </header>
+    <ol class="frise">
+      <li><b>Juin</b><span>JARVIS et LEONHARD</span></li>
+      <li><b>Août</b><span>LEAP 57 et ce portfolio</span></li>
+      <li><b>Septembre</b><span>Plan B, Razor, l'indépendance</span></li>
+      <li><b>Octobre</b><span>ULTRON COCKPIT, sites et apps clients</span></li>
+      <li><b>Aujourd'hui</b><span>BASTION</span></li>
+    </ol>
+    <div class="preuves">
+      <a class="preuve" href="https://claude.ai/artifact/XDR28AoSxV4tvVT4rPLpCQ" target="_blank" rel="noopener"><img src="media/preuves/bahia.jpg" alt="" loading="lazy" width="640" height="340"><small>Site · octobre</small><b>Le Palais de Bahia</b></a>
+      <a class="preuve" href="https://claude.ai/artifact/T41Y55G1mh7rdnWUZ1cPz5" target="_blank" rel="noopener"><img src="media/preuves/fulmine.jpg" alt="" loading="lazy" width="640" height="340"><small>Site · octobre</small><b>Fulmine Moda</b></a>
+      <a class="preuve" href="https://claude.ai/artifact/QLLmHsfTkNYsZzofD8x8zV" target="_blank" rel="noopener"><img src="media/preuves/ocrousti.jpg" alt="" loading="lazy" width="640" height="340"><small>Commande en ligne · octobre</small><b>O'Crousti Lausanne</b></a>
+      <a class="preuve" href="https://claude.ai/artifact/Rcp7gLJWyDv2eBz8CkqU63" target="_blank" rel="noopener"><img src="media/preuves/phoenix.jpg" alt="" loading="lazy" width="640" height="340"><small>Application · octobre</small><b>Phoenix Parc</b></a>
+      <div class="preuve preuve--outil"><small>Mes usines</small><b>Plan B</b><span>Ma chaîne de production de vidéos publicitaires, pilotée depuis le téléphone.</span></div>
+      <div class="preuve preuve--outil"><small>Mes usines</small><b>JARVIS</b><span>Le générateur de sites, sur mes propres cartes graphiques.</span></div>
+      <div class="preuve preuve--outil"><small>Mes usines</small><b>LEONHARD</b><span>La supervision de tout un parc, tenue par une seule personne.</span></div>
+      <div class="preuve preuve--outil"><small>Mes usines</small><b>ULTRON COCKPIT</b><span>20 minutes le matin, 20 le soir : je décide, les agents produisent.</span></div>
+    </div>
+  </section>
+  <header class="arcade__tete" id="arcade">
     <h2 id="titre-arcade">L'arcade</h2>
     <p class="arcade__sous">Un jeu phare et treize bornes, écrits pour ce portfolio. Tout tourne dans votre navigateur.</p>
   </header>
