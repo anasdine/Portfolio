@@ -276,7 +276,7 @@ async function entrer(nom, i, ancre, bouton) {
         st.id = 'bastion-seul';
         st.textContent = `main > section:not(#${ancre}), [data-nav], [data-up], [data-theme-btn], [data-preloader] { display: none !important; }
           main > section#${ancre} { padding-top: clamp(30px, 6vh, 70px) !important; margin-top: 0 !important; }
-          [data-ada-bubble], [data-ada], [data-voice-btn], [data-ada-follow] { display: none !important; }
+          #haut, [data-explain-dot], [data-ada-bubble], [data-ada], [data-voice-btn], [data-ada-follow] { display: none !important; }
           /* le contenu ne dépend d'aucune animation au défilement : dans une branche, tout est visible d'office */
           [data-reveal], [data-reveal] *, [data-split-title], [data-split-title] *, [data-split-words], [data-split-words] *,
           [data-plane-wrap], [data-rack-wrap], [data-piece] { opacity: 1 !important; visibility: visible !important; clip-path: none !important; }
