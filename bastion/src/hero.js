@@ -242,7 +242,7 @@ const BRANCHES = [
   ['Offre', 0, 'freelance'], ['Projets', 1, 'pieces'], ['Ultron', 2, 'strates'], ['Parcours', 3, 'reglage'], ['Contact', 4, 'contact'],
 ];
 const univers = document.querySelector('[data-univers]');
-const cadreUnivers = univers.querySelector('iframe');
+let cadreUnivers = univers.querySelector('iframe');
 const retour = univers.querySelector('[data-retour]');
 const titreUnivers = univers.querySelector('[data-univers-titre]');
 const SOURCE = location.hostname.endsWith('github.io') ? '../' : 'https://anasdine.github.io/Portfolio/';
@@ -254,7 +254,10 @@ async function entrer(nom, i, ancre, bouton) {
   if (!leger) scrollTo(0, (FIN_TRAJET + (FIN_PANNEAUX - FIN_TRAJET) * (i / (BRANCHES.length - 1))) * H);
   await new Promise((ok) => setTimeout(ok, calme || leger ? 0 : 750));   // la caméra rejoint le panneau avant d'entrer
   titreUnivers.textContent = nom;
-  cadreUnivers.src = SOURCE + '#' + ancre;
+  // Un cadre neuf à chaque entrée : changer seulement l'ancre d'une page déjà chargée ne déclencherait aucun chargement.
+  const neuf = cadreUnivers.cloneNode(false);
+  cadreUnivers.replaceWith(neuf);
+  cadreUnivers = neuf;
   // Une branche montre une seule section : le reste de la page est masqué, puis ses animations sont recalculées.
   // Le cadre reste caché jusque-là : le visiteur ne voit jamais l'ancienne page se construire.
   univers.classList.remove('pret');
@@ -280,6 +283,7 @@ async function entrer(nom, i, ancre, bouton) {
       essais++;
     }, 150);
   };
+  cadreUnivers.src = SOURCE + '#' + ancre;
   univers.classList.add('ouvert');
   document.documentElement.classList.add('jeu-ouvert');
   retour.focus();
@@ -289,7 +293,7 @@ function revenir() {
   univers.classList.remove('ouvert');
   document.documentElement.classList.remove('jeu-ouvert');
   cadreUnivers.onload = null;
-  cadreUnivers.removeAttribute('src');
+  cadreUnivers.src = 'about:blank';     // décharge la page : sa boucle d'animation ne doit pas tourner derrière
   if (mode === 'live') tour?.demarrer();
   dernierBouton?.focus();
 }
