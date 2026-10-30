@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Signe Anas Dine">
+  <rect width="512" height="512" fill="#0A0C0E"></rect>
+  <g stroke="#3FD3C6" stroke-width="6" fill="none">
+    <path d="M40 88 V40 H88"></path><path d="M424 40 H472 V88"></path>
+    <path d="M472 424 V472 H424"></path><path d="M88 472 H40 V424"></path>
+  </g>
+  <g fill="none" stroke="#E4E8EA" stroke-width="17" stroke-linecap="round">
+    <path d="M132 158 L246 216"></path><path d="M132 216 L246 216"></path><path d="M132 274 L246 216"></path>
+    <path d="M246 216 L352 216"></path>
+  </g>
+  <circle cx="246" cy="216" r="26" fill="#3FD3C6"></circle>
+  <circle cx="374" cy="216" r="23" fill="none" stroke="#3FD3C6" stroke-width="14"></circle>
+  <g fill="#3FD3C6">
+    <rect x="132" y="318" width="242" height="14"></rect>
+    <rect x="132" y="346" width="242" height="14" opacity=".7"></rect>
+    <rect x="132" y="374" width="242" height="14" opacity=".46"></rect>
+    <rect x="132" y="402" width="242" height="14" opacity=".26"></rect>
+  </g>
+</svg>

@@ -557,7 +557,7 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     fractale.regler(phi, t);
     nuit.value = adoucir(DEBUT_FRACTALE, DEBUT_FRACTALE + (1 - DEBUT_FRACTALE) / PERIODES, p);
     bureau.salle.visible = nuit.value < 0.995 && p > 0.27;   // inutile de rendre la salle (et son miroir) depuis l'extérieur
-    for (const { b } of battants) b.visible = bureau.salle.visible;
+    for (const { b } of battants) b.visible = nuit.value < 0.995;
     const fov = THREE.MathUtils.lerp(CHAMP, 52, adoucir(0.18, FIN_TRAJET, p));
     if (Math.abs(fov - champ) > 0.01) { champ = fov; redimensionner(); }
 
