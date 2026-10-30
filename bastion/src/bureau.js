@@ -415,7 +415,7 @@ export async function creerBureau(scene) {
       ecran.lookAt(0, SOL + 3, 0);
       salle.add(ecran);
     }
-    return { force, base: 0.35, angle, position: panneau.position.clone() };
+    return { force, base: 0.35, angle, position: panneau.position.clone(), maille: panneau, largeur: 21, hauteur: 11.8 };
   });
 
   return {

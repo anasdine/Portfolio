@@ -109,6 +109,11 @@ async function basculer(vers) {
     lancement = performance.now();
     lentes = 0;
     tour.demarrer();
+    // Les premières images de la 3D sont les plus lentes : le balayage attend qu'elles soient passées, sinon on ne le verrait pas.
+    await Promise.race([
+      (async () => { for (let k = 0; k < 6; k++) await new Promise(requestAnimationFrame); })(),
+      new Promise((ok) => setTimeout(ok, 1500)),
+    ]);
     racine.dataset.mode = 'live';
     // Aucune image au bout de 15 secondes : le moteur s'est figé, on ne laisse jamais le visiteur devant un écran mort.
     setTimeout(() => { if (mode === 'live' && !fps && document.visibilityState === 'visible') passerLeger(); }, 15000);
@@ -260,26 +265,31 @@ const titreUnivers = univers.querySelector('[data-univers-titre]');
 const SOURCE = location.hostname.endsWith('github.io') ? '../' : 'https://anasdine.github.io/Portfolio/';
 let dernierBouton = null;
 
-let entree = 0;                              // un retour pendant la plongée annule tout ce qui restait à faire
+let entree = 0;                              // un retour pendant l'ouverture annule tout ce qui restait à faire
+let ouverture = null;                        // le verre qui s'ouvre : la même animation, jouée à l'envers, le referme
+const PLEIN = ['0% 0%', '100% 0%', '100% 100%', '0% 100%'];
+const polygone = (coins) => `polygon(${coins.join(', ')})`;
 async function entrer(nom, i, ancre, bouton) {
   const ce = ++entree;
   dernierBouton = bouton;
-  const pause = (ms) => (calme || leger ? null : new Promise((ok) => setTimeout(ok, ms)));
   titreUnivers.textContent = nom;
   univers.querySelector('[data-univers-nom]').textContent = nom;
-  if (!leger) {
-    if (Math.abs(scrollY / hauteur() - pPanneau(i)) > 0.002) await glisser(pPanneau(i));
-    // on traverse le verre du panneau : sa teinte est celle de la page, il n'y a pas de coupure
-    document.documentElement.classList.add('plonge');
-    tour?.plonger(true);
-    await pause(760);
-    if (ce !== entree) return;
-  }
+  const anime = !leger && !calme && mode === 'live' && tour;
+  if (!leger && Math.abs(scrollY / hauteur() - pPanneau(i)) > 0.002) await glisser(pPanneau(i));
+  if (ce !== entree) return;
+  ouverture?.cancel();
+  ouverture = null;
   univers.classList.remove('pret');
+  if (anime) {
+    // Le panneau devient la page : même teinte, mêmes coins. Le verre s'étire jusqu'aux bords de l'écran, sans coupure.
+    document.documentElement.classList.add('plonge');
+    tour.plonger(true);
+    ouverture = univers.animate({ clipPath: [polygone(tour.cadrePanneau(i)), polygone(PLEIN)] }, { duration: 880, delay: 140, easing: 'cubic-bezier(.76, 0, .24, 1)', fill: 'both' });
+  }
   univers.classList.add('ouvert');
   document.documentElement.classList.add('jeu-ouvert');
   retour.focus();
-  await pause(420);
+  if (anime) await ouverture.finished.catch(() => {});
   if (ce !== entree) return;
   tour?.arreter();                                                         // la 3D se tait : la page a toute la machine
   // Un cadre neuf à chaque entrée : changer seulement l'ancre d'une page déjà chargée ne déclencherait aucun chargement.
@@ -322,16 +332,33 @@ async function entrer(nom, i, ancre, bouton) {
   }, 150);
   cadreUnivers.src = SOURCE + '#' + ancre;
 }
-function revenir() {
-  entree++;
+async function revenir() {
+  const ce = ++entree;
+  const fini = univers.classList.contains('ouvert') && ouverture;
+  cadreUnivers.onload = null;
+  univers.classList.remove('pret');                                        // la page s'efface : il ne reste que le verre
+  if (mode === 'live') tour?.demarrer();
+  dernierBouton?.focus();
+  if (fini) {
+    await new Promise((ok) => setTimeout(ok, 240));                        // la scène a repris avant que le verre ne la découvre
+    if (ce !== entree) return;
+    tour?.plonger(false);
+    document.documentElement.classList.remove('plonge');
+    ouverture.reverse();
+    await ouverture.finished.catch(() => {});
+    if (ce !== entree) return;
+  } else {
+    tour?.plonger(false);
+    document.documentElement.classList.remove('plonge');
+  }
   univers.classList.remove('ouvert');
   document.documentElement.classList.remove('jeu-ouvert');
-  cadreUnivers.onload = null;
-  if (mode === 'live') tour?.demarrer();
-  tour?.plonger(false);
-  document.documentElement.classList.remove('plonge');
-  setTimeout(() => { if (!univers.classList.contains('ouvert')) cadreUnivers.src = 'about:blank'; }, 500);   // décharge la page une fois refermée
-  dernierBouton?.focus();
+  setTimeout(() => {
+    if (univers.classList.contains('ouvert')) return;
+    ouverture?.cancel();
+    ouverture = null;
+    cadreUnivers.src = 'about:blank';                                      // décharge la page une fois refermée
+  }, 500);
 }
 for (const [nom, i, ancre] of BRANCHES) {
   const c = document.createElement('button');

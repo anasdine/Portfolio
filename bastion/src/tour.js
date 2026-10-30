@@ -599,8 +599,8 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
       devantPanneau.copy(a.position);
       devantPanneau.x *= 1 - 2.4 / 24;
       devantPanneau.z *= 1 - 2.4 / 24;
-      pos.lerp(devantPanneau, plongee.valeur);
-      vise.lerp(a.position, plongee.valeur);
+      pos.lerp(devantPanneau, plongee.valeur * 0.18);     // une simple poussée : c'est le verre qui vient à l'œil, pas l'inverse
+      vise.lerp(a.position, plongee.valeur * 0.35);
     }
     const poidsDehors = 1 - adoucir(0.3, FIN_TRAJET, p);
     camera.position.set(pos.x + souris.lx * (poidsDehors * 24 + 1.2) + Math.sin(t * 0.07) * 3 * poidsDehors, pos.y - souris.ly * 0.8, pos.z);
@@ -697,6 +697,14 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     poser(p) { defilement.cible = p; defilement.valeur = p; },
     decaler(dp) { defilement.cible += dp; defilement.valeur += dp; },
     plonger(oui) { plongee.cible = oui ? 1 : 0; },
+    // les quatre coins du verre à l'écran, pour que la page en sorte exactement
+    cadrePanneau(i) {
+      const a = bureau.panneaux[i], l = a.largeur / 2, h = a.hauteur / 2;
+      return [[-l, h], [l, h], [l, -h], [-l, -h]].map(([x, y]) => {
+        const c = a.maille.localToWorld(new THREE.Vector3(x, y, 0)).project(camera);
+        return `${((c.x + 1) * 50).toFixed(2)}% ${((1 - c.y) * 50).toFixed(2)}%`;
+      });
+    },
     get etat() { return etat.valeur; },
     // pour le mode diagnostic : ce que le moteur fait vraiment à cet instant
     lourds() {
