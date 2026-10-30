@@ -305,6 +305,7 @@ async function entrer(nom, i, ancre, bouton) {
   const cadre = cadreUnivers;
   let essais = 0, stable = 0;
   const isoler = setInterval(() => {
+    if (ce !== entree) return clearInterval(isoler);                       // le visiteur est reparti : la page ne doit plus revenir
     if (cadre !== cadreUnivers || ++essais > 66) { clearInterval(isoler); univers.classList.add('pret'); return; }
     try {
       const w = cadre.contentWindow, d = w.document, s = d.getElementById(ancre);
@@ -326,7 +327,7 @@ async function entrer(nom, i, ancre, bouton) {
         w.scrollTo(0, 0);
       }
       if (!univers.classList.contains('pret') && stable >= 6) {
-        setTimeout(() => { if (essais < 30) w.scrollTo(0, 0); univers.classList.add('pret'); }, 200);
+        setTimeout(() => { if (ce !== entree) return; if (essais < 30) w.scrollTo(0, 0); univers.classList.add('pret'); }, 200);
       }
     } catch { clearInterval(isoler); univers.classList.add('pret'); }   // autre origine, en local : page entière
   }, 150);
