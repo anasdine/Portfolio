@@ -86,10 +86,10 @@ function preparer() {
   preparation ??= creerTour(toile, { surEtat, surFoyer, surFps: (n) => {
       fps = n;
       if (mode === 'live') ecrireLegende();
-      // dix secondes pour s'installer, puis six secondes d'affilée sous 20 images : on arrête de forcer
+      // dix secondes pour s'installer après le passage en 3D, puis huit secondes d'affilée sous 14 images : on arrête de forcer
       if (mode === 'live' && document.visibilityState === 'visible' && performance.now() - lancement > 10000) {
-        lentes = n < 20 ? lentes + 1 : 0;
-        if (lentes >= 6) passerLeger();
+        lentes = n < 14 ? lentes + 1 : 0;
+        if (lentes >= 8) passerLeger();
       } else if (mode !== 'live') lancement = performance.now();
     } })
     .then((t) => (tour = t))
@@ -106,6 +106,8 @@ async function basculer(vers) {
   if (vers === mode) return;
   if (vers === 'live') {
     if (!(await preparer())) return;
+    lancement = performance.now();
+    lentes = 0;
     tour.demarrer();
     racine.dataset.mode = 'live';
     // Aucune image au bout de 15 secondes : le moteur s'est figé, on ne laisse jamais le visiteur devant un écran mort.
