@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BASTION — Anas Dine</title>
+<meta name="description" content="Anas Dine, administrateur systèmes et réseaux en Suisse romande : automatisation, IA hébergée en local, sites et applications.">
+<meta name="color-scheme" content="dark">
+<link rel="preload" href="media/tour.jpg" as="image">
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three/three.module.js",
+    "three/webgpu": "./vendor/three/three.webgpu.js",
+    "three/tsl": "./vendor/three/three.tsl.js",
+    "three/addons/": "./vendor/three/addons/"
+  }
+}
+</script>
+<style>
+  @font-face { font-family: 'IBM Plex Mono'; font-weight: 400; font-display: swap; src: url(vendor/fonts/plex-mono-400.woff2) format('woff2'); }
+  @font-face { font-family: 'IBM Plex Mono'; font-weight: 500; font-display: swap; src: url(vendor/fonts/plex-mono-500.woff2) format('woff2'); }
+  @font-face { font-family: 'IBM Plex Sans Condensed'; font-weight: 500; font-display: swap; src: url(vendor/fonts/plex-sans-cond-500.woff2) format('woff2'); }
+  @font-face { font-family: 'IBM Plex Sans Condensed'; font-weight: 600; font-display: swap; src: url(vendor/fonts/plex-sans-cond-600.woff2) format('woff2'); }
+
+  :root {
+    --fond: #07090b;
+    --texte: #e4e8ea;
+    --discret: #7c8791;
+    --trait: #39424a;
+    --sain: #3fd3c6;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --titre: 'IBM Plex Sans Condensed', 'IBM Plex Sans', sans-serif;
+    --marge: clamp(16px, 3.2vw, 44px);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--fond); color: var(--texte); }
+  body { font: 400 14px/1.5 var(--mono); -webkit-font-smoothing: antialiased; }
+  .parcours { height: 1000vh; }
+
+  .hero { --teinte: #ff5c4d; position: fixed; inset: 0; height: 100svh; overflow: hidden; isolation: isolate; }
+  .hero video, .hero canvas {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block;
+    transition: opacity 1.2s cubic-bezier(.4, 0, .2, 1);
+  }
+  .hero canvas { opacity: 0; }
+  .hero[data-mode="live"] canvas { opacity: 1; }
+  .hero[data-mode="live"] video { opacity: 0; }
+
+  .hud { position: absolute; inset: 0; z-index: 2; pointer-events: none; padding: var(--marge); display: grid; grid-template-rows: auto 1fr auto; }
+  /* Le texte reste lisible sur la glace claire : un voile outremer, seulement là où il se pose. */
+  .hud::before { content: ''; position: absolute; inset: 0; z-index: -1;
+    background: radial-gradient(120% 90% at 0% 100%, rgba(5, 8, 44, .78), rgba(5, 8, 44, .34) 42%, transparent 66%),
+                linear-gradient(to bottom, rgba(5, 8, 44, .4), transparent 18%); }
+  .hud button { pointer-events: auto; }
+
+  /* Les quatre coins du signe AD, aux quatre coins de l'écran. */
+  .coin { position: absolute; width: 22px; height: 22px; border: 2px solid var(--sain); opacity: .55; }
+  .coin.hg { top: 12px; left: 12px; border-right: 0; border-bottom: 0; }
+  .coin.hd { top: 12px; right: 12px; border-left: 0; border-bottom: 0; }
+  .coin.bg { bottom: 12px; left: 12px; border-right: 0; border-top: 0; }
+  .coin.bd { bottom: 12px; right: 12px; border-left: 0; border-top: 0; }
+
+  .haut { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+  .marque { font: 600 15px/1 var(--titre); letter-spacing: .32em; }
+  .marque span { color: var(--teinte); transition: color .4s; }
+
+  .bascule { display: inline-flex; border: 1px solid var(--trait); background: rgba(7, 9, 11, .55); backdrop-filter: blur(6px); }
+  .bascule button {
+    font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--discret);
+    background: none; border: 0; padding: 9px 12px; cursor: pointer;
+  }
+  .bascule button[aria-pressed="true"] { color: var(--texte); background: rgba(228, 232, 234, .08); }
+  .bascule button:disabled { opacity: .35; cursor: not-allowed; }
+  .bascule button:focus-visible, .restaurer:focus-visible { outline: 1px solid var(--sain); outline-offset: 2px; }
+
+  .titre { align-self: end; max-width: 34rem; padding-bottom: clamp(18px, 6vh, 64px); }
+  .indice { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); font-size: 11px; letter-spacing: .14em; color: var(--texte); text-transform: uppercase; }
+  .contact { position: absolute; left: 50%; bottom: 44px; transform: translateX(-50%); pointer-events: none; opacity: 0;
+    font: 500 13px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--fond); background: var(--sain); padding: 15px 22px; text-decoration: none; white-space: nowrap; }
+  .contact:focus-visible { outline: 2px solid var(--texte); outline-offset: 3px; }
+  /* Hors écran vertical, la fiche reste lisible par les lecteurs d'écran sans s'afficher. */
+  .fiche { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  @media (max-aspect-ratio: 1/1) {
+    .fiche { width: auto; height: auto; overflow: visible; clip-path: none; left: var(--marge); right: var(--marge); bottom: 104px;
+      padding: 16px 18px; background: rgba(4, 8, 20, .84); border: 1px solid rgba(63, 211, 198, .5); backdrop-filter: blur(6px);
+      opacity: 0; transition: opacity .35s; }
+    .fiche.visible { opacity: 1; }
+    .fiche h2 { margin: 0 0 8px; font: 600 26px/1 var(--titre); color: var(--texte); }
+    .fiche p { margin: 3px 0; font-size: 12px; color: #9aa4ac; }
+    .fiche p.fort { color: var(--texte); font-weight: 500; }
+  }
+  .niveau { position: absolute; top: 70px; left: 50%; transform: translateX(-50%); opacity: 0; font-size: 12px; letter-spacing: .1em; color: var(--sain); white-space: nowrap; }
+  /* L'arcade : la fin du voyage. Le code des jeux est celui du portfolio ; seul leur habillage change ici. */
+  .arcade { position: relative; z-index: 3; background: radial-gradient(120% 60vh at 50% 0, #0b1c3a, #050818 70%); padding: clamp(70px, 14vh, 150px) var(--marge) 60px; }
+  .arcade__tete { max-width: 1320px; margin: 0 auto clamp(40px, 8vh, 80px); }
+  .arcade__tete p { margin: 0 0 12px; font-size: 12px; letter-spacing: .08em; color: var(--sain); }
+  .arcade h2 { margin: 0; font: 600 clamp(52px, 10vw, 150px)/.9 var(--titre); letter-spacing: -.01em; }
+  .arcade__sous { max-width: 34rem; margin-top: 18px; color: #9aa4ac; font-size: 13px; }
+  [data-arcade-grille] { max-width: 1320px; margin: 0 auto; min-height: 60vh; }
+  [data-arcade-grille] [data-game] { position: relative; background: linear-gradient(180deg, rgba(20, 38, 74, .5), rgba(7, 12, 30, .72)) !important;
+    border: 1px solid rgba(63, 211, 198, .2) !important; border-radius: 0 !important; backdrop-filter: blur(8px);
+    opacity: 0; transform: translateY(26px); transition: opacity .8s, transform .8s cubic-bezier(.2, .7, .2, 1), border-color .3s, box-shadow .3s; }
+  [data-arcade-grille] [data-game].vu { opacity: 1; transform: none; }
+  [data-arcade-grille] [data-game]:hover { border-color: rgba(63, 211, 198, .65) !important; box-shadow: 0 0 44px rgba(63, 211, 198, .1); }
+  [data-arcade-grille] [data-game]::before { content: ''; position: absolute; top: -1px; left: -1px; width: 16px; height: 16px; border: solid var(--sain); border-width: 2px 0 0 2px; pointer-events: none; }
+  [data-arcade-grille] [data-game]::after { content: ''; position: absolute; right: -1px; bottom: -1px; width: 16px; height: 16px; border: solid var(--sain); border-width: 0 2px 2px 0; pointer-events: none; }
+  [data-arcade-grille] canvas { background: #03060f; }
+  [data-arcade-grille] button { font-family: var(--mono); cursor: pointer; }
+  .arcade__pied { max-width: 1320px; margin: clamp(60px, 12vh, 120px) auto 0; padding-top: 22px; border-top: 1px solid var(--trait); display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; font-size: 12px; color: var(--discret); }
+  .arcade__pied a, .arcade__pied button { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--texte); background: none; border: 1px solid var(--trait); padding: 14px 16px; min-height: 44px; cursor: pointer; text-decoration: none; }
+  .arcade__pied a:hover, .arcade__pied button:hover { border-color: var(--sain); color: var(--sain); }
+  .rail { position: fixed; z-index: 5; right: 10px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; }
+  .rail button { display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-width: 44px; min-height: 44px; padding: 0 8px; background: none; border: 0; cursor: pointer;
+    font: 500 10px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--texte); }
+  .rail span { opacity: 0; transform: translateX(6px); transition: opacity .25s, transform .25s; text-shadow: 0 1px 8px #000; }
+  .rail i { width: 7px; height: 7px; border: 1px solid var(--texte); transform: rotate(45deg); transition: background .25s, border-color .25s; }
+  .rail button:hover span, .rail button:focus-visible span, .rail button[aria-current="true"] span { opacity: 1; transform: none; }
+  .rail button[aria-current="true"] i { background: var(--sain); border-color: var(--sain); }
+  .rail button:focus-visible { outline: 1px solid var(--sain); }
+  @media (max-width: 640px) { .rail span { display: none; } .rail { right: 0; } }
+  /* L'easter egg : une fissure dans le pied de page, à peine visible. */
+  .fissure { width: 44px; height: 44px; padding: 0; background: none; border: 0 !important; cursor: pointer; color: var(--trait); font: 500 16px var(--mono); transition: color .3s, text-shadow .3s; }
+  .fissure:hover, .fissure:focus-visible { color: #ff5c4d; text-shadow: 0 0 14px #ff5c4d; }
+  .faille { width: min(calc(100% - 32px), 440px); padding: 28px; color: var(--texte); background: #070b1c; border: 1px solid rgba(255, 92, 77, .5); font: 400 13px/1.6 var(--mono); }
+  .faille::backdrop { background: rgba(2, 3, 12, .8); backdrop-filter: blur(5px); }
+  .faille h3 { margin: 0 0 10px; font: 600 32px/1 var(--titre); letter-spacing: .14em; color: #ff5c4d; }
+  .faille p { margin: 0 0 18px; color: #9aa4ac; }
+  .faille div { display: flex; flex-wrap: wrap; gap: 10px; }
+  .faille a, .faille button { min-height: 44px; padding: 13px 15px; font: 500 12px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--texte); background: none; border: 1px solid var(--trait); cursor: pointer; text-decoration: none; }
+  /* L'arrivée : un flash, le titre qui s'écrase, tout le reste qui tombe en place. */
+  .arcade::before { content: ''; position: fixed; inset: 0; z-index: 9; background: #ebfbff; opacity: 0; pointer-events: none; }
+  .arcade.bam::before { animation: bam-flash .9s ease-out; }
+  .arcade.bam .arcade__tete { animation: bam-titre .8s cubic-bezier(.16, 1, .3, 1); }
+  .arcade.bam [data-arcade-grille] { animation: bam-grille 1s cubic-bezier(.16, 1, .3, 1); }
+  @keyframes bam-flash { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes bam-titre { from { transform: scale(1.5); filter: blur(10px); opacity: 0; } to { transform: none; filter: none; opacity: 1; } }
+  @keyframes bam-grille { from { transform: translateY(90px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .journal { margin: 0 0 14px; font-size: 12px; color: var(--teinte); letter-spacing: .04em; transition: color .4s; min-height: 1.5em; }
+  h1 { margin: 0; font: 600 clamp(44px, 7.4vw, 104px)/.92 var(--titre); letter-spacing: -.01em; text-shadow: 0 2px 30px rgba(0, 0, 0, .6); }
+  .role { margin: 14px 0 0; color: var(--texte); opacity: .78; font-size: clamp(12px, 1.05vw, 14px); }
+
+  .bas { display: flex; justify-content: space-between; align-items: end; gap: 20px; }
+  .legende { margin: 0; font-size: 11px; color: var(--discret); max-width: 30rem; }
+  .restaurer {
+    position: relative; overflow: hidden; flex: none;
+    font: 500 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--texte);
+    background: rgba(7, 9, 11, .55); border: 1px solid var(--teinte); padding: 12px 16px; cursor: pointer;
+    transition: border-color .4s; touch-action: none; user-select: none;
+  }
+  .restaurer::before { content: ''; position: absolute; inset: 0; background: var(--teinte); opacity: .22; transform: scaleX(0); transform-origin: left; transition: transform .35s; }
+  .restaurer.maintenu::before { transform: scaleX(1); transition: transform 2.2s linear; }
+  .restaurer:disabled { cursor: default; color: var(--sain); }
+
+  @media (max-width: 640px) {
+    .bas { flex-direction: column-reverse; align-items: stretch; }
+    .hud { padding-bottom: 42px; }
+    .indice { bottom: 14px; }
+    .restaurer { width: 100%; min-height: 44px; }
+    .bascule button { padding: 9px 9px; letter-spacing: .04em; min-height: 44px; }
+  }
+</style>
+</head>
+<body>
+<div class="parcours" data-parcours></div>
+<main class="hero" data-hero data-mode="video">
+  <video src="media/tour.mp4" poster="media/tour.jpg" muted loop playsinline autoplay preload="auto" aria-hidden="true"></video>
+  <canvas aria-hidden="true"></canvas>
+
+  <div class="hud">
+    <i class="coin hg"></i><i class="coin hd"></i><i class="coin bg"></i><i class="coin bd"></i>
+    <header class="haut">
+      <div class="marque">BASTION<span>.</span></div>
+      <div class="bascule" role="group" aria-label="Affichage de la tour">
+        <button type="button" data-vers="video" aria-pressed="true">Vidéo générée</button>
+        <button type="button" data-vers="live" aria-pressed="false">Temps réel</button>
+      </div>
+    </header>
+
+    <section class="titre">
+      <p class="journal" data-journal>&gt; bastion · intégrité 34 %</p>
+      <h1>Anas Dine</h1>
+      <p class="role">Administrateur systèmes &amp; réseaux · automatisation · IA hébergée en local</p>
+    </section>
+
+    <footer class="bas">
+      <p class="legende" data-legende></p>
+      <button type="button" class="restaurer" data-restaurer>Maintenir pour restaurer</button>
+    </footer>
+    <section class="fiche" data-fiche aria-live="polite"></section>
+    <div class="niveau" data-niveau aria-hidden="true"></div>
+    <div class="indice" data-indice>Défilez pour entrer ↓</div>
+    <a class="contact" data-contact href="https://ch.linkedin.com/in/anas-dine-732921327/en" rel="noopener">LinkedIn : Anas Dine</a>
+  </div>
+</main>
+<nav class="rail" aria-label="Chapitres">
+  <button type="button" data-chapitre="0"><span>La tour</span><i></i></button>
+  <button type="button" data-chapitre="0.47"><span>La salle</span><i></i></button>
+  <button type="button" data-chapitre="0.82"><span>Leonhard</span><i></i></button>
+  <button type="button" data-chapitre="arcade"><span>L'arcade</span><i></i></button>
+</nav>
+<section class="arcade" id="arcade" aria-labelledby="titre-arcade">
+  <header class="arcade__tete">
+    <p>&gt; bastion · fin de la plongée · [ OK ]</p>
+    <h2 id="titre-arcade">L'arcade</h2>
+    <p class="arcade__sous">Treize jeux, écrits pour ce portfolio. Tout tourne dans votre navigateur.</p>
+  </header>
+  <div data-arcade-grille></div>
+  <footer class="arcade__pied">
+    <span>Anas Dine · Suisse romande <button type="button" class="fissure" data-fissure hidden aria-label="Une fissure dans le mur">⌁</button></span>
+    <span style="display:flex;gap:10px;flex-wrap:wrap">
+      <a href="https://ch.linkedin.com/in/anas-dine-732921327/en" rel="noopener">LinkedIn</a>
+      <button type="button" data-remonter>Revenir à la tour ↑</button>
+    </span>
+  </footer>
+</section>
+<dialog class="faille" data-faille aria-labelledby="titre-faille">
+  <h3 id="titre-faille">DEAD RIFT</h3>
+  <p>Vous avez trouvé la faille. Derrière, un jeu qui tourne sur une machine privée : l'entrée se fait sur invitation, avec un code.</p>
+  <div><a href="https://ch.linkedin.com/in/anas-dine-732921327/en" rel="noopener">Demander un code</a><button type="button" data-faille-fermer>Refermer</button></div>
+</dialog>
+<script type="module" src="src/hero.js"></script>
+</body>
+</html>

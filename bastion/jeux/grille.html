@@ -1,0 +1,253 @@
+<div data-jeux-grid="1" style="margin-top:clamp(30px,5vh,54px);display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:clamp(18px,2.4vw,30px)">
+
+
+      <article data-game="triage" style="border:1px solid rgba(228,232,234,.12);background:rgba(11,14,17,.6);display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid rgba(228,232,234,.09);font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase">
+          <span style="color:#048B9A">Jeu 01</span><span style="color:#E4E8EA">Triage SOC</span>
+          <span data-g1-time="1" style="margin-left:auto;color:#56606A">40 s</span>
+          <span data-g1-score="1" style="color:#E4E8EA">0</span>
+        </div>
+        <div style="padding:16px 14px;flex:1 1 auto;display:flex;flex-direction:column;gap:12px;min-height:190px">
+          <p data-g1-alert="1" style="margin:0;flex:1 1 auto;display:flex;align-items:center;font-size:16px;line-height:1.4;color:#E4E8EA;min-height:56px">Une alerte arrive. À vous de dire ce qu'elle vaut.</p>
+          <p data-g1-verdict="1" style="margin:0;min-height:15px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;color:#56606A">Priorité 1 = production arrêtée · Bruit = aucune action attendue.</p>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+            <button type="button" data-g1-key="0" style="background:none;border:1px solid rgba(255,92,77,.45);color:#FF5C4D;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.1em;padding:12px 4px;cursor:pointer;min-height:44px" style-hover="background:rgba(255,92,77,.14)">P1</button>
+            <button type="button" data-g1-key="1" style="background:none;border:1px solid rgba(245,165,36,.45);color:#F5A524;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.1em;padding:12px 4px;cursor:pointer;min-height:44px" style-hover="background:rgba(245,165,36,.14)">P2</button>
+            <button type="button" data-g1-key="2" style="background:none;border:1px solid rgba(65,105,225,.45);color:#4169E1;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.1em;padding:12px 4px;cursor:pointer;min-height:44px" style-hover="background:rgba(65,105,225,.14)">P3</button>
+            <button type="button" data-g1-key="3" style="background:none;border:1px solid rgba(228,232,234,.2);color:#7C8791;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.1em;padding:12px 4px;cursor:pointer;min-height:44px" style-hover="background:rgba(228,232,234,.1)">BRUIT</button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid rgba(228,232,234,.09)">
+          <button type="button" data-g1-start="1" style="background:none;border:1px solid #048B9A;color:#048B9A;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.18em;padding:11px 16px;cursor:pointer;min-height:44px" style-hover="background:#048B9A;color:#07090B">JOUER</button>
+          <span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.1em;color:#39424A">touches 1 · 2 · 3 · 0</span>
+        </div>
+      </article>
+
+      <article data-game="pare-feu" style="border:1px solid rgba(228,232,234,.12);background:rgba(11,14,17,.6);display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid rgba(228,232,234,.09);font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase">
+          <span style="color:#048B9A">Jeu 02</span><span style="color:#E4E8EA">Pare-feu</span>
+          <span data-g2-time="1" style="margin-left:auto;color:#56606A">40 s</span>
+          <span data-g2-score="1" style="color:#E4E8EA">0</span>
+        </div>
+        <div data-cursor="voir" style="position:relative;flex:1 1 auto;min-height:190px">
+          <canvas data-g2="1" role="img" aria-label="Grille de ports : bloquez les paquets hostiles, laissez passer le trafic légitime." style="position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair"></canvas>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid rgba(228,232,234,.09)">
+          <button type="button" data-g2-start="1" style="background:none;border:1px solid #048B9A;color:#048B9A;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.18em;padding:11px 16px;cursor:pointer;min-height:44px" style-hover="background:#048B9A;color:#07090B">JOUER</button>
+          <span data-g2-hint="1" style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.06em;color:#39424A">rouge = à bloquer · cyan = à laisser passer</span>
+        </div>
+      </article>
+
+      <article data-game="rack" style="border:1px solid rgba(228,232,234,.12);background:rgba(11,14,17,.6);display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid rgba(228,232,234,.09);font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase">
+          <span style="color:#048B9A">Jeu 03</span><span style="color:#E4E8EA">Monter la baie</span>
+          <span data-g3-level="1" style="margin-left:auto;color:#56606A">baie 1</span>
+          <span data-g3-moves="1" style="color:#E4E8EA">0 / 7</span>
+        </div>
+        <div data-cursor="voir" style="position:relative;flex:1 1 auto;min-height:250px">
+          <canvas data-g3="1" role="img" aria-label="Placez chaque équipement au bon emplacement dans la baie : lourd en bas, brassage en haut, onduleur au pied." style="position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none"></canvas>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid rgba(228,232,234,.09)">
+          <button type="button" data-g3-new="1" style="background:none;border:1px solid #048B9A;color:#048B9A;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.18em;padding:11px 16px;cursor:pointer;min-height:44px" style-hover="background:#048B9A;color:#07090B">NOUVELLE BAIE</button>
+          <span data-g3-state="1" style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.06em;color:#39424A">glissez chaque appareil à sa place · cliquez pour retirer</span>
+        </div>
+      </article>
+
+
+
+            <article data-game="vaisseau" style="grid-column:1/-1;border:1px solid rgba(4,139,154,.25);background:rgba(11,14,17,.6);display:flex;flex-direction:column">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:11px 14px;border-bottom:1px solid rgba(228,232,234,.09);font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase">
+          <span style="color:#048B9A">Jeu 04</span><span style="color:#E4E8EA">Sonde AD·2026</span>
+          <span style="color:#56606A">vol 3D — récupérez les données, détruisez les intrus</span>
+          <span data-g4-map="1" style="margin-left:auto;color:#048B9A">corridor de données</span>
+          <span data-g4-wave="1" style="color:#56606A">vague 1</span>
+          <span data-g4-speed="1" style="color:#56606A">312 u/s</span>
+          <span data-g4-hull="1" style="color:#048B9A">coque 100 %</span>
+          <span data-g4-score="1" style="color:#E4E8EA">0</span>
+        </div>
+        <div data-cursor="voir" style="position:relative;flex:1 1 auto;min-height:clamp(300px,50vh,520px)">
+          <canvas data-g4="1" data-explain="Un vrai jeu de vol en 3D, écrit pour cette page. Rien n'est téléchargé : le vaisseau et le corridor sont générés par le code." role="img" aria-label="Jeu de vaisseau en 3D : pilotez la sonde dans le corridor de données, récupérez les blocs et détruisez les intrus." style="position:absolute;inset:0;width:100%;height:100%;display:block;cursor:none;touch-action:none"></canvas>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 14px;border-top:1px solid rgba(228,232,234,.09)">
+          <button type="button" data-g4-start="1" style="background:none;border:1px solid #048B9A;color:#048B9A;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.18em;padding:11px 18px;cursor:pointer;min-height:44px" style-hover="background:#048B9A;color:#07090B">DÉCOLLER</button>
+          <span style="display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:#39424A">
+            <span>Vaisseau</span>
+            <button type="button" data-g4-ship="0" aria-pressed="true" style="background:rgba(4,139,154,.14);border:1px solid #048B9A;color:#5FD3E3;font-family:inherit;font-size:9px;letter-spacing:.14em;padding:0 11px;min-height:36px;cursor:pointer">Sonde</button>
+            <button type="button" data-g4-ship="1" aria-pressed="false" style="background:none;border:1px solid rgba(228,232,234,.16);color:#7C8791;font-family:inherit;font-size:9px;letter-spacing:.14em;padding:0 11px;min-height:36px;cursor:pointer">Lame</button>
+            <button type="button" data-g4-ship="2" aria-pressed="false" style="background:none;border:1px solid rgba(228,232,234,.16);color:#7C8791;font-family:inherit;font-size:9px;letter-spacing:.14em;padding:0 11px;min-height:36px;cursor:pointer">Bastion</button>
+          </span>
+          <span data-g4-hint="1" style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.06em;color:#39424A">flèches ou souris · espace pour tirer · doigt sur mobile</span>
+        </div>
+      </article>
+
+      <article data-game="salle" style="grid-column:1/-1;border:1px solid rgba(228,232,234,.12);background:rgba(11,14,17,.6);display:flex;flex-direction:column">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:11px 14px;border-bottom:1px solid rgba(228,232,234,.09);font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase">
+          <span style="color:#048B9A">Jeu 05</span><span style="color:#E4E8EA">La salle machine</span>
+          <span style="color:#56606A">traversez la salle sans rien heurter</span>
+          <span data-g5-dist="1" style="margin-left:auto;color:#E4E8EA">0 m</span>
+          <span data-g5-best="1" style="color:#56606A">record 0 m</span>
+        </div>
+        <div data-cursor="voir" style="position:relative;flex:1 1 auto;min-height:clamp(230px,34vh,340px)">
+          <canvas data-g5="1" role="img" aria-label="Jeu de plateforme en silhouettes : traversez la salle machine, sautez les obstacles et les trous." style="position:absolute;inset:0;width:100%;height:100%;display:block;cursor:none;touch-action:none"></canvas>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 14px;border-top:1px solid rgba(228,232,234,.09)">
+          <button type="button" data-g5-start="1" style="background:none;border:1px solid #048B9A;color:#048B9A;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.18em;padding:11px 18px;cursor:pointer;min-height:44px" style-hover="background:#048B9A;color:#07090B">ENTRER</button>
+          <button type="button" data-g5-mult="1" aria-label="Changer la vitesse" style="background:none;border:1px solid #048B9A;color:#048B9A;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.14em;padding:11px 14px;cursor:pointer;min-height:44px;transition:color .3s ease,border-color .3s ease" style-hover="background:rgba(4,139,154,.14)">VITESSE ×1</button>
+          <span data-g5-hint="1" style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.06em;color:#39424A">espace, clic ou doigt pour sauter · deux fois pour un saut long</span>
+        </div>
+      </article>
+
+      <article data-game="modele" style="grid-column:1/-1;border:1px solid rgba(4,139,154,.25);background:rgba(11,14,17,.6);display:flex;flex-direction:column">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:11px 14px;border-bottom:1px solid rgba(228,232,234,.09);font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase">
+          <span style="color:#048B9A">Jeu 06</span><span style="color:#E4E8EA">Élevez votre modèle</span>
+          <span style="color:#56606A">un LLM local à faire grandir — il vit même quand vous partez</span>
+          <span data-g6-age="1" style="margin-left:auto;color:#56606A">âge 0 j</span>
+          <span data-g6-size="1" style="color:#048B9A">0,5 B</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))">
+          <div style="position:relative;min-height:clamp(240px,32vh,320px);border-right:1px solid rgba(228,232,234,.09)">
+            <canvas data-g6="1" role="img" aria-label="Votre modèle local, sous forme de robot : son visage change selon la faim, la température et l'alignement." style="position:absolute;inset:0;width:100%;height:100%;display:block;cursor:pointer"></canvas>
+          </div>
+          <div style="padding:14px;display:flex;flex-direction:column;gap:11px">
+            <p data-g6-say="1" style="margin:0;min-height:34px;font-size:13.5px;line-height:1.5;color:#C6CED4">Il vient de naître. Donnez-lui des données propres, gardez-le froid, et alignez-le avant qu'il ne raconte n'importe quoi.</p>
+            <div data-g6-bars="1" style="display:grid;gap:8px">
+              <div style="display:grid;gap:4px"><span style="display:flex;justify-content:space-between;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#7C8791"><span>Données</span><span data-g6-v="data" style="color:#E4E8EA">60</span></span><span style="height:3px;background:rgba(228,232,234,.09);display:block"><span data-g6-b="data" style="display:block;height:100%;width:60%;background:#048B9A;transition:width .4s ease"></span></span></div>
+              <div style="display:grid;gap:4px"><span style="display:flex;justify-content:space-between;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#7C8791"><span>Température GPU</span><span data-g6-v="temp" style="color:#E4E8EA">38</span></span><span style="height:3px;background:rgba(228,232,234,.09);display:block"><span data-g6-b="temp" style="display:block;height:100%;width:38%;background:#F5A524;transition:width .4s ease"></span></span></div>
+              <div style="display:grid;gap:4px"><span style="display:flex;justify-content:space-between;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#7C8791"><span>Alignement</span><span data-g6-v="trust" style="color:#E4E8EA">70</span></span><span style="height:3px;background:rgba(228,232,234,.09);display:block"><span data-g6-b="trust" style="display:block;height:100%;width:70%;background:#4169E1;transition:width .4s ease"></span></span></div>
+              <div style="display:grid;gap:4px"><span style="display:flex;justify-content:space-between;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#7C8791"><span>Entraînement</span><span data-g6-v="xp" style="color:#E4E8EA">0</span></span><span style="height:3px;background:rgba(228,232,234,.09);display:block"><span data-g6-b="xp" style="display:block;height:100%;width:0%;background:#E4E8EA;transition:width .4s ease"></span></span></div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px">
+              <button type="button" data-g6-act="feed" style="background:none;border:1px solid rgba(4,139,154,.45);color:#048B9A;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10px;letter-spacing:.1em;padding:11px 6px;cursor:pointer;min-height:44px" style-hover="background:rgba(4,139,154,.14)">DONNÉES +</button>
+              <button type="button" data-g6-act="cool" style="background:none;border:1px solid rgba(65,105,225,.45);color:#4169E1;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10px;letter-spacing:.1em;padding:11px 6px;cursor:pointer;min-height:44px" style-hover="background:rgba(65,105,225,.14)">REFROIDIR</button>
+              <button type="button" data-g6-act="align" style="background:none;border:1px solid rgba(228,232,234,.2);color:#9AA4AC;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10px;letter-spacing:.1em;padding:11px 6px;cursor:pointer;min-height:44px" style-hover="background:rgba(228,232,234,.1)">ALIGNER</button>
+              <button type="button" data-g6-act="train" style="background:none;border:1px solid rgba(245,165,36,.5);color:#F5A524;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10px;letter-spacing:.1em;padding:11px 6px;cursor:pointer;min-height:44px" style-hover="background:rgba(245,165,36,.14)">ENTRAÎNER</button>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;margin-top:auto">
+              <span data-g6-state="1" style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:#048B9A">état : nominal</span>
+              <button type="button" data-g6-reset="1" style="margin-left:auto;background:none;border:1px solid rgba(228,232,234,.14);color:#56606A;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.14em;padding:9px 11px;cursor:pointer;min-height:36px" style-hover="border-color:#FF5C4D;color:#FF5C4D">REPARTIR DE ZÉRO</button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article data-game="paquet" style="border:1px solid rgba(228,232,234,.12);background:rgba(11,14,17,.6);display:flex;flex-direction:column">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:11px 14px;border-bottom:1px solid rgba(228,232,234,.09);font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase">
+          <span style="color:#048B9A">Jeu 07</span><span style="color:#E4E8EA">Collecte de paquets</span>
+          <span style="color:#56606A">guidez la sonde, évitez les boucles</span>
+          <span data-g7-score="1" style="margin-left:auto;color:#E4E8EA">0</span><span data-g7-best="1" style="color:#56606A">record 0</span>
+        </div>
+        <div data-cursor="voir" style="position:relative;flex:1 1 auto;min-height:250px">
+          <canvas data-g7="1" role="img" aria-label="Jeu de serpent : la sonde parcourt le réseau et récupère les paquets sans se recouper." style="position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none"></canvas>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 14px;border-top:1px solid rgba(228,232,234,.09)">
+          <button type="button" data-g7-start="1" style="background:none;border:1px solid #048B9A;color:#048B9A;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.18em;padding:11px 18px;cursor:pointer;min-height:44px" style-hover="background:#048B9A;color:#07090B">JOUER</button>
+          <span data-g7-hint="1" style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.06em;color:#39424A">flèches ou glissé du doigt · un paquet allonge la sonde</span>
+        </div>
+      </article>
+
+      <article data-game="filtre" style="border:1px solid rgba(228,232,234,.12);background:rgba(11,14,17,.6);display:flex;flex-direction:column">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:11px 14px;border-bottom:1px solid rgba(228,232,234,.09);font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase">
+          <span style="color:#048B9A">Jeu 08</span><span style="color:#E4E8EA">Renvoyer les attaques</span>
+          <span style="color:#56606A">la raquette protège le pare-feu</span>
+          <span data-g8-score="1" style="margin-left:auto;color:#E4E8EA">0</span><span data-g8-lives="1" style="color:#048B9A">3 vies</span>
+        </div>
+        <div data-cursor="voir" style="position:relative;flex:1 1 auto;min-height:250px">
+          <canvas data-g8="1" role="img" aria-label="Jeu de casse-brique : renvoyez le paquet pour détruire les tentatives d'intrusion." style="position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none"></canvas>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 14px;border-top:1px solid rgba(228,232,234,.09)">
+          <button type="button" data-g8-start="1" style="background:none;border:1px solid #048B9A;color:#048B9A;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.18em;padding:11px 18px;cursor:pointer;min-height:44px" style-hover="background:#048B9A;color:#07090B">JOUER</button>
+          <span data-g8-hint="1" style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.06em;color:#39424A">souris, flèches ou doigt pour déplacer la raquette</span>
+        </div>
+      </article>
+
+      <article data-game="deduction" style="border:1px solid rgba(228,232,234,.12);background:rgba(11,14,17,.6);display:flex;flex-direction:column">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:11px 14px;border-bottom:1px solid rgba(228,232,234,.09);font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase">
+          <span style="color:#048B9A">Jeu 09</span><span style="color:#E4E8EA">Trouver l'intrusion</span>
+          <span style="color:#56606A">les chiffres disent combien de voisines sont compromises</span>
+          <span data-g9-flags="1" style="margin-left:auto;color:#E4E8EA">0 / 8</span><span data-g9-state="1" style="color:#56606A">analyse en cours</span>
+        </div>
+        <div data-cursor="voir" style="position:relative;flex:1 1 auto;min-height:250px">
+          <canvas data-g9="1" role="img" aria-label="Jeu de déduction : marquez les machines compromises à partir du nombre de voisines infectées." style="position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none"></canvas>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 14px;border-top:1px solid rgba(228,232,234,.09)">
+          <button type="button" data-g9-start="1" style="background:none;border:1px solid #048B9A;color:#048B9A;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.18em;padding:11px 18px;cursor:pointer;min-height:44px" style-hover="background:#048B9A;color:#07090B">NOUVELLE ANALYSE</button>
+          <span data-g9-hint="1" style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.06em;color:#39424A">clic : ouvrir · maintien : marquer</span>
+        </div>
+      </article>
+
+      <article data-game="inventaire" style="border:1px solid rgba(228,232,234,.12);background:rgba(11,14,17,.6);display:flex;flex-direction:column">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:11px 14px;border-bottom:1px solid rgba(228,232,234,.09);font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase">
+          <span style="color:#048B9A">Jeu 10</span><span style="color:#E4E8EA">Inventaire du parc</span>
+          <span style="color:#56606A">retrouvez les paires d'équipements</span>
+          <span data-g10-pairs="1" style="margin-left:auto;color:#E4E8EA">0 / 8</span><span data-g10-moves="1" style="color:#56606A">0 coup</span>
+        </div>
+        <div data-cursor="voir" style="position:relative;flex:1 1 auto;min-height:250px">
+          <canvas data-g10="1" role="img" aria-label="Jeu de mémoire : associez les équipements identiques du parc." style="position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none"></canvas>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 14px;border-top:1px solid rgba(228,232,234,.09)">
+          <button type="button" data-g10-start="1" style="background:none;border:1px solid #048B9A;color:#048B9A;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.18em;padding:11px 18px;cursor:pointer;min-height:44px" style-hover="background:#048B9A;color:#07090B">JOUER</button>
+          <span data-g10-hint="1" style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.06em;color:#39424A">retournez deux cartes : si elles concordent, elles restent</span>
+        </div>
+      </article>
+
+      <article data-game="reflexe" style="border:1px solid rgba(228,232,234,.12);background:rgba(11,14,17,.6);display:flex;flex-direction:column">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:11px 14px;border-bottom:1px solid rgba(228,232,234,.09);font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase">
+          <span style="color:#048B9A">Jeu 11</span><span style="color:#E4E8EA">Temps de réaction</span>
+          <span style="color:#56606A">coupez dès que le voyant passe au rouge</span>
+          <span data-g11-ms="1" style="margin-left:auto;color:#E4E8EA">— ms</span><span data-g11-best="1" style="color:#56606A">record —</span>
+        </div>
+        <div data-cursor="voir" style="position:relative;flex:1 1 auto;min-height:210px">
+          <canvas data-g11="1" role="img" aria-label="Jeu de réflexe : coupez le lien dès que le voyant passe au rouge." style="position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none"></canvas>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 14px;border-top:1px solid rgba(228,232,234,.09)">
+          <button type="button" data-g11-start="1" style="background:none;border:1px solid #048B9A;color:#048B9A;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.18em;padding:11px 18px;cursor:pointer;min-height:44px" style-hover="background:#048B9A;color:#07090B">JOUER</button>
+          <span data-g11-hint="1" style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.06em;color:#39424A">attendez le rouge, puis cliquez · trop tôt = faux positif</span>
+        </div>
+      </article>
+
+      <article data-game="sequence" style="border:1px solid rgba(228,232,234,.12);background:rgba(11,14,17,.6);display:flex;flex-direction:column">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:11px 14px;border-bottom:1px solid rgba(228,232,234,.09);font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase">
+          <span style="color:#048B9A">Jeu 12</span><span style="color:#E4E8EA">Séquence de démarrage</span>
+          <span style="color:#56606A">répétez l'ordre d'allumage des équipements</span>
+          <span data-g12-lvl="1" style="margin-left:auto;color:#E4E8EA">palier 1</span><span data-g12-best="1" style="color:#56606A">record 0</span>
+        </div>
+        <div data-cursor="voir" style="position:relative;flex:1 1 auto;min-height:210px">
+          <canvas data-g12="1" role="img" aria-label="Jeu de mémoire : reproduisez l'ordre dans lequel les équipements s'allument." style="position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none"></canvas>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 14px;border-top:1px solid rgba(228,232,234,.09)">
+          <button type="button" data-g12-start="1" style="background:none;border:1px solid #048B9A;color:#048B9A;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.18em;padding:11px 18px;cursor:pointer;min-height:44px" style-hover="background:#048B9A;color:#07090B">JOUER</button>
+          <span data-g12-hint="1" style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.06em;color:#39424A">regardez la séquence, puis reproduisez-la</span>
+        </div>
+      </article>
+
+      <article data-game="terminal" style="grid-column:1/-1;border:1px solid rgba(4,139,154,.28);background:rgba(7,10,12,.72);display:flex;flex-direction:column">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:11px 14px;border-bottom:1px solid rgba(228,232,234,.09);font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase">
+          <span style="color:#048B9A">Jeu 13</span><span style="color:#E4E8EA">Terminal — équipe rouge, équipe bleue</span>
+          <span style="color:#56606A">tapez de vraies commandes</span>
+          <span data-g13-turn="1" style="color:#5FD3E3">tour 1 / 12</span>
+          <span data-g13-side="1" style="color:#FF5C4D">rôle : attaque</span>
+          <span data-g13-score="1" style="color:#E4E8EA">0</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))">
+          <div style="border-right:1px solid rgba(228,232,234,.09);display:flex;flex-direction:column;min-width:0">
+            <div data-g13-log="1" style="flex:1 1 auto;min-height:clamp(260px,38vh,400px);max-height:clamp(260px,38vh,400px);overflow-y:auto;padding:12px 13px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11.5px;line-height:1.65;color:#9AA4AC;white-space:pre-wrap;word-break:break-word"></div>
+            <form data-g13-form="1" style="display:flex;border-top:1px solid rgba(228,232,234,.09)">
+              <span style="flex:0 0 auto;display:grid;place-items:center;padding:0 10px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12px;color:#048B9A">$</span>
+              <input data-g13-in="1" type="text" autocomplete="off" spellcheck="false" placeholder="help" aria-label="Commande" style="flex:1 1 auto;min-width:0;background:none;border:0;color:#E4E8EA;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;padding:13px 0;outline:none">
+              <button type="submit" style="flex:0 0 auto;background:none;border:0;border-left:1px solid rgba(228,232,234,.09);color:#048B9A;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.14em;padding:0 15px;cursor:pointer;min-height:44px" style-hover="background:#048B9A;color:#07090B">ENTRÉE</button>
+            </form>
+          </div>
+          <div style="display:flex;flex-direction:column;min-width:0">
+            <div data-cursor="voir" style="position:relative;flex:1 1 auto;min-height:clamp(200px,30vh,320px)">
+              <canvas data-g13="1" role="img" aria-label="Carte du réseau : les machines à compromettre ou à défendre, et les liens entre elles." style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
+            </div>
+            <div data-g13-help="1" style="padding:10px 13px;border-top:1px solid rgba(228,232,234,.09);font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10px;line-height:1.7;color:#56606A"></div>
+          </div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 14px;border-top:1px solid rgba(228,232,234,.09)">
+          <button type="button" data-g13-start="1" style="background:none;border:1px solid #048B9A;color:#048B9A;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.18em;padding:11px 18px;cursor:pointer;min-height:44px" style-hover="background:#048B9A;color:#07090B">JOUER</button>
+          <button type="button" data-g13-swap="1" style="background:none;border:1px solid rgba(228,232,234,.16);color:#7C8791;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.14em;padding:11px 16px;cursor:pointer;min-height:44px" style-hover="border-color:#048B9A;color:#048B9A">CHANGER DE CAMP</button>
+          <span data-g13-hint="1" style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.06em;color:#39424A">tapez help pour la liste des commandes</span>
+        </div>
+      </article>
+    </div>
