@@ -42,7 +42,7 @@ export function chargerArcade() {
 
 // Les jeux viennent du portfolio : leurs textes sont traduits par son moteur, chargé seulement si la page n'est pas en
 // français. Le fichier pèse 650 Ko, et la table n'est utile qu'aux jeux.
-const MOTEUR = location.hostname.endsWith('github.io') ? '../i18n.js' : 'https://anasdine.github.io/Portfolio/i18n.js';
+const MOTEUR = location.hostname.endsWith('github.io') ? './vitrine/i18n.js' : 'https://anasdine.github.io/Portfolio/vitrine/i18n.js';
 let moteur = null;
 function traduireJeux() {
   if (langue === 'fr' && !moteur) return;

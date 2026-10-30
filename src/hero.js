@@ -289,7 +289,7 @@ const univers = document.querySelector('[data-univers]');
 let cadreUnivers = univers.querySelector('iframe');
 const retour = univers.querySelector('[data-retour]');
 const titreUnivers = univers.querySelector('[data-univers-titre]');
-const SOURCE = location.hostname.endsWith('github.io') ? '../' : 'https://anasdine.github.io/Portfolio/';
+const SOURCE = location.hostname.endsWith('github.io') ? './vitrine/' : 'https://anasdine.github.io/Portfolio/vitrine/';
 let dernierBouton = null;
 
 let entree = 0;                              // un retour pendant l'ouverture annule tout ce qui restait à faire
