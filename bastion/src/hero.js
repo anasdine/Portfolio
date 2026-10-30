@@ -255,34 +255,38 @@ async function entrer(nom, i, ancre, bouton) {
   await new Promise((ok) => setTimeout(ok, calme || leger ? 0 : 750));   // la caméra rejoint le panneau avant d'entrer
   titreUnivers.textContent = nom;
   // Un cadre neuf à chaque entrée : changer seulement l'ancre d'une page déjà chargée ne déclencherait aucun chargement.
-  const neuf = cadreUnivers.cloneNode(false);
+  const neuf = document.createElement('iframe');
+  neuf.title = cadreUnivers.title;
   cadreUnivers.replaceWith(neuf);
   cadreUnivers = neuf;
   // Une branche montre une seule section : le reste de la page est masqué, puis ses animations sont recalculées.
   // Le cadre reste caché jusque-là : le visiteur ne voit jamais l'ancienne page se construire.
   univers.classList.remove('pret');
-  cadreUnivers.onload = () => {
-    let essais = 0;
-    const isoler = setInterval(() => {
-      try {
-        const w = cadreUnivers.contentWindow, d = w.document, s = d.getElementById(ancre);
-        const pret = s && s.offsetHeight && !(d.querySelector('[data-preloader]')?.offsetHeight > 0);
-        if (pret || essais > 40) {
-          clearInterval(isoler);
-          const st = d.createElement('style');
-          st.textContent = `main > section:not(#${ancre}), [data-nav], [data-up], [data-theme-btn], [data-preloader] { display: none !important; }
-            main > section#${ancre} { padding-top: clamp(30px, 6vh, 70px) !important; margin-top: 0 !important; }
-            html, body { overflow-x: hidden; }`;
-          d.head.append(st);
-          w.scrollTo(0, 0);
-          w.dispatchEvent(new Event('resize'));
-          w.ScrollTrigger?.refresh();
-          setTimeout(() => { w.scrollTo(0, 0); univers.classList.add('pret'); }, 250);
-        }
-      } catch { clearInterval(isoler); univers.classList.add('pret'); }   // autre origine, en local : page entière
-      essais++;
-    }, 150);
-  };
+  // La page est un paquet qui réécrit son document au démarrage : une pose unique peut être effacée. On surveille donc
+  // pendant dix secondes, et on repose l'isolation chaque fois qu'elle a disparu.
+  const cadre = cadreUnivers;
+  let essais = 0;
+  const isoler = setInterval(() => {
+    if (cadre !== cadreUnivers || ++essais > 66) { clearInterval(isoler); univers.classList.add('pret'); return; }
+    try {
+      const w = cadre.contentWindow, d = w.document, s = d.getElementById(ancre);
+      if (!s || !s.offsetHeight) return;
+      if (!d.getElementById('bastion-seul')) {
+        const st = d.createElement('style');
+        st.id = 'bastion-seul';
+        st.textContent = `main > section:not(#${ancre}), [data-nav], [data-up], [data-theme-btn], [data-preloader] { display: none !important; }
+          main > section#${ancre} { padding-top: clamp(30px, 6vh, 70px) !important; margin-top: 0 !important; }
+          html, body { overflow-x: hidden; }`;
+        d.head.append(st);
+        w.dispatchEvent(new Event('resize'));
+        w.ScrollTrigger?.refresh();
+        w.scrollTo(0, 0);
+      }
+      if (!univers.classList.contains('pret') && essais > 6) {
+        setTimeout(() => { if (essais < 30) w.scrollTo(0, 0); univers.classList.add('pret'); }, 200);
+      }
+    } catch { clearInterval(isoler); univers.classList.add('pret'); }   // autre origine, en local : page entière
+  }, 150);
   cadreUnivers.src = SOURCE + '#' + ancre;
   univers.classList.add('ouvert');
   document.documentElement.classList.add('jeu-ouvert');
