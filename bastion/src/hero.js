@@ -1,8 +1,9 @@
 // L'en-tête : la même tour en deux versions. D'abord la vidéo générée par IA ; dès que le visiteur bouge la souris,
 // la scène three.js prend le relais au même cadrage. Sur tactile, ou si le système demande moins d'animations, la
 // vidéo reste, et le bouton « temps réel » permet de basculer à la main (comme le boîtier LEAP57 du portfolio).
-import { creerTour, DEBUT_FRACTALE, PERIODES } from './tour.js';
+import { creerTour, DEBUT_FRACTALE, FIN_TRAJET, FIN_PANNEAUX, PERIODES } from './tour.js';
 import { PANNEAUX } from './bureau.js';
+import { chargerArcade } from './arcade.js';
 
 const racine = document.querySelector('[data-hero]');
 const video = racine.querySelector('video');
@@ -25,7 +26,7 @@ const VIDEO_A_JOUR = true;
 
 function ecrireLegende() {
   legende.textContent = mode === 'video'
-    ? '↳ séquence générée par IA : une image, puis une vidéo, sans caméra ni logiciel 3D'
+    ? '↳ séquence générée par IA, sans caméra ni logiciel 3D'
     : `↳ une tour de 300 m, calculée en direct par votre navigateur · ${tour.backend}${fps ? ` · ${fps} i/s` : ''}`;
 }
 
@@ -122,17 +123,9 @@ if (!VIDEO_A_JOUR) {
   basculer('live');
 }
 
-// Le relais automatique : la vidéo a le temps d'être vue (4 s), puis le premier mouvement de souris la réveille.
-if (VIDEO_A_JOUR && !tactile && !calme) {
-  (window.requestIdleCallback || setTimeout)(() => preparer());
-  const debut = performance.now();
-  const reveil = () => {
-    if (performance.now() - debut < 4000) return;
-    removeEventListener('pointermove', reveil);
-    basculer('live');
-  };
-  addEventListener('pointermove', reveil, { passive: true });
-}
+// L'accueil : sur ordinateur, la scène vivante prend le relais dès qu'elle est prête ; la vidéo sert d'affiche pendant le
+// chargement. Sur tactile, ou si le système demande moins d'animations, la vidéo reste jusqu'au premier défilement.
+if (VIDEO_A_JOUR && !tactile && !calme) preparer().then((t) => t && basculer('live'));
 
 // Débogage et captures : ?mode=live force le temps réel, ?etat=1 la tour restaurée.
 const q = new URLSearchParams(location.search);
@@ -145,25 +138,11 @@ const bas = racine.querySelector('.bas');
 const indice = racine.querySelector('[data-indice]');
 const contact = racine.querySelector('[data-contact]');
 const niveau = racine.querySelector('[data-niveau]');
+const branches = document.querySelector('[data-branches]');
 const parcours = document.querySelector('[data-parcours]');
 const arcade = document.querySelector('.arcade');
-let horsChamp = false, arcadeChargee = false, arcadeAtteinte = false, pPrecedent = 0, dernierY = 0;
+let horsChamp = false, arcadeAtteinte = false, pPrecedent = 0, dernierY = 0;
 
-// L'arcade n'arrive que si on s'en approche : les 13 jeux ne pèsent rien sur le début du parcours.
-async function chargerArcade() {
-  if (arcadeChargee) return;
-  arcadeChargee = true;
-  const boite = document.querySelector('[data-arcade-grille]');
-  boite.innerHTML = await (await fetch('jeux/grille.html')).text();
-  if (!window.THREE) window.THREE = await import('three');
-  const s = document.createElement('script');
-  s.src = 'jeux/jeux.js';
-  document.body.append(s);
-  const apparition = new IntersectionObserver((vus) => {
-    for (const v of vus) if (v.isIntersecting) { v.target.classList.add('vu'); apparition.unobserve(v.target); }
-  }, { threshold: 0.12 });
-  for (const j of boite.querySelectorAll('[data-game]')) apparition.observe(j);
-}
 document.querySelector('[data-remonter]')?.addEventListener('click', () => scrollTo({ top: 0, behavior: 'smooth' }));
 const PERIODE = (1 - DEBUT_FRACTALE) / PERIODES;
 function suivreDefilement() {
@@ -177,8 +156,9 @@ function suivreDefilement() {
   titre.style.opacity = 1 - fondu(0.02, 0.09, p);
   bas.style.opacity = 1 - fondu(0.12, 0.2, p);
   indice.style.opacity = 1 - fondu(0, 0.03, p);
-  contact.style.opacity = fondu(0.72, 0.75, p) * (1 - fondu(0.97, 0.995, p));
-  contact.style.pointerEvents = p > 0.72 && p < 0.98 ? 'auto' : 'none';
+  contact.style.opacity = fondu(0.77, 0.8, p) * (1 - fondu(0.97, 0.995, p));
+  contact.style.pointerEvents = p > 0.77 && p < 0.98 ? 'auto' : 'none';
+  branches.classList.toggle('visible', p > FIN_TRAJET - 0.01 && p < FIN_PANNEAUX + 0.02);
   // Bam : au bout du tunnel, on ne remonte pas doucement vers l'arcade, on y tombe. Seulement en descendant.
   if (p > 0.996 && pPrecedent <= 0.996 && scrollY >= dernierY && !arcadeAtteinte) {
     arcadeAtteinte = true;
@@ -217,3 +197,44 @@ marquerChapitre();
 const faille = document.querySelector('[data-faille]');
 document.querySelector('[data-fissure]').addEventListener('click', () => faille.showModal());
 document.querySelector('[data-faille-fermer]').addEventListener('click', () => faille.close());
+
+// Les branches : depuis la table, chaque panneau ouvre son univers, avec le contenu complet du portfolio.
+// Le détail n'est pas recopié : c'est la vraie page, ses huit langues et son parcours « réglage de calibre ».
+const BRANCHES = [
+  ['Offre', 0, 'freelance'], ['Projets', 1, 'pieces'], ['Ultron', 2, 'strates'], ['Parcours', 3, 'reglage'], ['Contact', 4, 'contact'],
+];
+const univers = document.querySelector('[data-univers]');
+const cadreUnivers = univers.querySelector('iframe');
+const retour = univers.querySelector('[data-retour]');
+const titreUnivers = univers.querySelector('[data-univers-titre]');
+const SOURCE = location.hostname.endsWith('github.io') ? '../' : 'https://anasdine.github.io/Portfolio/';
+let dernierBouton = null;
+
+async function entrer(nom, i, ancre, bouton) {
+  dernierBouton = bouton;
+  const H = parcours.offsetHeight - innerHeight;
+  scrollTo(0, (FIN_TRAJET + (FIN_PANNEAUX - FIN_TRAJET) * (i / (BRANCHES.length - 1))) * H);
+  await new Promise((ok) => setTimeout(ok, calme ? 0 : 750));   // la caméra rejoint le panneau avant d'entrer
+  titreUnivers.textContent = nom;
+  cadreUnivers.src = SOURCE + '#' + ancre;
+  univers.classList.add('ouvert');
+  document.documentElement.classList.add('jeu-ouvert');
+  retour.focus();
+  setTimeout(() => tour?.arreter(), 700);                       // la 3D se tait : la page a toute la machine
+}
+function revenir() {
+  univers.classList.remove('ouvert');
+  document.documentElement.classList.remove('jeu-ouvert');
+  cadreUnivers.removeAttribute('src');
+  if (mode === 'live') tour?.demarrer();
+  dernierBouton?.focus();
+}
+for (const [nom, i, ancre] of BRANCHES) {
+  const c = document.createElement('button');
+  c.type = 'button';
+  c.textContent = nom;
+  c.addEventListener('click', () => entrer(nom, i, ancre, c));
+  branches.append(c);
+}
+retour.addEventListener('click', revenir);
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && univers.classList.contains('ouvert')) revenir(); });

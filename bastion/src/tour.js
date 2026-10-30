@@ -13,10 +13,11 @@ import { chromaticAberration } from 'three/addons/tsl/display/ChromaticAberratio
 import { radialBlur } from 'three/addons/tsl/display/radialBlur.js';
 import { creerBureau, SOL } from './bureau.js';
 import { creerFractale } from './fractale.js';
+import { creerPeuple } from './peuple.js';
 
 // Le calendrier du défilement, de 0 à 1.
-const FIN_TRAJET = 0.46;           // on entre dans la salle
-const FIN_PANNEAUX = 0.76;         // le dernier panneau a été lu
+export const FIN_TRAJET = 0.46;           // on entre dans la salle
+export const FIN_PANNEAUX = 0.76;         // le dernier panneau a été lu
 export const DEBUT_FRACTALE = 0.82;  // on est devant LEONHARD, le zoom commence
 export const PERIODES = 6;         // la plongée compte six niveaux, puis elle débouche sur l'arcade
 
@@ -500,6 +501,7 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     return vec4(mix(vue, vec3(0.92, 0.99, 1), fondu), 1);
   })();
 
+  const peuple = creerPeuple(dehors, metal);
   const bureau = await creerBureau(scene);
   const CENTRE = new THREE.Vector3(0, SOL + 4.3, 0);
   const fractale = await creerFractale(scene, CENTRE, { allege: matchMedia('(pointer: coarse)').matches });
@@ -530,12 +532,13 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
       // dans la salle : l'œil se place de biais, le panneau occupe la droite du cadre et l'hologramme la gauche
       const e = Math.min(1, (p - FIN_TRAJET) / (FIN_PANNEAUX - FIN_TRAJET)) * (bureau.panneaux.length - 1);
       const i = Math.floor(e), f = adoucir(0.15, 0.85, e - i);
-      const a0 = bureau.panneaux[Math.min(i, 3)], a1 = bureau.panneaux[Math.min(i + 1, 3)];
+      const dernier = bureau.panneaux.length - 1;
+      const a0 = bureau.panneaux[Math.min(i, dernier)], a1 = bureau.panneaux[Math.min(i + 1, dernier)];
       const vertical = camera.aspect < 1;
       const angle = THREE.MathUtils.lerp(a0.angle, a1.angle, f) + Math.PI + (vertical ? 0 : 0.49);
       const recul = vertical ? 11 : 7;
       orbite.set(Math.cos(angle) * recul, SOL + 3.4, Math.sin(angle) * recul);
-      vise2.lerpVectors(a0.position, a1.position, f).multiplyScalar(0.88);
+      vise2.lerpVectors(a0.position, a1.position, f).multiplyScalar(0.95);
       vise2.y = SOL + 7.2;
       const arrivee = adoucir(FIN_TRAJET, FIN_TRAJET + 0.08, p);
       CHEMIN.getPoint(1, pos);
@@ -617,7 +620,8 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     souris.ly += (souris.y - souris.ly) * (1 - Math.exp(-dt * 1.6));
     defilement.valeur += (defilement.cible - defilement.valeur) * (1 - Math.exp(-dt * 3.2));
     placerCamera(defilement.valeur, t, dt);
-    bureau.actualiser(foyer);
+    bureau.actualiser(foyer, t);
+    if (dehors.visible) peuple.actualiser(t);
     surFoyer(foyer);
     if (dehors.visible) for (const [i, f] of flottants.entries()) f.position.y = f.userData.base + Math.sin(t * 0.18 + i * 1.7) * 3;
 

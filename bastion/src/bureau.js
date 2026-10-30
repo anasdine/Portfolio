@@ -2,7 +2,7 @@
 // flottants qui portent le contenu du portfolio. Elle occupe vraiment le pied du fût : on y entre sans coupure.
 import * as THREE from 'three/webgpu';
 import {
-  Fn, Discard, uniform, uv, time, positionWorld, normalWorld, cameraPosition, reflector, reflect, instanceIndex, texture, smoothstep, mix,
+  Fn, Discard, uniform, uv, time, positionWorld, normalWorld, cameraPosition, reflector, reflect, instanceIndex, texture, positionLocal, smoothstep, mix,
   vec2, vec3, color, float, fract, floor, abs, sin, cos, length, atan, step, hash, pow, fwidth, dot, normalize, max,
 } from 'three/tsl';
 
@@ -11,7 +11,7 @@ export const RAYON = 29.4;
 export const PANNEAUX = [
   {
     titre: 'OFFRE', lignes: [
-      ['Freelance depuis le 12.09.2026', 1],
+      ['Indépendant à 20 %, en plus de DM Surfaces', 1],
       ['IA · sites web · applications', 1],
       ['', 0],
       ['Automatisation', 0],
@@ -21,23 +21,35 @@ export const PANNEAUX = [
   },
   {
     titre: 'PROJETS', lignes: [
+      ['ULTRON COCKPIT', 1],
+      ['Mon assistance de chaque jour', 0],
       ['LEAP 57', 1],
       ['Boîtier : une vraie conception technique', 0],
-      ['', 0],
-      ['Treize jeux jouables', 1],
-      ['', 0],
+      ['Razor, l\'Archonte et treize jeux', 1],
       ['one-cars.fr · vtc-liberty.fr · clean-dream.fr', 0],
       ['lartdorient.fr · dreamforyou.fr', 0],
     ],
   },
   {
-    titre: 'PARCOURS', lignes: [
-      ['Administrateur systèmes et réseaux', 1],
-      ['Suisse romande', 0],
+    titre: 'ULTRON', cockpit: true, lignes: [
+      ['Mon exosquelette d\'IA', 1],
+      ['20 min à l\'oral le matin, 20 le soir.', 0],
       ['', 0],
+      ['Un routage intelligent entre usines.', 0],
+      ['Des centaines d\'agents produisent.', 0],
+      ['', 0],
+      ['Je décide, j\'envoie les demandes clients.', 0],
+      ['Je garde l\'essentiel.', 1],
+    ],
+  },
+  {
+    titre: 'PARCOURS', lignes: [
+      ['DM Surfaces · 80 %', 1],
+      ['Indépendant · 20 %', 1],
+      ['', 0],
+      ['Administrateur systèmes et réseaux', 0],
+      ['Suisse romande', 0],
       ['Autodidacte depuis l\'enfance', 0],
-      ['Gatexinfo · 2026', 0],
-      ['En ce moment : freelance, orchestration d\'IA', 1],
     ],
   },
   {
@@ -47,13 +59,13 @@ export const PANNEAUX = [
       ['Disponible pour vos projets', 0],
       ['IA · sites · applications', 0],
       ['', 0],
-      ['Le lien LinkedIn est juste en dessous', 0],
+      ['Toute la suite est dans cette branche', 0],
     ],
   },
 ];
 
 // Le texte est dessiné dans une toile, puis posé sur le panneau : il partage la lumière de la salle.
-function toilePanneau({ titre, lignes }, numero) {
+function toilePanneau({ titre, lignes, cockpit }, numero) {
   const l = 2048, h = 1152;
   const c = document.createElement('canvas');
   c.width = l; c.height = h;
@@ -76,11 +88,34 @@ function toilePanneau({ titre, lignes }, numero) {
   g.fillStyle = '#3fd3c6';
   g.fillRect(120, 405, 240, 6);
   let y = 510;
+  const corps = cockpit ? 0.8 : 1;
   for (const [texte, fort] of lignes) {
     g.fillStyle = fort ? '#e4e8ea' : '#9aa4ac';
-    g.font = fort ? '500 62px "IBM Plex Mono"' : '400 50px "IBM Plex Mono"';
+    g.font = fort ? `500 ${Math.round(62 * (cockpit ? 0.8 : 1))}px "IBM Plex Mono"` : `400 ${Math.round(50 * (cockpit ? 0.86 : 1))}px "IBM Plex Mono"`;
     g.fillText(texte, 120, y);
-    y += texte ? 86 : 46;
+    y += (texte ? 86 : 46) * corps;
+  }
+  if (cockpit) {
+    // L'archipel du cockpit : les briques autour de la rosace, qui est posée devant, en 3D.
+    const cx = 1500, cy = 590, r = 390;
+    g.strokeStyle = 'rgba(255, 194, 74, .55)';
+    g.lineWidth = 3;
+    g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke();
+    g.strokeStyle = 'rgba(134, 169, 240, .3)';
+    g.beginPath(); g.arc(cx, cy, r * 0.76, 0, Math.PI * 2); g.stroke();
+    [['Plan B', '#ff5f8f'], ['JARVIS', '#5c8dff'], ['Palier', '#36e0b0'], ['LEONHARD', '#5fd4ff'], ['Usine', '#b6ee4c']].forEach(([nom, teinte], i) => {
+      const a = -Math.PI / 2 + i * (Math.PI * 2 / 5);
+      const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+      g.strokeStyle = 'rgba(255, 227, 163, .3)';
+      g.beginPath(); g.moveTo(cx + Math.cos(a) * 250, cy + Math.sin(a) * 250); g.lineTo(x, y); g.stroke();
+      g.fillStyle = teinte;
+      g.beginPath(); g.arc(x, y, 20, 0, Math.PI * 2); g.fill();
+      g.font = '500 46px "IBM Plex Mono"';
+      g.textAlign = 'center';
+      g.fillStyle = '#f3f1ec';
+      g.fillText(nom, x, y + (Math.sin(a) > 0.1 ? 78 : -40));
+      g.textAlign = 'left';
+    });
   }
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
@@ -284,6 +319,32 @@ export async function creerBureau(scene) {
   salle.add(emetteur);
 
   // Les quatre panneaux, disposés en arc face au centre.
+  // La rosace : la vraie géométrie du cockpit, lue dans son SVG, extrudée, avec son dégradé de l'or vers le lapis.
+  const svg = await (await fetch('media/rosace.svg')).text();
+  const formes = [...svg.matchAll(/points="([^"]+)"/g)].map((m) => {
+    const f = new THREE.Shape();
+    m[1].trim().split(/\s+/).forEach((p, i) => { const [x, y] = p.split(',').map(Number); if (i) f.lineTo(x, -y); else f.moveTo(x, -y); });
+    f.closePath();
+    return f;
+  });
+  const rosace = new THREE.ExtrudeGeometry(formes, { depth: 0.035, bevelEnabled: false, curveSegments: 1 });
+  const matRosace = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide });
+  matRosace.colorNode = Fn(() => {
+    const r = length(positionLocal.xy);
+    const a = mix(color(0xffc24a), color(0xffe3a3), smoothstep(0, 0.26, r));
+    const b2 = mix(a, color(0xd6e5fa), smoothstep(0.26, 0.4, r));
+    const c = mix(b2, color(0x86a9f0), smoothstep(0.4, 0.6, r));
+    const d = mix(c, color(0x4361dd), smoothstep(0.6, 0.8, r));
+    return mix(d, color(0x2438bc), smoothstep(0.8, 1, r)).mul(1.5);
+  })();
+  const fleurs = [];
+  const voute = new THREE.Mesh(rosace, matRosace);
+  voute.scale.setScalar(11.5);
+  voute.rotation.x = Math.PI / 2;
+  voute.position.y = SOL + HAUT - 0.15;
+  salle.add(voute);
+  fleurs.push(voute);
+
   const matClavier = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
   matClavier.colorNode = Fn(() => {
     const c = uv();
@@ -301,8 +362,10 @@ export async function creerBureau(scene) {
     return mix(BLEU, TEAL, c.y).mul(barre.mul(0.75).add(0.05));
   })();
 
+  const matVerre = new THREE.MeshBasicMaterial({ color: 0x040a18, transparent: true, opacity: 0.9, side: THREE.DoubleSide });
+
   const affichages = PANNEAUX.map((contenu, i) => {
-    const angle = -Math.PI / 2 + i * (Math.PI / 2.5) - Math.PI / 2.5 * 1.5;
+    const angle = -Math.PI / 2 + (i - (PANNEAUX.length - 1) / 2) * 1.02;   // le cockpit, au centre, fait face à la porte
     const carte = toilePanneau(contenu, i);
     const force = uniform(0.35);
     const mat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
@@ -314,9 +377,19 @@ export async function creerBureau(scene) {
       return texture(carte).rgb.mul(1.5).add(fond).mul(lignes).mul(force);
     })();
     const panneau = new THREE.Mesh(new THREE.PlaneGeometry(21, 11.8), mat);
+    const verre = new THREE.Mesh(new THREE.PlaneGeometry(21, 11.8), matVerre);
+    verre.position.z = -0.04;
+    panneau.add(verre);
     panneau.position.set(Math.cos(angle) * 24, SOL + 8, Math.sin(angle) * 24);
     panneau.lookAt(0, SOL + 5.5, 0);
     salle.add(panneau);
+    if (contenu.cockpit) {
+      const fleur = new THREE.Mesh(rosace, matRosace);
+      fleur.scale.setScalar(2.45);
+      fleur.position.set(((1500 / 2048) - 0.5) * 21, (0.5 - 590 / 1152) * 11.8, 0.5);
+      panneau.add(fleur);
+      fleurs.push(fleur);
+    }
 
     const cadre = new THREE.Mesh(new THREE.BoxGeometry(12, 0.9, 2), matSocle);
     cadre.position.set(Math.cos(angle) * 21.5, SOL + 0.8, Math.sin(angle) * 21.5);
@@ -341,7 +414,8 @@ export async function creerBureau(scene) {
   return {
     salle,
     panneaux: affichages,
-    actualiser(foyer) {
+    actualiser(foyer, t) {
+      for (const f of fleurs) f.rotation.z = t * 0.06;
       for (const [i, a] of affichages.entries()) {
         const cible = 0.18 + 0.82 * Math.max(0, 1 - Math.abs(foyer - i));
         a.force.value += (cible - a.force.value) * 0.08;
