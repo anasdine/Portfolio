@@ -1,4 +1,6 @@
 // L'arcade : un jeu phare, treize bornes, et une scène qui ouvre chaque jeu en grand.
+import { t, langue, surLangue } from './langues.js';
+
 // Les jeux restent posés hors champ, à leur taille, dès le chargement : leurs toiles se mesurent une seule fois, et
 // ils n'ont pas besoin de savoir qu'ils ont changé de maison.
 export const BORNES = [
@@ -33,8 +35,24 @@ export function chargerArcade() {
       s.onload = ok; s.onerror = non;
       document.body.append(s);
     });
+    traduireJeux();
   })();
   return chargement;
+}
+
+// Les jeux viennent du portfolio : leurs textes sont traduits par son moteur, chargé seulement si la page n'est pas en
+// français. Le fichier pèse 650 Ko, et la table n'est utile qu'aux jeux.
+const MOTEUR = location.hostname.endsWith('github.io') ? '../i18n.js' : 'https://anasdine.github.io/Portfolio/i18n.js';
+let moteur = null;
+function traduireJeux() {
+  if (langue === 'fr' && !moteur) return;
+  moteur ??= new Promise((ok, non) => {
+    const s = document.createElement('script');
+    s.src = MOTEUR;
+    s.onload = ok; s.onerror = non;
+    document.body.append(s);
+  });
+  moteur.then(() => window.I18N?.set(langue)).catch(() => {});   // sans le moteur, les jeux restent en français : ils tournent
 }
 
 function fermerScene() {
@@ -58,19 +76,25 @@ async function ouvrir(id, bouton) {
   }
   await chargerArcade();
   grille.querySelector(`[data-game="${id}"]`)?.classList.add('actif');
+  window.I18N?.rescan();
   scene.scrollTop = 0;
 }
 
 const liste = document.querySelector('[data-bornes]');
-for (const [i, [id, titre, ligne, genre]] of BORNES.entries()) {
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.className = 'borne';
-  b.dataset.lance = id;
-  b.innerHTML = `<img src="media/jeux/${id}.jpg" alt="" loading="lazy" width="640" height="360">
-    <span class="borne__n">${String(i + 1).padStart(2, '0')} · ${genre}</span><b>${titre}</b><span>${ligne}</span>`;
-  liste.append(b);
+function ecrireBornes() {
+  const bornes = BORNES.map(([id, titre, ligne, genre], i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'borne';
+    b.dataset.lance = id;
+    b.innerHTML = `<img src="media/jeux/${id}.jpg" alt="" loading="lazy" width="640" height="360">
+    <span class="borne__n">${String(i + 1).padStart(2, '0')} · ${t(genre)}</span><b>${t(titre)}</b><span>${t(ligne)}</span>`;
+    return b;
+  });
+  liste.replaceChildren(...bornes);
 }
+ecrireBornes();
+surLangue(() => { ecrireBornes(); if (chargement) traduireJeux(); });
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-lance]');
   if (b) ouvrir(b.dataset.lance, b);

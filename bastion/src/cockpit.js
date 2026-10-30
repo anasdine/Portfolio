@@ -4,6 +4,7 @@
 import * as THREE from 'three/webgpu';
 import { Fn, uv, time, texture, positionWorld, cameraPosition, uniform, length, fract, pow, vec2, float, smoothstep } from 'three/tsl';
 import { SIMPLE } from './qualite.js';
+import { t, surLangue } from './langues.js';
 
 // Les îles suivent les canaux de lumière du sol : huit directions, en commençant derrière la table.
 const ILES = [
@@ -83,41 +84,54 @@ function bandeau() {
   const c = document.createElement('canvas');
   c.width = 4096; c.height = 128;
   const g = c.getContext('2d');
-  g.fillStyle = '#000';
-  g.fillRect(0, 0, c.width, c.height);
-  g.font = '500 54px "IBM Plex Mono"';
-  g.textBaseline = 'middle';
-  // le texte est répété jusqu'au bord, puis resserré juste assez pour boucler sans raccord
-  const unite = g.measureText(CHAINE).width;
-  const n = Math.max(1, Math.round(c.width / unite));
-  g.setTransform(c.width / (unite * n), 0, 0, 1, 0, 0);
-  g.fillStyle = '#ffe3a3';
-  for (let i = 0; i < n; i++) g.fillText(CHAINE, i * unite, 66);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.wrapS = THREE.RepeatWrapping;
-  t.anisotropy = 8;
-  return t;
+  const texture = new THREE.CanvasTexture(c);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.anisotropy = 8;
+  const peindre = () => {
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.fillStyle = '#000';
+    g.fillRect(0, 0, c.width, c.height);
+    g.font = '500 54px "IBM Plex Mono", sans-serif';
+    g.textBaseline = 'middle';
+    // le texte est répété jusqu'au bord, puis resserré juste assez pour boucler sans raccord
+    const chaine = t(CHAINE);
+    const unite = g.measureText(chaine).width;
+    const n = Math.max(1, Math.round(c.width / unite));
+    g.setTransform(c.width / (unite * n), 0, 0, 1, 0, 0);
+    g.fillStyle = '#ffe3a3';
+    for (let i = 0; i < n; i++) g.fillText(chaine, i * unite, 66);
+    texture.needsUpdate = true;
+  };
+  peindre();
+  surLangue(peindre);
+  return texture;
 }
 
 function etiquette([nom, role, teinte]) {
   const c = document.createElement('canvas');
   c.width = 512; c.height = 160;
   const g = c.getContext('2d');
-  g.textAlign = 'center';
-  g.fillStyle = teinte;
-  g.fillRect(232, 8, 48, 3);
-  g.fillStyle = '#f3f1ec';
-  g.font = '600 76px "IBM Plex Sans Condensed"';
-  g.fillText(nom, 256, 84);
-  if (role) {
+  const texture = new THREE.CanvasTexture(c);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const peindre = () => {
+    g.clearRect(0, 0, c.width, c.height);
+    g.textAlign = 'center';
     g.fillStyle = teinte;
-    g.font = '500 30px "IBM Plex Mono"';
-    g.fillText(role, 256, 128);
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
+    g.fillRect(232, 8, 48, 3);
+    g.fillStyle = '#f3f1ec';
+    g.font = '600 76px "IBM Plex Sans Condensed", sans-serif';
+    g.fillText(nom, 256, 84);
+    if (role) {
+      g.fillStyle = teinte;
+      g.font = '500 30px "IBM Plex Mono", sans-serif';
+      g.fillText(t(role), 256, 128, 496);
+    }
+    texture.needsUpdate = true;
+  };
+  peindre();
+  surLangue(peindre);
+  return texture;
 }
 
 const additif = () => new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });

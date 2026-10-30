@@ -524,9 +524,14 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     const centre = screenUV.sub(0.5).mul(vec2(1, 0.8));
     const vignette = float(1).sub(smoothstep(0.42, 1, length(centre))).mul(0.32).add(0.68);
     const grain = fract(sin(dot(screenUV.add(fract(time)), vec2(12.9898, 78.233))).mul(43758.5453)).sub(0.5);
-    const bord = ouverture.mul(1.9);
-    const dansTunnel = float(1).sub(smoothstep(bord.sub(0.5), bord, length(screenUV.sub(0.5).mul(vec2(format, 1))))).mul(step(0.001, ouverture));
-    const vue = mix(c.mul(vignette), tunnel, dansTunnel).add(grain.mul(0.014));
+    // Le portail : un anneau net et lumineux, qui vient vers l'œil de plus en plus vite et l'avale. Sans bord, on ne verrait
+    // qu'un fondu entre deux images, et rien ne dirait qu'on passe de l'autre côté.
+    const bord = ouverture.mul(ouverture).mul(1.9);
+    const distance = length(screenUV.sub(0.5).mul(vec2(format, 1)));
+    const ouvert = step(0.001, ouverture);
+    const dansTunnel = float(1).sub(smoothstep(bord.sub(0.012), bord, distance)).mul(ouvert);
+    const anneauPortail = pow(float(1).sub(smoothstep(0, float(0.05).add(bord.mul(0.1)), abs(distance.sub(bord)))), 2).mul(ouvert).mul(float(1).sub(smoothstep(0.92, 1, ouverture)));
+    const vue = mix(c.mul(vignette), tunnel, dansTunnel).add(mix(color(0x3fd3c6), color(0xffc24a), smoothstep(0, 0.5, bord)).mul(anneauPortail.mul(2.6))).add(grain.mul(0.014));
     // la sortie : la rosace s'ouvre en iris jusqu'à remplir l'écran, le relais est pris par l'éclair de l'arcade
     const irisR = fondu.mul(1.5);
     const iris = float(1).sub(smoothstep(irisR.sub(0.2), irisR, length(screenUV.sub(0.5).mul(vec2(format, 1))))).mul(step(0.001, fondu));
@@ -563,7 +568,10 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     de.set(Math.cos(a) * r, THREE.MathUtils.lerp(de.y, vers.y, x), Math.sin(a) * r);
   }
 
-  function placerCamera(p, t, dt) {
+  function placerCamera(q, t, dt) {
+    // Le chemin est parcouru à vitesse constante : ses points de passage ne sont pas régulièrement espacés, et sans cette
+    // correction l'œil piétine sur l'escalier avant de franchir la porte d'un coup.
+    const p = q < FIN_TRAJET ? CHEMIN.getUtoTmapping(q / FIN_TRAJET) * FIN_TRAJET : q;
     if (p < FIN_TRAJET) {
       CHEMIN.getPoint(p / FIN_TRAJET, pos);
       const vers = adoucir(0.08, 0.34, p);
@@ -603,8 +611,10 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
       vise.lerp(a.position, plongee.valeur * 0.35);
     }
     const poidsDehors = 1 - adoucir(0.3, FIN_TRAJET, p);
-    camera.position.set(pos.x + souris.lx * (poidsDehors * 24 + 1.2) + Math.sin(t * 0.07) * 3 * poidsDehors, pos.y - souris.ly * 0.8, pos.z);
-    camera.lookAt(vise.x + souris.lx * 1.4, vise.y - souris.ly * (poidsDehors * 10 + 0.7), vise.z);
+    // Le grand écart de la souris n'existe qu'au large : la porte fait dix mètres, il faut être dans l'axe bien avant elle.
+    const large = 1 - adoucir(0.1, 0.22, p);
+    camera.position.set(pos.x + souris.lx * (large * 24 + 1.2) + Math.sin(t * 0.07) * 3 * large, pos.y - souris.ly * 0.8, pos.z);
+    camera.lookAt(vise.x + souris.lx * 1.4, vise.y - souris.ly * (large * 10 + 0.7), vise.z);
     // la plongée : le monde s'éteint, la caméra roule lentement, le zoom ne dépend que du défilement
     const dansLeZoom = adoucir(DEBUT_FRACTALE - 0.02, DEBUT_FRACTALE + 0.02, p);
     roulis += dt * 0.05 * dansLeZoom;
@@ -618,13 +628,13 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     bureau.salle.visible = nuit.value < 0.995 && p > 0.22;   // inutile de rendre la salle (et son miroir) depuis l'extérieur
     for (const { b } of battants) b.visible = nuit.value < 0.995;
     const fov = THREE.MathUtils.lerp(CHAMP, camera.aspect < 1 ? CHAMP : 52, adoucir(0.18, FIN_TRAJET, p));
-    if (Math.abs(fov - champ) > 0.01) { champ = fov; redimensionner(); }
+    if (Math.abs(fov - champ) > 0.01) { champ = fov; cadrer(); }
 
     for (const { b, cote } of battants) b.position.x = cote * (1.8 + 3.7 * adoucir(0.2, 0.26, p));
     dehors.visible = p < FIN_TRAJET + 0.02;
     forceRayons.value = poidsDehors;
     // la dernière ligne droite : le tunnel s'ouvre, accélère de plus en plus, puis tout blanchit
-    ouverture.value = adoucir(0.885, 0.945, p);
+    ouverture.value = adoucir(0.875, 0.955, p);
     fractale.groupe.visible = ouverture.value < 0.98;   // une fois le tunnel plein écran, rien ne sert de la dessiner
     const elan = adoucir(0.885, 1, p);
     avance.value = t * 0.35 + elan * elan * 26;
@@ -636,15 +646,18 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     centreRayons.value.set(sommet.x * 0.5 + 0.5, 0.5 - sommet.y * 0.5);
   }
 
+  const cadrer = () => {
+    camera.fov = camera.aspect > 16 / 9
+      ? THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(champ / 2)) * (16 / 9) / camera.aspect))
+      : champ;
+    camera.updateProjectionMatrix();
+  };
   const redimensionner = () => {
     const l = toile.clientWidth, h = toile.clientHeight;
     if (!l || !h) return;
     renderer.setSize(l, h, false);
     camera.aspect = l / h;
-    camera.fov = camera.aspect > 16 / 9
-      ? THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(champ / 2)) * (16 / 9) / camera.aspect))
-      : champ;
-    camera.updateProjectionMatrix();
+    cadrer();
   };
   new ResizeObserver(redimensionner).observe(toile);
   redimensionner();
@@ -665,6 +678,26 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     renderer.setPixelRatio(Math.min(devicePixelRatio, PALIERS[palier]));
     redimensionner();
   };
+  // Comme igloo.inc : tout est calculé avant le premier mouvement. La scène se dessine une fois à chaque endroit du trajet
+  // pendant que la vidéo tourne devant elle, et plus aucun shader ne se compile en plein défilement.
+  // Il faut la vraie boucle d'images : hors d'elle, three.js ne remet pas à jour les miroirs et les passes d'une image à l'autre.
+  function chauffer() {
+    let p = 0.01;
+    const fin = () => { renderer.setAnimationLoop(null); placerCamera(defilement.valeur, 0, 0); };
+    return Promise.race([
+      new Promise((ok) => renderer.setAnimationLoop(() => {
+        placerCamera(p, 0, 0);
+        bureau.actualiser(foyer, 0, 0);
+        if (dehors.visible) peuple.actualiser(0);
+        pipeline.render();
+        p += 0.02;
+        if (p >= 1) ok();
+      })),
+      new Promise((ok) => setTimeout(ok, 6000)),                   // onglet en arrière-plan : pas d'images, on ne bloque pas
+    ]).then(fin);
+  }
+  await chauffer();
+
   function dessiner() {
     horloge.update();
     const dt = Math.min(horloge.getDelta(), 0.1), t = horloge.getElapsed();

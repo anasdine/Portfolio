@@ -22,6 +22,17 @@ function askResize(fn){ requestAnimationFrame(fn); }
 function keepGL(r){ return r; }
 var ADA = { ready: false, say: function(){}, focus: function(){}, release: function(){} };
 var PIPES = [];
+/* La boucle commune du moteur d'origine : chaque jeu y dessine, et s'abstient seul quand il est hors champ. */
+(function(){
+  var tp = 0;
+  function pas(ts){
+    var dt = tp ? Math.min(.05, (ts - tp) / 1000) : .016;
+    tp = ts;
+    for(var i = 0; i < PIPES.length; i++){ var p = PIPES[i]; if(p.vis){ try{ p.frame(dt, ts / 1000); }catch(e){ console.error('[jeu] ' + e.message); } } }
+    requestAnimationFrame(pas);
+  }
+  requestAnimationFrame(pas);
+})();
 var EASE = 'expo.out';
 /* Les jeux n'emploient que trois gestes de GSAP : une petite animation native suffit, sans charger la bibliothèque. */
 function etapes(o){ var r = {}, t = []; if('opacity' in o) r.opacity = o.opacity; if('y' in o) t.push('translateY(' + o.y + 'px)'); if('scale' in o) t.push('scale(' + o.scale + ')'); if(t.length) r.transform = t.join(' '); return r; }

@@ -7,6 +7,7 @@ import {
 } from 'three/tsl';
 import { creerCockpit } from './cockpit.js';
 import { SIMPLE } from './qualite.js';
+import { t, langue, surLangue } from './langues.js';
 
 export const SOL = 21.05;          // le dessus de l'assise, là où la porte débouche
 export const RAYON = 29.4;
@@ -67,11 +68,27 @@ export const PANNEAUX = [
 ];
 
 // Le texte est dessiné dans une toile, puis posé sur le panneau : il partage la lumière de la salle.
-function toilePanneau({ titre, lignes, cockpit }, numero) {
-  const l = 2048, h = 1152;
+// Les textes se réécrivent sur la même toile quand la langue change ; les noms propres ne se traduisent pas.
+function toilePanneau(contenu, numero) {
   const c = document.createElement('canvas');
-  c.width = l; c.height = h;
+  c.width = 2048; c.height = 1152;
   const g = c.getContext('2d');
+  const t2 = new THREE.CanvasTexture(c);
+  t2.colorSpace = THREE.SRGBColorSpace;
+  t2.anisotropy = 8;
+  const peindre = () => { peindrePanneau(g, contenu, numero); t2.needsUpdate = true; };
+  peindre();
+  surLangue(peindre);
+  return t2;
+}
+
+function peindrePanneau(g, { titre, lignes, cockpit }, numero) {
+  const l = 2048, h = 1152;
+  // L'arabe part de la droite : celle du panneau, ou celle de la colonne de texte quand l'archipel occupe la moitié droite.
+  const rtl = langue === 'ar', largeur = cockpit ? 920 : l - 240;
+  const x0 = rtl ? 120 + largeur : 120;
+  g.direction = rtl ? 'rtl' : 'ltr';
+  g.textAlign = rtl ? 'right' : 'left';
   g.fillStyle = '#000';
   g.fillRect(0, 0, l, h);
   g.strokeStyle = '#3fd3c6';
@@ -83,18 +100,18 @@ function toilePanneau({ titre, lignes, cockpit }, numero) {
   }
   g.fillStyle = '#3fd3c6';
   g.font = '500 44px "IBM Plex Mono"';
-  g.fillText(`> bastion/${String(numero + 1).padStart(2, '0')}`, 120, 170);
+  g.fillText(`> bastion/${String(numero + 1).padStart(2, '0')}`, x0, 170);
   g.fillStyle = '#e4e8ea';
-  g.font = '600 190px "IBM Plex Sans Condensed"';
-  g.fillText(titre, 112, 360);
+  g.font = '600 190px "IBM Plex Sans Condensed", sans-serif';
+  g.fillText(t(titre), x0 + (rtl ? 8 : -8), 360, largeur);
   g.fillStyle = '#3fd3c6';
-  g.fillRect(120, 405, 240, 6);
+  g.fillRect(rtl ? x0 - 240 : x0, 405, 240, 6);
   let y = 510;
   const corps = cockpit ? 0.8 : 1;
   for (const [texte, fort] of lignes) {
     g.fillStyle = fort ? '#e4e8ea' : '#9aa4ac';
-    g.font = fort ? `500 ${Math.round(62 * (cockpit ? 0.8 : 1))}px "IBM Plex Mono"` : `400 ${Math.round(50 * (cockpit ? 0.86 : 1))}px "IBM Plex Mono"`;
-    g.fillText(texte, 120, y);
+    g.font = fort ? `500 ${Math.round(62 * (cockpit ? 0.8 : 1))}px "IBM Plex Mono", sans-serif` : `400 ${Math.round(50 * (cockpit ? 0.86 : 1))}px "IBM Plex Mono", sans-serif`;
+    if (texte) g.fillText(t(texte), x0, y, largeur);    // une traduction plus longue se resserre au lieu de sortir du panneau
     y += (texte ? 86 : 46) * corps;
   }
   if (cockpit) {
@@ -119,10 +136,6 @@ function toilePanneau({ titre, lignes, cockpit }, numero) {
       g.textAlign = 'left';
     });
   }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 8;
-  return t;
 }
 
 export async function creerBureau(scene) {

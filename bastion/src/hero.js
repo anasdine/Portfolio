@@ -4,6 +4,7 @@
 import { creerTour, DEBUT_FRACTALE, DEBUT_PANNEAUX, FIN_TRAJET, FIN_PANNEAUX, PERIODES } from './tour.js';
 import { PANNEAUX } from './bureau.js';
 import { chargerArcade } from './arcade.js';
+import { t, surLangue, brancherSelecteur } from './langues.js';
 
 const racine = document.querySelector('[data-hero]');
 const video = racine.querySelector('video');
@@ -35,28 +36,31 @@ function passerLeger() {
 }
 const sansGL = () => { try { return !navigator.gpu && !document.createElement('canvas').getContext('webgl2'); } catch { return true; } };
 
-let tour = null, preparation = null, mode = 'video', restaure = false, fps = 0;
+let tour = null, preparation = null, mode = 'video', restaure = false, fps = 0, enBascule = false;
 
 // À repasser à false si la vidéo ne correspond plus à la tour : la page part alors directement du temps réel, et on ne
 // présente pas une image périmée.
 const VIDEO_A_JOUR = true;
 
+const ecrire = (el, texte) => { if (el.textContent !== texte) el.textContent = texte; };   // écrire dans la page à chaque image pour rien coûte une mise en page
+
 function ecrireLegende() {
   legende.textContent = mode === 'video'
-    ? '↳ vidéo générée par IA : une boucle, elle ne réagit à rien. Passez en temps réel pour comparer.'
-    : `↳ temps réel : rien n'est enregistré, votre navigateur calcule cette tour de 300 m${tactile ? '' : ' et suit votre souris'} · ${tour.backend}${fps ? ` · ${fps} i/s` : ''}`;
+    ? t('↳ vidéo générée par IA : une boucle, elle ne réagit à rien. Passez en temps réel pour comparer.')
+    : `${t('↳ temps réel : rien n\'est enregistré, votre navigateur calcule cette tour de 300 m')}${tactile ? '' : t(' et suit votre souris')} · ${tour.backend}${fps ? ` · ${fps} ${t('i/s')}` : ''}`;
 }
 
 function surEtat(e) {
   const rgb = COMPROMIS.map((c, i) => Math.round(c + (RESTAURE[i] - c) * e));
   racine.style.setProperty('--teinte', `rgb(${rgb.join(',')})`);
   if (restaure) return;
-  journal.textContent = `> bastion · intégrité ${Math.round(34 + 66 * e)} %`;
+  ecrire(journal, t('> bastion · intégrité # %', Math.round(34 + 66 * e)));
   if (e > 0.97) {
     restaure = true;
     tour.viser(1);
-    journal.textContent = '[ OK ] bastion restauré · intégrité 100 %';
-    restaurer.textContent = 'restauré';
+    journal.textContent = t('[ OK ] bastion restauré · intégrité 100 %');
+    restaurer.dataset.t = 'restauré';
+    restaurer.textContent = t('restauré');
     restaurer.disabled = true;
   }
 }
@@ -72,10 +76,10 @@ function surFoyer(foyer) {
   ficheAffichee = i;
   const { titre, lignes } = PANNEAUX[i];
   const h2 = document.createElement('h2');
-  h2.textContent = titre;
-  const textes = lignes.filter(([t]) => t).map(([t, fort]) => {
+  h2.textContent = t(titre);
+  const textes = lignes.filter(([texte]) => texte).map(([texte, fort]) => {
     const p = document.createElement('p');
-    p.textContent = t;
+    p.textContent = t(texte);
     p.classList.toggle('fort', Boolean(fort));
     return p;
   });
@@ -103,9 +107,10 @@ function preparer() {
 }
 
 async function basculer(vers) {
-  if (vers === mode) return;
+  if (vers === mode || enBascule) return;
   if (vers === 'live') {
-    if (!(await preparer())) return;
+    enBascule = true;
+    if (!(await preparer())) { enBascule = false; return; }
     lancement = performance.now();
     lentes = 0;
     tour.demarrer();
@@ -115,6 +120,7 @@ async function basculer(vers) {
       new Promise((ok) => setTimeout(ok, 1500)),
     ]);
     racine.dataset.mode = 'live';
+    enBascule = false;
     // Aucune image au bout de 15 secondes : le moteur s'est figé, on ne laisse jamais le visiteur devant un écran mort.
     setTimeout(() => { if (mode === 'live' && !fps && document.visibilityState === 'visible') passerLeger(); }, 15000);
     setTimeout(() => mode === 'live' && video.pause(), 1300);
@@ -152,6 +158,7 @@ restaurer.addEventListener('keyup', (e) => { if (e.key === ' ' || e.key === 'Ent
 if (calme) video.removeAttribute('autoplay'), video.pause();
 if (mode === 'video') legende.textContent = VIDEO_A_JOUR ? legende.textContent : '↳ chargement de la scène…';
 if (VIDEO_A_JOUR) ecrireLegende();
+ecrire(journal, t('> bastion · intégrité # %', 34));
 
 if (!VIDEO_A_JOUR) {
   video.pause();
@@ -181,10 +188,12 @@ const parcours = document.querySelector('[data-parcours]');
 const arcade = document.querySelector('.arcade');
 let lancement = performance.now(), lentes = 0;
 let horsChamp = false, arcadeAtteinte = false, pPrecedent = 0, dernierY = 0;
+let enGlisse = false, lest = false, trajet = 0;   // enGlisse : c'est le trajet qui pilote la caméra, pas la position de la page
 
 document.querySelector('[data-remonter]')?.addEventListener('click', () => scrollTo({ top: 0, behavior: 'smooth' }));
 const PERIODE = (1 - DEBUT_FRACTALE) / PERIODES;
 const FIN_ACCUEIL = 0.07;                  // le titre a presque disparu
+const IMMERSION = 0.87;
 function suivreDefilement() {
   if (leger) {
     branches.classList.add('visible');
@@ -194,9 +203,9 @@ function suivreDefilement() {
   const H = Math.max(1, parcours.offsetHeight - innerHeight);
   const p = Math.min(1, scrollY / H);
   if (p > FIN_ACCUEIL && mode === 'video') basculer('live');   // la vidéo ne sait pas avancer : ici, seule la scène peut suivre
-  tour?.defiler(p);
+  if (!enGlisse) tour?.defiler(p);
   const n = Math.min(PERIODES, Math.max(0, Math.floor((p - DEBUT_FRACTALE) / PERIODE)));
-  niveau.textContent = `> leonhard · niveau ${n} / ${PERIODES}`;
+  ecrire(niveau, t('> leonhard · niveau # / #', n, PERIODES));
   niveau.style.opacity = fondu(DEBUT_FRACTALE - 0.02, DEBUT_FRACTALE, p);
   titre.style.opacity = 1 - fondu(0.02, 0.09, p);
   titre.style.transform = `translate3d(0, ${-90 * fondu(0.02, 0.09, p)}px, 0)`;
@@ -208,6 +217,7 @@ function suivreDefilement() {
   // Bam : au bout du tunnel, on ne remonte pas doucement vers l'arcade, on y tombe. Seulement en descendant.
   if (p > 0.996 && pPrecedent <= 0.996 && scrollY >= dernierY && !arcadeAtteinte) {
     arcadeAtteinte = true;
+    trajet++; lest = enGlisse = false;       // le bam prend la main sur le trajet en cours
     chargerArcade();
     const arrivee = parcours.offsetHeight + 2, fin = performance.now() + 650;
     const tenir = () => { scrollTo(0, arrivee); if (performance.now() < fin) requestAnimationFrame(tenir); };
@@ -219,13 +229,30 @@ function suivreDefilement() {
   pPrecedent = p; dernierY = scrollY;
   // Une fois l'arcade montée, le 3D se tait : les jeux ont toute la machine pour eux.
   const couvert = scrollY > parcours.offsetHeight;
+  // Dans le tunnel, plus d'interface : le voile et les boutons ne doivent pas rester posés sur la lumière.
+  document.documentElement.classList.toggle('immersion', p > IMMERSION && !couvert);
   if (couvert !== horsChamp && tour) { horsChamp = couvert; if (couvert) tour.arreter(); else if (mode === 'live') tour.demarrer(); }
   racine.style.visibility = couvert ? 'hidden' : '';
   if (scrollY > parcours.offsetHeight - innerHeight * 2.5) chargerArcade();
 }
 addEventListener('scroll', suivreDefilement, { passive: true });
-(leger ? Promise.resolve() : preparer()).then(() => { suivreDefilement(); if (q.has('debug')) window.bastion = tour; });   // ?debug : position exacte, pour vérifier le raccord
+(leger ? Promise.resolve() : preparer()).then(() => {
+  suivreDefilement();
+  if (q.has('debug')) window.bastion = tour;
+  // L'arcade se charge au repos, derrière la vidéo : à la dernière seconde, elle couperait l'élan du tunnel.
+  if (!leger && !tactile) (window.requestIdleCallback || setTimeout)(chargerArcade);
+});   // ?debug : position exacte, pour vérifier le raccord
 suivreDefilement();
+
+// Les langues : tout ce qui est écrit par le code se réécrit au changement.
+brancherSelecteur(document.querySelector('[data-langue]'));
+surLangue(() => {
+  ecrireLegende();
+  if (!restaure) ecrire(journal, t('> bastion · intégrité # %', Math.round(34 + 66 * (tour?.etat ?? 0))));
+  else journal.textContent = t('[ OK ] bastion restauré · intégrité 100 %');
+  ficheAffichee = null;
+  suivreDefilement();
+});
 
 // Le rail : on peut aller droit au but. Le saut est immédiat, le fondu de la caméra fait le reste.
 const chapitres = [...document.querySelectorAll('[data-chapitre]')];
@@ -272,10 +299,12 @@ const polygone = (coins) => `polygon(${coins.join(', ')})`;
 async function entrer(nom, i, ancre, bouton) {
   const ce = ++entree;
   dernierBouton = bouton;
-  titreUnivers.textContent = nom;
-  univers.querySelector('[data-univers-nom]').textContent = nom;
+  titreUnivers.textContent = t(nom);
+  univers.querySelector('[data-univers-nom]').textContent = t(nom);
   const anime = !leger && !calme && mode === 'live' && tour;
+  arrimage = true;
   if (!leger && Math.abs(scrollY / hauteur() - pPanneau(i)) > 0.002) await glisser(pPanneau(i));
+  arrimage = false;
   if (ce !== entree) return;
   ouverture?.cancel();
   ouverture = null;
@@ -364,53 +393,88 @@ async function revenir() {
 for (const [nom, i, ancre] of BRANCHES) {
   const c = document.createElement('button');
   c.type = 'button';
-  c.textContent = nom;
+  c.dataset.t = nom;
+  c.textContent = t(nom);
   c.addEventListener('click', () => entrer(nom, i, ancre, c));
   branches.append(c);
 }
 retour.addEventListener('click', revenir);
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && univers.classList.contains('ouvert')) revenir(); });
 
-// Le défilement assisté : un cran, un glissé ou une flèche lance le trajet jusqu'à l'étape suivante. Tout le monde vit la
-// même mise en scène, à la même vitesse, quelle que soit sa molette ou son pavé tactile. Dans l'arcade, le défilement est libre.
+// Le défilement lesté, comme igloo.inc : un chemin qu'on suit, sans étape. Le geste déplace une cible, et un ressort amorti
+// la rejoint : la vitesse reste continue, les crans d'une molette se fondent en une seule glissade, et on s'arrête où on veut.
+// Le clavier et le rail, eux, vont d'étape en étape. Dans l'arcade, le défilement est libre.
 const ETAPES_GUIDE = [0, 0.09, 0.345, ...BRANCHES.map(([, i]) => pPanneau(i)), 0.84, 1];
-const courbe = (x) => (1 - Math.cos(x * Math.PI)) / 2;   // une seule courbe de vitesse pour tout le parcours : douce, sans à-coup
+const RESSORT = 2.8;              // plus c'est bas, plus le parcours est lourd
+const CRAN = 120 / 0.014;         // un cran de molette vaut 1,4 % du parcours
+const CRAN_MAX = 0.03;            // un geste brusque ou une souris rapide ne fait pas sauter de scène
+const REPOS = 240;
+const DOIGT = 7;                  // écrans de glissé pour tout le parcours
+const SURVOL = 1.03;              // le tunnel ne ralentit pas avant le bam : la cible est au-delà de l'arrivée
+const ASPIRATION = 0.965;
+const courbe = (x) => (1 - Math.cos(x * Math.PI)) / 2;
 const plongeon = (x) => x ** 2.4;                // le tunnel ne fait qu'accélérer, jusqu'au bam
-let enGlisse = false, trajet = 0, dernierCran = 0, doigt = null;
+let cible = 0, courant = 0, vitesse = 0, dernierGeste = 0, dernierCran = 0, arrimage = false;
+let doigt = null, departDoigt = 0, elanDoigt = 0;
 const hauteur = () => Math.max(1, parcours.offsetHeight - innerHeight);
 const arrivee = () => parcours.offsetHeight + 2;
 const dansLeParcours = () => !leger && scrollY < hauteur() - 1;
 const occupe = () => document.documentElement.classList.contains('jeu-ouvert') || faille.open;
+const placer = (p) => { tour?.poser(p); scrollTo(0, p * hauteur()); };
 
 function glisser(vers) {
   const depart = scrollY / hauteur();
-  if (calme) { scrollTo(0, vers * hauteur()); tour?.poser(vers); return Promise.resolve(); }
+  lest = false;
+  const ce = ++trajet;
+  if (calme) { enGlisse = false; placer(vers); return Promise.resolve(); }
   const tunnel = vers === 1;
   const duree = tunnel ? 5200 : vers === 0.84 ? 3400 : Math.min(4200, 1400 + Math.abs(vers - depart) * 13000);   // le virage vers LEONHARD est le plus large : on lui laisse le temps
   const t0 = performance.now();
   enGlisse = true;
-  const ce = ++trajet;
   return new Promise((fini) => {
     const pas = (t) => {
       if (ce !== trajet) return fini();
-      const x = Math.min(1, (t - t0) / duree);
-      const p = depart + (vers - depart) * (tunnel ? plongeon(x) : courbe(x));
-      tour?.poser(p);                            // le trajet est déjà lissé : la caméra le suit sans retard
-      scrollTo(0, p * hauteur());
+      const x = Math.min(1, Math.max(0, (t - t0) / duree));   // l'horodatage de l'image peut précéder t0
+      placer(depart + (vers - depart) * (tunnel ? plongeon(x) : courbe(x)));
       if (x < 1 && scrollY < hauteur() - 1) requestAnimationFrame(pas);
       else { enGlisse = false; fini(); }
     };
     requestAnimationFrame(pas);
   });
 }
-async function avancer(sens) {
-  // La tour vidéo et la tour 3D ont le même cadrage à l'arrêt : on change d'abord d'image, sur place, et seulement ensuite on part.
-  if (mode === 'video' && sens > 0) {
-    enGlisse = true;
-    await basculer('live');
-    await new Promise((ok) => setTimeout(ok, 1000));
-    enGlisse = false;
+function suivreCible(ce) {
+  let avant = performance.now();
+  const pas = (t) => {
+    if (ce !== trajet) return;
+    if (leger) { lest = enGlisse = false; return; }
+    const dt = Math.min(0.05, Math.max(0, (t - avant) / 1000));
+    avant = t;
+    // On ne part qu'une fois la 3D à l'écran : le geste s'accumule pendant ce temps, rien n'est perdu.
+    if (mode !== 'video') {
+      vitesse += (RESSORT * RESSORT * (cible - courant) - 2 * RESSORT * vitesse) * dt;
+      courant = calme ? cible : Math.max(0, courant + vitesse * dt);
+      placer(Math.min(1, courant));
+    }
+    const pose = Math.abs(cible - courant) < 0.0002 && Math.abs(vitesse) < 0.0005;
+    if (courant >= 1 || (t - dernierGeste > REPOS && pose)) { lest = enGlisse = false; return; }
+    requestAnimationFrame(pas);
+  };
+  requestAnimationFrame(pas);
+}
+function lester(dp) {
+  if (!lest) {
+    lest = enGlisse = true;
+    cible = courant = Math.min(1, scrollY / hauteur());
+    vitesse = 0;
+    suivreCible(++trajet);
   }
+  if (dp > 0 && mode === 'video') basculer('live');
+  cible = Math.min(SURVOL, Math.max(0, cible + dp));
+  if (dp > 0 && cible > ASPIRATION) cible = SURVOL;
+  dernierGeste = performance.now();
+}
+async function avancer(sens) {
+  if (mode === 'video' && sens > 0) await basculer('live');
   const p = scrollY / hauteur();
   const suivante = sens > 0 ? ETAPES_GUIDE.find((e) => e > p + 0.004) : ETAPES_GUIDE.findLast((e) => e < p - 0.004);
   if (suivante !== undefined) glisser(suivante);
@@ -419,30 +483,39 @@ async function avancer(sens) {
 function remonterALaTable() {
   const e = document.querySelector('[data-eclair]');
   e.classList.remove('part'); void e.offsetWidth; e.classList.add('part');
-  const p = ETAPES_GUIDE.at(-3);
-  scrollTo(0, p * hauteur());
-  tour?.poser(p);
+  placer(ETAPES_GUIDE.at(-3));
 }
 function pousser(sens) {
   if (occupe() || leger) return false;
-  if (dansLeParcours()) { if (!enGlisse) avancer(sens); return true; }
+  if (dansLeParcours()) { avancer(sens); return true; }
   if (sens < 0 && scrollY <= arrivee() + 4) { remonterALaTable(); return true; }
   return false;
 }
+const pixels = (e) => e.deltaY * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? innerHeight : 1);
 addEventListener('wheel', (e) => {
   const maintenant = performance.now(), isole = maintenant - dernierCran > 120;
   dernierCran = maintenant;
+  if (arrimage) { e.preventDefault(); return; }
   if (occupe() || leger || !e.deltaY) return;
-  if (dansLeParcours() || enGlisse) { e.preventDefault(); if (isole) pousser(Math.sign(e.deltaY)); return; }
+  if (dansLeParcours() || enGlisse) { e.preventDefault(); lester(Math.max(-CRAN_MAX, Math.min(CRAN_MAX, pixels(e) / CRAN))); return; }
   if (isole && e.deltaY < 0 && scrollY <= arrivee() + 4) { e.preventDefault(); pousser(-1); }
 }, { passive: false });
-addEventListener('touchstart', (e) => { doigt = e.touches[0].clientY; }, { passive: true });
-addEventListener('touchmove', (e) => { if (!occupe() && !leger && (dansLeParcours() || enGlisse)) e.preventDefault(); }, { passive: false });
+addEventListener('touchstart', (e) => { doigt = departDoigt = e.touches[0].clientY; elanDoigt = 0; }, { passive: true });
+addEventListener('touchmove', (e) => {
+  if (arrimage) { e.preventDefault(); return; }
+  if (occupe() || leger || e.touches.length > 1 || !(dansLeParcours() || enGlisse)) return;
+  e.preventDefault();
+  const y = e.touches[0].clientY, dp = (doigt - y) / (innerHeight * DOIGT);
+  doigt = y;
+  elanDoigt = dp;
+  lester(dp);
+}, { passive: false });
 addEventListener('touchend', (e) => {
   if (doigt === null) return;
-  const d = doigt - e.changedTouches[0].clientY;
+  const d = departDoigt - e.changedTouches[0].clientY;
   doigt = null;
-  if (Math.abs(d) > 36) pousser(Math.sign(d));
+  if (lest) { if (!occupe()) lester(Math.max(-0.08, Math.min(0.08, elanDoigt * 14))); return; }   // le doigt lancé garde son élan
+  if (!dansLeParcours() && Math.abs(d) > 36) pousser(Math.sign(d));
 }, { passive: true });
 addEventListener('keydown', (e) => {
   const sens = { ArrowDown: 1, PageDown: 1, ' ': 1, ArrowUp: -1, PageUp: -1 }[e.key];

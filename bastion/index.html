@@ -58,7 +58,7 @@
   .hero[data-mode="live"] .balayage { transform: translate3d(0, 0, 0); }
   .hero.balaye .balayage { opacity: 1; }
 
-  .hud { position: absolute; inset: 0; z-index: 2; pointer-events: none; padding: var(--marge); display: grid; grid-template-rows: auto 1fr auto; }
+  .hud { position: absolute; inset: 0; z-index: 2; pointer-events: none; padding: var(--marge); display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr auto; }
   /* Le texte reste lisible sur la glace claire : un voile outremer, seulement là où il se pose. */
   .hud::before { content: ''; position: absolute; inset: 0; z-index: -1;
     background: radial-gradient(120% 90% at 0% 100%, rgba(5, 8, 44, .78), rgba(5, 8, 44, .34) 42%, transparent 66%),
@@ -120,7 +120,8 @@
   .bornes { max-width: 1320px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 18px; }
   .borne { display: flex; flex-direction: column; gap: 5px; padding: 0 0 16px; text-align: left; cursor: pointer; color: #9aa4ac; font: 400 12px/1.45 var(--mono); background: rgba(13, 26, 54, .55); border: 1px solid rgba(63, 211, 198, .18); overflow: hidden; transition: border-color .25s, transform .3s cubic-bezier(.2, .7, .2, 1), box-shadow .3s; }
   .borne:hover, .borne:focus-visible { border-color: var(--sain); transform: translateY(-4px); box-shadow: 0 14px 40px rgba(0, 0, 0, .45); outline: 0; }
-  .borne img { width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; display: block; background: #03060f; margin-bottom: 8px; }
+  .borne img { width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; display: block; background: #03060f; margin-bottom: 8px; filter: brightness(1.75) saturate(1.3); transition: filter .3s; }
+  .borne:hover img, .borne:focus-visible img { filter: brightness(2.1) saturate(1.4); }
   .borne > * { margin-left: 14px; margin-right: 14px; } .borne img { margin-left: 0; margin-right: 0; }
   .borne__n { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--sain); }
   .borne b { font: 600 20px/1.1 var(--titre); color: var(--texte); }
@@ -167,13 +168,14 @@
   /* Les branches : on choisit depuis la table, on entre, on revient. */
   .branches { position: fixed; z-index: 4; left: 50%; bottom: 20px; transform: translate(-50%, 16px); display: flex; gap: 6px; max-width: calc(100vw - 20px); overflow-x: auto; padding: 6px; background: rgba(4, 10, 24, .82); border: 1px solid rgba(63, 211, 198, .35); backdrop-filter: blur(8px); opacity: 0; pointer-events: none; transition: opacity .35s, transform .35s; }
   .branches.visible { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
-  .branches::before { content: 'Entrer :'; align-self: center; padding: 0 8px 0 6px; font-size: 11px; letter-spacing: .08em; color: var(--sain); white-space: nowrap; }
+  .branches::before { content: var(--entrer, 'Entrer :'); align-self: center; padding: 0 8px 0 6px; font-size: 11px; letter-spacing: .08em; color: var(--sain); white-space: nowrap; }
   .branches button { flex: none; min-height: 44px; padding: 0 15px; font: 500 12px var(--mono); letter-spacing: .06em; color: var(--texte); background: none; border: 1px solid transparent; cursor: pointer; }
   .branches button:hover, .branches button:focus-visible { color: #050818; background: var(--sain); outline: 0; }
   .univers { position: fixed; inset: 0; z-index: 25; display: flex; flex-direction: column; background: #040a18; visibility: hidden; opacity: 0; transition: opacity .42s ease, visibility 0s .42s; }
   .univers.ouvert { visibility: visible; opacity: 1; transition: opacity .42s ease, visibility 0s; }
   .hud, .branches, .rail { transition: opacity .3s; }
   html.plonge .hud, html.plonge .branches, html.plonge .rail { opacity: 0 !important; pointer-events: none; }
+  html.immersion .hud, html.immersion .rail { opacity: 0; pointer-events: none; }
   .univers__barre { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px clamp(10px, 2vw, 22px); background: #050818; border-bottom: 1px solid rgba(63, 211, 198, .35); font-size: 12px; color: var(--sain); }
   .univers__barre button { min-height: 44px; padding: 0 15px; font: 500 12px var(--mono); letter-spacing: .05em; color: #050818; background: var(--sain); border: 0; cursor: pointer; }
   .univers iframe { flex: 1; width: 100%; border: 0; background: #040a18; opacity: 0; transition: opacity .2s ease; }
@@ -213,6 +215,22 @@
   html, body { overflow-x: clip; }
   .arcade { overflow-x: clip; }
   @media (max-width: 640px) { .branches { left: 8px; right: 8px; max-width: none; display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; padding: 3px; overflow: hidden; transform: translateY(16px); } .branches.visible { transform: none; } .branches::before { display: none; } .branches button { padding: 0 1px; font-size: 11px; letter-spacing: 0; } .hud { padding-bottom: 56px; } .rail { display: none; } }
+  /* Le sélecteur de langue : au-dessus de tout le voyage, de la tour à l'arcade. */
+  .langue { position: fixed; z-index: 12; top: calc(var(--marge) - 4px); right: var(--marge); font: 500 11px/1 var(--mono); transition: opacity .3s; }
+  .langue > button { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 10px; color: var(--texte); background: rgba(7, 9, 11, .62); border: 1px solid var(--trait); backdrop-filter: blur(6px); cursor: pointer; font: inherit; letter-spacing: .06em; }
+  .langue ul { position: absolute; top: calc(100% + 4px); inset-inline-end: 0; margin: 0; padding: 4px; min-width: 190px; list-style: none; background: #070d1c; border: 1px solid var(--trait); }
+  .langue li button { display: block; width: 100%; min-height: 40px; padding: 0 12px; text-align: start; font: 400 13px var(--mono); color: var(--texte); background: none; border: 0; cursor: pointer; }
+  .langue li button:hover, .langue li button:focus-visible { background: rgba(63, 211, 198, .16); outline: 0; }
+  .langue li button[aria-current="true"] { color: var(--sain); }
+  .langue > button:focus-visible { outline: 1px solid var(--sain); outline-offset: 2px; }
+  html.immersion .langue, html.plonge .langue, html.jeu-ouvert .langue { opacity: 0; pointer-events: none; }
+  /* La place du sélecteur dans la barre du haut. */
+  .haut { padding-inline-end: 74px; }
+  /* L'arabe se lit de droite à gauche : le voile et les textes changent de côté. */
+  [dir="rtl"] .hud::before { background: radial-gradient(120% 90% at 100% 100%, rgba(5, 8, 44, .78), rgba(5, 8, 44, .34) 42%, transparent 66%), linear-gradient(to bottom, rgba(5, 8, 44, .4), transparent 18%); }
+  [dir="rtl"] .borne, [dir="rtl"] .une { text-align: right; }
+  [dir="rtl"] .langue { right: auto; left: var(--marge); }
+  @media (max-width: 760px) { [dir="rtl"] .frise { border-left: 0; border-right: 1px solid rgba(63, 211, 198, .5); } [dir="rtl"] .frise li { padding: 0 18px 15px 0; } [dir="rtl"] .frise li::before { left: auto; right: -5px; } }
   .journal { margin: 0 0 14px; font-size: 12px; color: var(--teinte); letter-spacing: .04em; transition: color .4s; min-height: 1.5em; }
   h1 { margin: 0; font: 600 clamp(44px, 7.4vw, 104px)/.92 var(--titre); letter-spacing: -.01em; text-shadow: 0 2px 30px rgba(0, 0, 0, .6); }
   .role { margin: 14px 0 0; color: var(--texte); opacity: .78; font-size: clamp(12px, 1.05vw, 14px); }
@@ -236,12 +254,20 @@
     .restaurer { width: 100%; min-height: 44px; }
     .titre::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 62%; z-index: -1; background: linear-gradient(to top, rgba(2, 5, 16, .9) 40%, transparent); pointer-events: none; }
     .journal { color: #ff9a8c; }
-    .bascule button { padding: 9px 9px; letter-spacing: .04em; min-height: 44px; }
+    .haut { flex-wrap: wrap; gap: 8px; padding-inline-end: 0; }
+    .marque { min-height: 34px; display: flex; align-items: center; }
+    .bascule { order: 1; width: 100%; }
+    .bascule button { flex: 1; padding: 9px 6px; letter-spacing: .04em; min-height: 40px; }
+    .frise li { min-width: 0; overflow-wrap: anywhere; }
   }
 </style>
 </head>
 <body>
 <div class="parcours" data-parcours></div>
+<div class="langue" data-langue>
+  <button type="button" aria-haspopup="true" aria-expanded="false" aria-label="Langue" data-t-aria><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3c2.6 2.6 2.6 15.4 0 18M12 3c-2.6 2.6-2.6 15.4 0 18"></path></svg><span data-langue-code>FR</span><span aria-hidden="true">▾</span></button>
+  <ul hidden></ul>
+</div>
 <main class="hero" data-hero data-mode="video">
   <video src="media/tour.mp4" poster="media/tour.jpg" muted loop playsinline autoplay preload="auto" aria-hidden="true"></video>
   <canvas aria-hidden="true"></canvas>
@@ -251,93 +277,93 @@
     <i class="coin hg"></i><i class="coin hd"></i><i class="coin bg"></i><i class="coin bd"></i>
     <header class="haut">
       <div class="marque">BASTION<span>.</span></div>
-      <div class="bascule" role="group" aria-label="Affichage de la tour">
-        <button type="button" data-vers="video" aria-pressed="true">Vidéo générée</button>
-        <button type="button" data-vers="live" aria-pressed="false">Temps réel</button>
+      <div class="bascule" role="group" aria-label="Affichage de la tour" data-t-aria>
+        <button type="button" data-t data-vers="video" aria-pressed="true">Vidéo générée</button>
+        <button type="button" data-t data-vers="live" aria-pressed="false">Temps réel</button>
       </div>
     </header>
 
     <section class="titre">
       <p class="journal" data-journal>&gt; bastion · intégrité 34 %</p>
       <h1>Anas Dine</h1>
-      <p class="role">Administrateur systèmes &amp; réseaux · automatisation · IA hébergée en local</p>
+      <p class="role" data-t>Administrateur systèmes &amp; réseaux · automatisation · IA hébergée en local</p>
     </section>
 
     <footer class="bas">
       <p class="legende" data-legende></p>
-      <button type="button" class="restaurer" data-restaurer>Maintenir pour restaurer</button>
+      <button type="button" class="restaurer" data-restaurer data-t>Maintenir pour restaurer</button>
     </footer>
     <section class="fiche" data-fiche aria-live="polite"></section>
     <div class="niveau" data-niveau aria-hidden="true"></div>
-    <nav class="branches" data-branches aria-label="Entrer dans une partie du portfolio"></nav>
-    <div class="indice" data-indice>Défilez pour entrer ↓</div>
+    <nav class="branches" data-branches aria-label="Entrer dans une partie du portfolio" data-t-aria></nav>
+    <div class="indice" data-indice data-t>Défilez pour entrer ↓</div>
     <a class="contact" data-contact href="https://ch.linkedin.com/in/anas-dine-732921327/en" rel="noopener">LinkedIn : Anas Dine</a>
   </div>
 </main>
-<nav class="rail" aria-label="Chapitres">
-  <button type="button" data-chapitre="0"><span>La tour</span><i></i></button>
-  <button type="button" data-chapitre="0.47"><span>La salle</span><i></i></button>
+<nav class="rail" aria-label="Chapitres" data-t-aria>
+  <button type="button" data-chapitre="0"><span data-t>La tour</span><i></i></button>
+  <button type="button" data-chapitre="0.47"><span data-t>La salle</span><i></i></button>
   <button type="button" data-chapitre="0.82"><span>Leonhard</span><i></i></button>
-  <button type="button" data-chapitre="production"><span>Production</span><i></i></button>
-  <button type="button" data-chapitre="arcade"><span>L'arcade</span><i></i></button>
+  <button type="button" data-chapitre="production"><span data-t>Production</span><i></i></button>
+  <button type="button" data-chapitre="arcade"><span data-t>L'arcade</span><i></i></button>
 </nav>
 <section class="arcade" id="arcade" aria-labelledby="titre-arcade">
   <section class="production" id="production" aria-labelledby="titre-production">
     <header class="arcade__tete">
-      <p>&gt; bastion · fin de la plongée · [ OK ]</p>
-      <h2 id="titre-production">La production</h2>
-      <p class="arcade__sous">Depuis juin, ça ne s'arrête pas : chaque mois, des outils et des réalisations de plus. Tout ce qui suit existe et s'ouvre.</p>
+      <p data-t>&gt; bastion · fin de la plongée · [ OK ]</p>
+      <h2 id="titre-production" data-t>La production</h2>
+      <p class="arcade__sous" data-t>Depuis juin, ça ne s'arrête pas : chaque mois, des outils et des réalisations de plus. Tout ce qui suit existe et s'ouvre.</p>
     </header>
     <ol class="frise">
-      <li><b>Juin</b><span>JARVIS et LEONHARD</span></li>
-      <li><b>Août</b><span>LEAP 57 et ce portfolio</span></li>
-      <li><b>Septembre</b><span>Plan B, Razor, l'indépendance</span></li>
-      <li><b>Octobre</b><span>ULTRON COCKPIT, sites et apps clients</span></li>
-      <li><b>Aujourd'hui</b><span>BASTION</span></li>
+      <li><b data-t>Juin</b><span data-t>JARVIS et LEONHARD</span></li>
+      <li><b data-t>Août</b><span data-t>LEAP 57 et ce portfolio</span></li>
+      <li><b data-t>Septembre</b><span data-t>Plan B, Razor, l'indépendance</span></li>
+      <li><b data-t>Octobre</b><span data-t>ULTRON COCKPIT, sites et apps clients</span></li>
+      <li><b data-t>Aujourd'hui</b><span data-t>BASTION</span></li>
     </ol>
     <div class="preuves">
-      <a class="preuve" href="https://claude.ai/artifact/XDR28AoSxV4tvVT4rPLpCQ" target="_blank" rel="noopener"><img src="media/preuves/bahia.jpg" alt="" loading="lazy" width="640" height="340"><small>Site · octobre</small><b>Le Palais de Bahia</b></a>
-      <a class="preuve" href="https://claude.ai/artifact/T41Y55G1mh7rdnWUZ1cPz5" target="_blank" rel="noopener"><img src="media/preuves/fulmine.jpg" alt="" loading="lazy" width="640" height="340"><small>Site · octobre</small><b>Fulmine Moda</b></a>
-      <a class="preuve" href="https://claude.ai/artifact/QLLmHsfTkNYsZzofD8x8zV" target="_blank" rel="noopener"><img src="media/preuves/ocrousti.jpg" alt="" loading="lazy" width="640" height="340"><small>Commande en ligne · octobre</small><b>O'Crousti Lausanne</b></a>
-      <a class="preuve" href="https://claude.ai/artifact/Rcp7gLJWyDv2eBz8CkqU63" target="_blank" rel="noopener"><img src="media/preuves/phoenix.jpg" alt="" loading="lazy" width="640" height="340"><small>Application · octobre</small><b>Phoenix Parc</b></a>
-      <div class="preuve preuve--outil"><small>Mes usines</small><b>Plan B</b><span>Ma chaîne de production de vidéos publicitaires, pilotée depuis le téléphone.</span></div>
-      <div class="preuve preuve--outil"><small>Mes usines</small><b>JARVIS</b><span>Le générateur de sites, sur mes propres cartes graphiques.</span></div>
-      <div class="preuve preuve--outil"><small>Mes usines</small><b>LEONHARD</b><span>La supervision de tout un parc, tenue par une seule personne.</span></div>
-      <div class="preuve preuve--outil"><small>Mes usines</small><b>ULTRON COCKPIT</b><span>20 minutes le matin, 20 le soir : je décide, les agents produisent.</span></div>
+      <a class="preuve" href="https://claude.ai/artifact/XDR28AoSxV4tvVT4rPLpCQ" target="_blank" rel="noopener"><img src="media/preuves/bahia.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Site · octobre</small><b>Le Palais de Bahia</b></a>
+      <a class="preuve" href="https://claude.ai/artifact/T41Y55G1mh7rdnWUZ1cPz5" target="_blank" rel="noopener"><img src="media/preuves/fulmine.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Site · octobre</small><b>Fulmine Moda</b></a>
+      <a class="preuve" href="https://claude.ai/artifact/QLLmHsfTkNYsZzofD8x8zV" target="_blank" rel="noopener"><img src="media/preuves/ocrousti.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Commande en ligne · octobre</small><b>O'Crousti Lausanne</b></a>
+      <a class="preuve" href="https://claude.ai/artifact/Rcp7gLJWyDv2eBz8CkqU63" target="_blank" rel="noopener"><img src="media/preuves/phoenix.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Application · octobre</small><b>Phoenix Parc</b></a>
+      <div class="preuve preuve--outil"><small data-t>Mes usines</small><b>Plan B</b><span data-t>Ma chaîne de production de vidéos publicitaires, pilotée depuis le téléphone.</span></div>
+      <div class="preuve preuve--outil"><small data-t>Mes usines</small><b>JARVIS</b><span data-t>Le générateur de sites, sur mes propres cartes graphiques.</span></div>
+      <div class="preuve preuve--outil"><small data-t>Mes usines</small><b>LEONHARD</b><span data-t>La supervision de tout un parc, tenue par une seule personne.</span></div>
+      <div class="preuve preuve--outil"><small data-t>Mes usines</small><b>ULTRON COCKPIT</b><span data-t>20 minutes le matin, 20 le soir : je décide, les agents produisent.</span></div>
     </div>
   </section>
   <header class="arcade__tete" id="arcade">
-    <h2 id="titre-arcade">L'arcade</h2>
-    <p class="arcade__sous">Un jeu phare et treize bornes, écrits pour ce portfolio. Tout tourne dans votre navigateur.</p>
+    <h2 id="titre-arcade" data-t>L'arcade</h2>
+    <p class="arcade__sous" data-t>Un jeu phare et treize bornes, écrits pour ce portfolio. Tout tourne dans votre navigateur.</p>
   </header>
   <button type="button" class="une" data-lance="razor">
     <img src="media/jeux/razor.jpg" alt="" loading="lazy">
-    <span><small>Le jeu phare · clavier, manette, tactile</small><b>Razor, l'Archonte</b><em>Un twin-stick néon. Cinq héros, des vagues, des gardiens, et une faille vers un autre monde toutes les trois vagues.</em><i>Lancer</i></span>
+    <span><small data-t>Le jeu phare · clavier, manette, tactile</small><b data-t>Razor, l'Archonte</b><em data-t>Un twin-stick néon. Cinq héros, des vagues, des gardiens, et une faille vers un autre monde toutes les trois vagues.</em><i data-t>Lancer</i></span>
   </button>
   <div class="bornes" data-bornes></div>
   <footer class="arcade__pied">
-    <span>Anas Dine · Suisse romande <button type="button" class="fissure" data-fissure hidden aria-label="Une fissure dans le mur">⌁</button></span>
+    <span><span data-t>Anas Dine · Suisse romande</span> <button type="button" class="fissure" data-fissure hidden aria-label="Une fissure dans le mur" data-t-aria>⌁</button></span>
     <span style="display:flex;gap:10px;flex-wrap:wrap">
       <a href="https://ch.linkedin.com/in/anas-dine-732921327/en" rel="noopener">LinkedIn</a>
-      <button type="button" data-remonter>Revenir à la tour ↑</button>
+      <button type="button" data-remonter data-t>Revenir à la tour ↑</button>
     </span>
   </footer>
 </section>
 <div class="eclair" data-eclair aria-hidden="true"></div>
-<div class="univers" data-univers role="dialog" aria-label="Détail du portfolio">
-  <div class="univers__barre"><span>&gt; bastion/<span data-univers-titre></span></span><button type="button" data-retour>← Retour à la table Ultron</button></div>
-  <span class="univers__charge" role="status"><span class="univers__nom" data-univers-nom></span>&gt; ouverture…</span>
+<div class="univers" data-univers role="dialog" aria-label="Détail du portfolio" data-t-aria>
+  <div class="univers__barre"><span>&gt; bastion/<span data-univers-titre></span></span><button type="button" data-retour data-t>← Retour à la table Ultron</button></div>
+  <span class="univers__charge" role="status"><span class="univers__nom" data-univers-nom></span><span data-t>&gt; ouverture…</span></span>
   <iframe title="Détail du portfolio"></iframe>
 </div>
-<div class="scene-jeu" data-scene role="dialog" aria-label="Jeu">
-  <button type="button" class="scene-jeu__fermer" data-scene-fermer>Fermer · Échap</button>
+<div class="scene-jeu" data-scene role="dialog" aria-label="Jeu" data-t-aria>
+  <button type="button" class="scene-jeu__fermer" data-scene-fermer data-t>Fermer · Échap</button>
   <iframe data-scene-razor title="Razor, l'Archonte" allow="fullscreen; gamepad" hidden></iframe>
   <div data-arcade-grille></div>
 </div>
 <dialog class="faille" data-faille aria-labelledby="titre-faille">
   <h3 id="titre-faille">DEAD RIFT</h3>
-  <p>Vous avez trouvé la faille. Derrière, un jeu qui tourne sur une machine privée : l'entrée se fait sur invitation, avec un code.</p>
-  <div><a href="https://ch.linkedin.com/in/anas-dine-732921327/en" rel="noopener">Demander un code</a><button type="button" data-faille-fermer>Refermer</button></div>
+  <p data-t>Vous avez trouvé la faille. Derrière, un jeu qui tourne sur une machine privée : l'entrée se fait sur invitation, avec un code.</p>
+  <div><a href="https://ch.linkedin.com/in/anas-dine-732921327/en" rel="noopener" data-t>Demander un code</a><button type="button" data-faille-fermer data-t>Refermer</button></div>
 </dialog>
 <script type="module" src="src/hero.js"></script>
 </body>
