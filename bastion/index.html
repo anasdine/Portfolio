@@ -199,7 +199,7 @@
   .leger .branches { position: absolute; }
   html, body { overflow-x: clip; }
   .arcade { overflow-x: clip; }
-  @media (max-width: 640px) { .branches { left: 8px; right: 8px; max-width: none; transform: translateY(16px); } .branches.visible { transform: none; } .branches::before { display: none; } .hud { padding-bottom: 56px; } }
+  @media (max-width: 640px) { .branches { left: 8px; right: 8px; max-width: none; display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; padding: 3px; overflow: hidden; transform: translateY(16px); } .branches.visible { transform: none; } .branches::before { display: none; } .branches button { padding: 0 1px; font-size: 11px; letter-spacing: 0; } .hud { padding-bottom: 56px; } .rail { display: none; } }
   .journal { margin: 0 0 14px; font-size: 12px; color: var(--teinte); letter-spacing: .04em; transition: color .4s; min-height: 1.5em; }
   h1 { margin: 0; font: 600 clamp(44px, 7.4vw, 104px)/.92 var(--titre); letter-spacing: -.01em; text-shadow: 0 2px 30px rgba(0, 0, 0, .6); }
   .role { margin: 14px 0 0; color: var(--texte); opacity: .78; font-size: clamp(12px, 1.05vw, 14px); }
@@ -221,6 +221,8 @@
     .hud { padding-bottom: 42px; }
     .indice { bottom: 14px; }
     .restaurer { width: 100%; min-height: 44px; }
+    .titre::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 62%; z-index: -1; background: linear-gradient(to top, rgba(2, 5, 16, .9) 40%, transparent); pointer-events: none; }
+    .journal { color: #ff9a8c; }
     .bascule button { padding: 9px 9px; letter-spacing: .04em; min-height: 44px; }
   }
 </style>

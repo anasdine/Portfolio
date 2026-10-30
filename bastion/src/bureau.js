@@ -201,8 +201,8 @@ export async function creerBureau(scene) {
   const matPlafond = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide });
   matPlafond.colorNode = Fn(() => {
     const d = length(positionWorld.xz);
-    const anneau = smoothstep(14, 15.5, d).mul(float(1).sub(smoothstep(16.5, 18, d)));
-    return color(0x070d18).add(vec3(0.5, 0.74, 0.86).mul(anneau.mul(0.62)));
+    const anneau = smoothstep(15.3, 15.5, d).mul(float(1).sub(smoothstep(15.7, 15.9, d)));
+    return color(0x070d18).add(vec3(0.25, 0.83, 0.78).mul(anneau.mul(0.8)));
   })();
   const plafond = new THREE.Mesh(new THREE.CircleGeometry(RAYON, 96), matPlafond);
   plafond.rotation.x = Math.PI / 2;
@@ -338,8 +338,10 @@ export async function creerBureau(scene) {
     return mix(d, color(0x2438bc), smoothstep(0.8, 1, r)).mul(1.5);
   })();
   const fleurs = [];
-  const voute = new THREE.Mesh(rosace, matRosace);
-  voute.scale.setScalar(11.5);
+  const matVoute = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide });
+  matVoute.colorNode = matRosace.colorNode.mul(0.3);
+  const voute = new THREE.Mesh(rosace, matVoute);
+  voute.scale.setScalar(7.5);
   voute.rotation.x = Math.PI / 2;
   voute.position.y = SOL + HAUT - 0.15;
   salle.add(voute);

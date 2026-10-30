@@ -63,6 +63,7 @@ export async function creerFractale(scene, centre, { allege = false } = {}) {
   scene.add(groupe);
 
   const zoom = uniform(1);
+  const presence = uniform(1);
   const echelles = new Float32Array(liste.length);
   liste.forEach((n, i) => { echelles[i] = n.e; });
   const aEchelle = instancedBufferAttribute(new THREE.InstancedBufferAttribute(echelles, 1));
@@ -78,7 +79,7 @@ export async function creerFractale(scene, centre, { allege = false } = {}) {
     const parCentre = float(1).sub(smoothstep(4.4, 5.2, length(positionWorld.sub(vec3(centre.x, centre.y, centre.z)))));
     const parOeil = smoothstep(0.15, 1.1, length(positionWorld.sub(cameraPosition)));
     const parGrandeur = float(1).sub(smoothstep(0.9, 3.4, taille).mul(0.9));   // la tour qu'on traverse s'efface devant celles qu'elle contient
-    return parTaille.mul(parCentre).mul(parOeil).mul(parGrandeur);
+    return parTaille.mul(parCentre).mul(parOeil).mul(parGrandeur).mul(presence);
   })();
 
   const matiere = (colorNode, intensite) => {
@@ -128,7 +129,8 @@ export async function creerFractale(scene, centre, { allege = false } = {}) {
 
   return {
     groupe,
-    regler(phi, t) {
+    regler(phi, t, p = 1) {
+      presence.value = p;
       const f = phi - Math.floor(phi);
       const s = K ** f;
       zoom.value = s;

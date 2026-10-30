@@ -197,7 +197,9 @@ function suivreDefilement() {
   if (p > 0.996 && pPrecedent <= 0.996 && scrollY >= dernierY && !arcadeAtteinte) {
     arcadeAtteinte = true;
     chargerArcade();
-    scrollTo(0, parcours.offsetHeight + 2);
+    const arrivee = parcours.offsetHeight + 2, fin = performance.now() + 650;
+    const tenir = () => { scrollTo(0, arrivee); if (performance.now() < fin) requestAnimationFrame(tenir); };
+    tenir();
     if (!calme) { arcade.classList.remove('bam'); void arcade.offsetWidth; arcade.classList.add('bam'); }
   }
   if (p < 0.97) arcadeAtteinte = false;
@@ -314,3 +316,18 @@ for (const [nom, i, ancre] of BRANCHES) {
 }
 retour.addEventListener('click', revenir);
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && univers.classList.contains('ouvert')) revenir(); });
+
+// ?diag : la page dit ce qu'elle fait. Rien ne sort du navigateur : c'est lu à l'écran, ou par les outils de test.
+if (q.has('diag')) {
+  const d = (window.__diag = { erreurs: [], reseau: [], fps: 0 });
+  addEventListener('error', (e) => d.erreurs.push(e.message || String(e.target?.src || e.target?.href)), true);
+  addEventListener('unhandledrejection', (e) => d.erreurs.push(String(e.reason)));
+  new PerformanceObserver((l) => { for (const e of l.getEntries()) if (e.responseStatus >= 400) d.reseau.push(e.responseStatus + ' ' + e.name); }).observe({ type: 'resource', buffered: true });
+  const bloc = document.createElement('pre');
+  bloc.style.cssText = 'position:fixed;z-index:99;left:8px;top:60px;margin:0;padding:8px 10px;font:11px/1.5 ui-monospace,monospace;color:#7ff0e4;background:rgba(0,0,0,.72);pointer-events:none';
+  document.body.append(bloc);
+  setInterval(() => {
+    Object.assign(d, { fps, mode, leger, largeur: innerWidth, hauteur: innerHeight, dpr: devicePixelRatio, ...(tour?.stats() || {}) });
+    bloc.textContent = Object.entries(d).map(([k, v]) => k + ' ' + (Array.isArray(v) ? v.length + (v.length ? ' : ' + v.at(-1) : '') : v)).join('\n');
+  }, 500);
+}

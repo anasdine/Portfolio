@@ -504,7 +504,7 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
   const peuple = creerPeuple(dehors, metal);
   const bureau = await creerBureau(scene);
   const CENTRE = new THREE.Vector3(0, SOL + 4.3, 0);
-  const fractale = await creerFractale(scene, CENTRE, { allege: matchMedia('(pointer: coarse)').matches });
+  const fractale = await creerFractale(scene, CENTRE, { allege: matchMedia('(pointer: coarse)').matches || innerWidth < 820 });
 
   // ── Le trajet : le défilement pilote tout. Dehors, la chaussée, l'escalier, les portes ; dedans, les panneaux ──────
   const CHEMIN = new THREE.CatmullRomCurve3([
@@ -515,7 +515,7 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
   const adoucir = (a, b, x) => { const t = THREE.MathUtils.clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
   const vise = new THREE.Vector3(), cibleVue = new THREE.Vector3(), pos = new THREE.Vector3(), sommet = new THREE.Vector3(), orbite = new THREE.Vector3(), vise2 = new THREE.Vector3();
   const devant = new THREE.Vector3(0, SOL + 4.3, 4);
-  let roulis = 0;
+  let roulis = 0, presence = 1;
   const souris = { x: 0, y: 0, lx: 0, ly: 0 };
   addEventListener('pointermove', (e) => { souris.x = e.clientX / innerWidth - 0.5; souris.y = e.clientY / innerHeight - 0.5; }, { passive: true });
   const defilement = { cible: 0, valeur: 0 };
@@ -536,7 +536,7 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
       const a0 = bureau.panneaux[Math.min(i, dernier)], a1 = bureau.panneaux[Math.min(i + 1, dernier)];
       const vertical = camera.aspect < 1;
       const angle = THREE.MathUtils.lerp(a0.angle, a1.angle, f) + Math.PI + (vertical ? 0 : 0.49);
-      const recul = vertical ? 11 : 7;
+      const recul = vertical ? Math.min(15, Math.max(7, 11.8 / (Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect) - 24)) : 7;
       orbite.set(Math.cos(angle) * recul, SOL + 3.4, Math.sin(angle) * recul);
       vise2.lerpVectors(a0.position, a1.position, f).multiplyScalar(0.95);
       vise2.y = SOL + 7.2;
@@ -557,14 +557,17 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     roulis += dt * 0.05 * dansLeZoom;
     camera.rotateZ(roulis);
     const phi = Math.min(PERIODES - 0.001, Math.max(0, (p - DEBUT_FRACTALE) / (1 - DEBUT_FRACTALE)) * PERIODES);
-    fractale.regler(phi, t);
+    // devant un panneau, l'hologramme se retire pour laisser lire
+    const viseePresence = foyer >= 0 ? (camera.aspect < 1 ? 0.05 : 0.18) : 1;
+    presence += (viseePresence - presence) * 0.08;
+    fractale.regler(phi, t, presence);
     nuit.value = adoucir(DEBUT_FRACTALE, DEBUT_FRACTALE + (1 - DEBUT_FRACTALE) / PERIODES, p);
-    bureau.salle.visible = nuit.value < 0.995 && p > 0.27;   // inutile de rendre la salle (et son miroir) depuis l'extérieur
+    bureau.salle.visible = nuit.value < 0.995 && p > 0.18;   // inutile de rendre la salle (et son miroir) depuis l'extérieur
     for (const { b } of battants) b.visible = nuit.value < 0.995;
-    const fov = THREE.MathUtils.lerp(CHAMP, 52, adoucir(0.18, FIN_TRAJET, p));
+    const fov = THREE.MathUtils.lerp(CHAMP, camera.aspect < 1 ? CHAMP : 52, adoucir(0.18, FIN_TRAJET, p));
     if (Math.abs(fov - champ) > 0.01) { champ = fov; redimensionner(); }
 
-    for (const { b, cote } of battants) b.position.x = cote * (1.8 + 3.7 * adoucir(0.3, 0.37, p));
+    for (const { b, cote } of battants) b.position.x = cote * (1.8 + 3.7 * adoucir(0.2, 0.26, p));
     dehors.visible = p < FIN_TRAJET + 0.02;
     forceRayons.value = poidsDehors;
     // la dernière ligne droite : le tunnel s'ouvre, accélère de plus en plus, puis tout blanchit
@@ -573,7 +576,7 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     const elan = adoucir(0.885, 1, p);
     avance.value = t * 0.35 + elan * elan * 26;
     format.value = camera.aspect;
-    fondu.value = Math.max(0.85 * adoucir(0.36, 0.385, p) * (1 - adoucir(0.385, 0.43, p)), adoucir(0.975, 0.998, p));
+    fondu.value = adoucir(0.975, 0.998, p);
     camera.updateMatrixWorld();
     sommet.set(0, H, 0).project(camera);
     centreRayons.value.set(sommet.x * 0.5 + 0.5, 0.5 - sommet.y * 0.5);
@@ -640,5 +643,10 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     poser(p) { defilement.cible = p; defilement.valeur = p; },
     decaler(dp) { defilement.cible += dp; defilement.valeur += dp; },
     get etat() { return etat.valeur; },
+    // pour le mode diagnostic : ce que le moteur fait vraiment à cet instant
+    stats() {
+      const i = renderer.info.render;
+      return { backend, palier: PALIERS[palier], toile: toile.width + '×' + toile.height, appels: i.drawCalls, triangles: i.triangles, p: +defilement.valeur.toFixed(3), foyer: +foyer.toFixed(2) };
+    },
   };
 }

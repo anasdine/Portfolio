@@ -5,20 +5,22 @@ import { Fn, uv, smoothstep, mix, color, float, vec3 } from 'three/tsl';
 
 const alea = (n) => { const s = Math.sin(n * 91.7 + 17.3) * 43758.5453; return s - Math.floor(s); };
 
+const effile = (x) => 1 - Math.abs(x) ** 2.1 * 0.97;
+function effiler(g, lateral) {
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) p[lateral === 'y' ? 'setY' : 'setZ'](i, p[lateral === 'y' ? 'getY' : 'getZ'](i) * effile(p.getX(i)));
+  p.needsUpdate = true;
+  g.computeVertexNormals();
+}
+
 function creerNavire(mats, L) {
   const navire = new THREE.Group();
   const coque = new THREE.Mesh(new THREE.SphereGeometry(1, 28, 14, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), mats.coque);
   coque.scale.set(L / 2, L * 0.17, L * 0.15);
-  const pc = coque.geometry.attributes.position;
-  for (let i = 0; i < pc.count; i++) {        // effile la proue et la poupe : une coque, pas une soucoupe
-    const x = pc.getX(i), k = 1 - Math.abs(x) ** 2.6 * 0.82;
-    pc.setZ(i, pc.getZ(i) * k);
-    pc.setX(i, x + (1 - k) * 0.12 * Math.sign(x));
-  }
-  pc.needsUpdate = true;
-  coque.geometry.computeVertexNormals();
+  effiler(coque.geometry, 'z');
   navire.add(coque);
   const pont = new THREE.Mesh(new THREE.CircleGeometry(1, 28), mats.pont);
+  effiler(pont.geometry, 'y');
   pont.rotation.x = -Math.PI / 2;
   pont.scale.set(L / 2, L * 0.15, 1);
   navire.add(pont);
@@ -26,6 +28,7 @@ function creerNavire(mats, L) {
   chateau.position.set(-L * 0.28, L * 0.037, 0);
   navire.add(chateau);
   const quille = new THREE.Mesh(new THREE.TorusGeometry(1, 0.012, 6, 48), mats.feu);
+  effiler(quille.geometry, 'y');
   quille.rotation.x = Math.PI / 2;
   quille.scale.set(L / 2, L * 0.15, 1);
   quille.position.y = -L * 0.012;
@@ -147,21 +150,25 @@ export function creerPeuple(dehors, metal) {
   });
 
   const patrouille = (objet, rayon, vitesse, depart) => { dehors.add(objet); return { rayon, vitesse, depart }; };
+  let robots0 = 0, chiens0 = 0;
   const robots = [[118, 0.025, 0.42, 5.2], [132, 0.022, 0.2, 4.2], [118, 0.025, 0.62, 5.2], [146, 0.02, 0.5, 6.2], [104, 0.03, 0.3, 3.6]].map(([rayon, v, d, ech]) => {
     const r = creerRobot(mats);
     r.groupe.scale.setScalar(ech);
-    return { ...r, ech, ...patrouille(r.groupe, rayon, v, d * Math.PI * 2) };
+    return { ...r, ech, couloir: [62, -96, 118, -148, 84][robots0++], ...patrouille(r.groupe, rayon, v, d * Math.PI * 2) };
   });
   const chiens = [[124, 0.03, 0.47, 3.4], [112, 0.034, 0.25, 3], [138, 0.027, 0.58, 3.8], [96, 0.04, 0.36, 2.6], [150, 0.024, 0.14, 4.2]].map(([rayon, v, d, ech]) => {
     const c = creerChien(mats);
     c.groupe.scale.setScalar(ech);
-    return { ...c, ech, ...patrouille(c.groupe, rayon, v, d * Math.PI * 2) };
+    return { ...c, ech, couloir: [46, -74, 136, -124, 102][chiens0++], ...patrouille(c.groupe, rayon, v, d * Math.PI * 2) };
   });
 
   const placer = (o, t) => {
-    const a = o.depart + t * o.vitesse;
-    o.groupe.position.set(Math.cos(a) * o.rayon, 0, Math.sin(a) * o.rayon);
-    o.groupe.rotation.y = -a;                // tangent au cercle, tête vers l'avant
+    const c = o.couloir, w = (o.vitesse * o.rayon) / 62;
+    const z = 128 + Math.sin(t * w + o.depart) * 62;
+    const avance = Math.cos(t * w + o.depart) >= 0;
+    o.groupe.position.set(c, 0, z);
+    const vise = avance ? 0 : Math.PI;
+    o.groupe.rotation.y += (vise - o.groupe.rotation.y) * 0.05;
   };
 
   return {
