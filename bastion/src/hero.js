@@ -239,7 +239,7 @@ document.querySelector('[data-faille-fermer]').addEventListener('click', () => f
 // Les branches : depuis la table, chaque panneau ouvre son univers, avec le contenu complet du portfolio.
 // Le détail n'est pas recopié : c'est la vraie page, ses huit langues et son parcours « réglage de calibre ».
 const BRANCHES = [
-  ['Offre', 0, 'freelance'], ['Projets', 1, 'pieces'], ['Ultron', 2, 'strates'], ['Parcours', 3, 'reglage'], ['Contact', 4, 'contact'],
+  ['Offre', 0, 'freelance'], ['Projets', 1, 'pieces'], ['Méthode', 2, 'strates'], ['Parcours', 3, 'reglage'], ['Contact', 4, 'contact'],
 ];
 const univers = document.querySelector('[data-univers]');
 let cadreUnivers = univers.querySelector('iframe');
