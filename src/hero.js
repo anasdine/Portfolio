@@ -189,6 +189,7 @@ const arcade = document.querySelector('.arcade');
 let lancement = performance.now(), lentes = 0;
 let horsChamp = false, arcadeAtteinte = false, pPrecedent = 0, dernierY = 0;
 let enGlisse = false, lest = false, trajet = 0;   // enGlisse : c'est le trajet qui pilote la caméra, pas la position de la page
+let prise = null, imageArrivee = 0;
 
 document.querySelector('[data-remonter]')?.addEventListener('click', () => scrollTo({ top: 0, behavior: 'smooth' }));
 const PERIODE = (1 - DEBUT_FRACTALE) / PERIODES;
@@ -215,13 +216,14 @@ function suivreDefilement() {
   contact.style.pointerEvents = p > 0.73 && p < 0.77 ? 'auto' : 'none';
   branches.classList.toggle('visible', p > DEBUT_PANNEAUX - 0.02 && p < FIN_PANNEAUX + 0.012);
   // Bam : au bout du tunnel, on ne remonte pas doucement vers l'arcade, on y tombe. Seulement en descendant.
-  if (p > 0.996 && pPrecedent <= 0.996 && scrollY >= dernierY && !arcadeAtteinte) {
+  if (!prise && p > 0.996 && pPrecedent <= 0.996 && scrollY >= dernierY && !arcadeAtteinte) {
     arcadeAtteinte = true;
     trajet++; lest = enGlisse = false;       // le bam prend la main sur le trajet en cours
     chargerArcade();
     const arrivee = parcours.offsetHeight + 2, fin = performance.now() + 650;
-    const tenir = () => { scrollTo(0, arrivee); if (performance.now() < fin) requestAnimationFrame(tenir); };
-    tenir();
+    const tenir = () => { scrollTo(0, arrivee); if (performance.now() < fin) imageArrivee = requestAnimationFrame(tenir); };
+    // Le doigt garde la main : aucun verrouillage de la position pendant son élan.
+    if (!defilementTactile) tenir();
     if (!calme) { const e = document.querySelector('[data-eclair]'); e.classList.remove('part'); void e.offsetWidth; e.classList.add('part'); }
     if (!calme) { arcade.classList.remove('bam'); void arcade.offsetWidth; arcade.classList.add('bam'); }
   }
@@ -409,13 +411,12 @@ const RESSORT = 2.8;              // plus c'est bas, plus le parcours est lourd
 const CRAN = 120 / 0.014;         // un cran de molette vaut 1,4 % du parcours
 const CRAN_MAX = 0.03;            // un geste brusque ou une souris rapide ne fait pas sauter de scène
 const REPOS = 240;
-const DOIGT = 7;                  // écrans de glissé pour tout le parcours
 const SURVOL = 1.03;              // le tunnel ne ralentit pas avant le bam : la cible est au-delà de l'arrivée
 const ASPIRATION = 0.965;
 const courbe = (x) => (1 - Math.cos(x * Math.PI)) / 2;
 const plongeon = (x) => x ** 2.4;                // le tunnel ne fait qu'accélérer, jusqu'au bam
 let cible = 0, courant = 0, vitesse = 0, dernierGeste = 0, dernierCran = 0, arrimage = false;
-let doigt = null, departDoigt = 0, elanDoigt = 0;
+let defilementTactile = false;
 const hauteur = () => Math.max(1, parcours.offsetHeight - innerHeight);
 const arrivee = () => parcours.offsetHeight + 2;
 const dansLeParcours = () => !leger && scrollY < hauteur() - 1;
@@ -493,6 +494,7 @@ function pousser(sens) {
 }
 const pixels = (e) => e.deltaY * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? innerHeight : 1);
 addEventListener('wheel', (e) => {
+  defilementTactile = false;
   const maintenant = performance.now(), isole = maintenant - dernierCran > 120;
   dernierCran = maintenant;
   if (arrimage) { e.preventDefault(); return; }
@@ -500,22 +502,13 @@ addEventListener('wheel', (e) => {
   if (dansLeParcours() || enGlisse) { e.preventDefault(); lester(Math.max(-CRAN_MAX, Math.min(CRAN_MAX, pixels(e) / CRAN))); return; }
   if (isole && e.deltaY < 0 && scrollY <= arrivee() + 4) { e.preventDefault(); pousser(-1); }
 }, { passive: false });
-addEventListener('touchstart', (e) => { doigt = departDoigt = e.touches[0].clientY; elanDoigt = 0; }, { passive: true });
-addEventListener('touchmove', (e) => {
-  if (arrimage) { e.preventDefault(); return; }
-  if (occupe() || leger || e.touches.length > 1 || !(dansLeParcours() || enGlisse)) return;
-  e.preventDefault();
-  const y = e.touches[0].clientY, dp = (doigt - y) / (innerHeight * DOIGT);
-  doigt = y;
-  elanDoigt = dp;
-  lester(dp);
-}, { passive: false });
-addEventListener('touchend', (e) => {
-  if (doigt === null) return;
-  const d = departDoigt - e.changedTouches[0].clientY;
-  doigt = null;
-  if (lest) { if (!occupe()) lester(Math.max(-0.08, Math.min(0.08, elanDoigt * 14))); return; }   // le doigt lancé garde son élan
-  if (!dansLeParcours() && Math.abs(d) > 36) pousser(Math.sign(d));
+// Le navigateur gère le doigt et son inertie, même au-dessus de la scène fixe.
+// Un geste interrompt aussi un trajet lancé au clavier, au rail ou à la molette.
+addEventListener('touchstart', () => {
+  defilementTactile = true;
+  if (occupe() || arrimage) return;
+  trajet++;
+  lest = enGlisse = false;
 }, { passive: true });
 addEventListener('keydown', (e) => {
   const sens = { ArrowDown: 1, PageDown: 1, ' ': 1, ArrowUp: -1, PageUp: -1 }[e.key];
@@ -524,6 +517,97 @@ addEventListener('keydown', (e) => {
 });
 addEventListener('scroll', () => document.documentElement.classList.toggle('guide', dansLeParcours()), { passive: true });
 document.documentElement.classList.toggle('guide', !leger);
+
+
+// Une barre tactile : aucun gestionnaire de geste sur la piste ou sur la page.
+const defilement = document.querySelector('[data-defilement]');
+const poignee = defilement.querySelector('[data-poignee]');
+const ecranDefilement = matchMedia('(max-width: 760px), (pointer: coarse) and (max-height: 520px)');
+let imageDefilement = 0;
+const borner = (n, max) => Math.max(0, Math.min(max, n));
+function mesurerDefilement() {
+  const vue = window.visualViewport;
+  defilement.style.setProperty('--defilement-vue', vue ? vue.height + 'px' : '100dvh');
+  defilement.style.setProperty('--defilement-haut', (vue?.offsetTop || 0) + 'px');
+  const hauteurPage = document.documentElement.scrollHeight;
+  const hauteurVue = document.documentElement.clientHeight;
+  const maximum = Math.max(0, hauteurPage - hauteurVue);
+  const piste = defilement.clientHeight;
+  const taille = Math.min(piste, Math.max(44, piste * hauteurVue / hauteurPage));
+  return { maximum, taille, course: Math.max(0, piste - taille) };
+}
+function actualiserDefilement() {
+  imageDefilement = 0;
+  defilement.hidden = !ecranDefilement.matches;
+  if (defilement.hidden) return;
+  const { maximum, taille, course } = mesurerDefilement();
+  if (prise) {
+    const delta = prise.y - prise.avant;
+    prise.avant = prise.y;
+    // Le déplacement relatif conserve le point de prise quand Safari redimensionne la vue.
+    if (delta && course && !occupe()) scrollTo({ top: borner(scrollY + delta * maximum / course, maximum), behavior: 'instant' });
+  }
+  const position = maximum ? borner(scrollY, maximum) / maximum : 0;
+  poignee.style.height = taille + 'px';
+  poignee.style.transform = 'translate3d(0, ' + position * course + 'px, 0)';
+  poignee.setAttribute('aria-valuenow', String(Math.round(position * 100)));
+  poignee.setAttribute('aria-disabled', String(!maximum));
+}
+function demanderDefilement() {
+  if (!imageDefilement) imageDefilement = requestAnimationFrame(actualiserDefilement);
+}
+function interrompreTrajet() {
+  trajet++;
+  lest = enGlisse = false;
+  defilementTactile = true; // Le raccord du tunnel ne doit pas reprendre la main.
+}
+poignee.addEventListener('pointerdown', (e) => {
+  if (prise || !e.isPrimary || e.button !== 0 || occupe() || arrimage) return;
+  interrompreTrajet();
+  // La prise annule aussi le maintien à l'arrivée de l'arcade.
+  cancelAnimationFrame(imageArrivee);
+  imageArrivee = 0;
+  scrollTo({ top: scrollY, behavior: 'instant' });
+  prise = { id: e.pointerId, y: e.clientY, avant: e.clientY };
+  poignee.setAttribute('data-glisse', '');
+  poignee.setPointerCapture(e.pointerId);
+  demanderDefilement();
+});
+poignee.addEventListener('pointermove', (e) => {
+  if (prise?.id !== e.pointerId) return;
+  prise.y = e.clientY;
+  demanderDefilement();
+});
+function terminerPrise(e) {
+  if (prise?.id !== e.pointerId) return;
+  if (e.type === 'pointerup') prise.y = e.clientY;
+  if (imageDefilement) cancelAnimationFrame(imageDefilement);
+  actualiserDefilement();
+  prise = null;
+  poignee.removeAttribute('data-glisse');
+  if (poignee.hasPointerCapture(e.pointerId)) poignee.releasePointerCapture(e.pointerId);
+}
+for (const nom of ['pointerup', 'pointercancel', 'lostpointercapture']) poignee.addEventListener(nom, terminerPrise);
+poignee.addEventListener('keydown', (e) => {
+  if (occupe() || arrimage) return;
+  const maximum = Math.max(0, document.documentElement.scrollHeight - document.documentElement.clientHeight);
+  const page = document.documentElement.clientHeight;
+  const destinations = { ArrowDown: scrollY + 40, ArrowUp: scrollY - 40, PageDown: scrollY + page,
+    PageUp: scrollY - page, ' ': scrollY + (e.shiftKey ? -page : page), Home: 0, End: maximum };
+  if (!(e.key in destinations)) return;
+  e.preventDefault();
+  e.stopPropagation();
+  interrompreTrajet();
+  scrollTo({ top: borner(destinations[e.key], maximum), behavior: 'instant' });
+  demanderDefilement();
+});
+addEventListener('scroll', demanderDefilement, { passive: true });
+addEventListener('resize', demanderDefilement);
+window.visualViewport?.addEventListener('resize', demanderDefilement);
+window.visualViewport?.addEventListener('scroll', demanderDefilement, { passive: true });
+ecranDefilement.addEventListener('change', demanderDefilement);
+new ResizeObserver(demanderDefilement).observe(document.body);
+demanderDefilement();
 
 // ?diag : la page dit ce qu'elle fait. Rien ne sort du navigateur : c'est lu à l'écran, ou par les outils de test.
 if (q.has('diag')) {

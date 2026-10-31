@@ -7,6 +7,8 @@ const CLE = 'ad2026.lang';
 const COLONNE = { en: 0, de: 1, it: 2, zh: 3, ar: 4, ja: 5, 'de-CH': 1 };
 
 const T = {
+  'Descendre d’un écran': ['Scroll down one screen', 'Eine Bildschirmhöhe nach unten scrollen', 'Scorri in basso di una schermata', '向下滚动一屏', 'مرّر شاشة واحدة لأسفل', '1画面下へスクロール'],
+  'Revenir en haut de la page': ['Back to top of page', 'Zurück zum Seitenanfang', 'Torna in cima alla pagina', '返回页面顶部', 'العودة إلى أعلى الصفحة', 'ページの先頭に戻る'],
   // l'interface
   'Affichage de la tour': ['Tower display', 'Turmansicht', 'Visualizzazione della torre', '塔的显示方式', 'عرض البرج', 'タワーの表示'],
   'Vidéo générée': ['Generated video', 'Generiertes Video', 'Video generato', '生成视频', 'فيديو مولّد', '生成動画'],

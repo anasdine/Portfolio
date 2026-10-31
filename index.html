@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>BASTION — Anas Dine</title>
 <meta name="description" content="Anas Dine, administrateur systèmes et réseaux en Suisse romande : automatisation, IA hébergée en local, sites et applications.">
 <meta name="color-scheme" content="dark">
@@ -43,7 +43,7 @@
   html, body { margin: 0; background: var(--fond); color: var(--texte); }
   body { font: 400 14px/1.5 var(--mono); -webkit-font-smoothing: antialiased; }
   .parcours { height: 1000vh; }
-  html.guide { scrollbar-width: none; touch-action: pan-x pinch-zoom; overscroll-behavior: none; }
+  html.guide { scrollbar-width: none; touch-action: pan-y pinch-zoom; overscroll-behavior: none; }
   html.guide::-webkit-scrollbar { display: none; }
 
   .hero { --teinte: #ff5c4d; position: fixed; inset: 0; height: 100svh; overflow: hidden; isolation: isolate; }
@@ -241,7 +241,7 @@
     position: relative; overflow: hidden; flex: none;
     font: 500 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--texte);
     background: rgba(7, 9, 11, .55); border: 1px solid var(--teinte); padding: 12px 16px; cursor: pointer;
-    transition: border-color .4s; touch-action: none; user-select: none;
+    transition: border-color .4s; touch-action: pan-y pinch-zoom; user-select: none;
   }
   .restaurer::before { content: ''; position: absolute; inset: 0; background: var(--teinte); opacity: .22; transform: scaleX(0); transform-origin: left; transition: transform .35s; }
   .restaurer.maintenu::before { transform: scaleX(1); transition: transform 2.2s linear; }
@@ -260,9 +260,46 @@
     .bascule button { flex: 1; padding: 9px 6px; letter-spacing: .04em; min-height: 40px; }
     .frise li { min-width: 0; overflow-wrap: anywhere; }
   }
+
+  /* Seule la poignée intercepte le geste, la piste laisse défiler la page. */
+  .navigation-defilement { display: none; }
+  @media (max-width: 760px), (pointer: coarse) and (max-height: 520px) {
+    .navigation-defilement {
+      position: fixed; z-index: 13;
+      top: calc(var(--defilement-haut, 0px) + 64px + env(safe-area-inset-top, 0px));
+      right: calc(8px + env(safe-area-inset-right, 0px));
+      width: 44px;
+      height: calc(var(--defilement-vue, 100dvh) - 80px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+      display: block; pointer-events: none;
+    }
+    .navigation-defilement::before {
+      content: ''; position: absolute; top: 0; bottom: 0; right: 20px; width: 3px;
+      background: rgba(7, 13, 28, .85); border: 1px solid rgba(63, 211, 198, .45); border-radius: 3px;
+    }
+    .navigation-defilement__poignee {
+      position: absolute; top: 0; left: 0; width: 44px; min-height: 44px;
+      pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none;
+      cursor: grab; border-radius: 4px;
+    }
+    .navigation-defilement__poignee::before {
+      content: ''; position: absolute; top: 0; bottom: 0; right: 18px; width: 7px;
+      background: var(--sain); border: 1px solid #070d1c; border-radius: 4px;
+      box-shadow: 0 0 8px rgba(63, 211, 198, .3);
+    }
+    .navigation-defilement__poignee:focus-visible { outline: 2px solid var(--texte); outline-offset: -2px; }
+    .navigation-defilement__poignee[data-glisse] { cursor: grabbing; visibility: visible; }
+  }
+  .navigation-defilement[hidden] { display: none; }
+  html.jeu-ouvert .navigation-defilement, html.plonge .navigation-defilement { visibility: hidden; }
+  .bas { padding-right: calc(60px + env(safe-area-inset-right, 0px)); }
+  .arcade { padding-right: max(var(--marge), calc(76px + env(safe-area-inset-right, 0px))); }
+  .branches { max-width: calc(100vw - 152px - env(safe-area-inset-right, 0px)); }
+  @media (max-width: 640px) {
+    .branches { right: calc(72px + env(safe-area-inset-right, 0px)); max-width: none; }
+  }
 </style>
 </head>
-<body>
+<body id="page">
 <div class="parcours" data-parcours></div>
 <div class="langue" data-langue>
   <button type="button" aria-haspopup="true" aria-expanded="false" aria-label="Langue" data-t-aria><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3c2.6 2.6 2.6 15.4 0 18M12 3c-2.6 2.6-2.6 15.4 0 18"></path></svg><span data-langue-code>FR</span><span aria-hidden="true">▾</span></button>
@@ -349,6 +386,9 @@
     </span>
   </footer>
 </section>
+<div class="navigation-defilement" data-defilement hidden>
+  <div class="navigation-defilement__poignee" data-poignee role="scrollbar" tabindex="0" aria-label="Défilement de la page" aria-controls="page" aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+</div>
 <div class="eclair" data-eclair aria-hidden="true"></div>
 <div class="univers" data-univers role="dialog" aria-label="Détail du portfolio" data-t-aria>
   <div class="univers__barre"><span>&gt; bastion/<span data-univers-titre></span></span><button type="button" data-retour data-t>← Retour à la table Ultron</button></div>
