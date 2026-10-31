@@ -303,6 +303,7 @@ const ouvrirFaille = () => {
   message.textContent = '';
   formulaire.hidden = false;
   ouvert.hidden = true;
+  aide.hidden = true;
   faille.showModal();
   formulaire.code.focus();
 };
@@ -315,10 +316,37 @@ formulaire.addEventListener('submit', async (e) => {
     formulaire.code.select();
     return;
   }
-  faille.querySelector('[data-faille-lien]').href = adresse;
+  lien.href = quandMeme.href = adresse;
+  aide.hidden = true;
   formulaire.hidden = true;
   ouvert.hidden = false;
 });
+// Avant d'ouvrir le jeu : répond-il depuis cet appareil ? Sans Tailscale, ou sans le partage accepté, son nom ne se résout pas et
+// la page ne chargerait jamais : on le dit, avec quoi faire. Une requête « no-cors » suffit (réponse opaque = joignable, même un
+// refus du serveur). Un navigateur qui bloquerait la requête alors que le jeu est joignable n'enferme personne : « Ouvrir quand
+// même » reste là.
+const lien = faille.querySelector('[data-faille-lien]');
+const aide = faille.querySelector('[data-faille-aide]');
+const quandMeme = faille.querySelector('[data-faille-quand-meme]');
+async function joignable(adresse, delai = 6000) {
+  const arret = new AbortController();
+  const minuterie = setTimeout(() => arret.abort(), delai);
+  try {
+    await fetch(new URL('manifest.json', adresse), { mode: 'no-cors', cache: 'no-store', credentials: 'omit', signal: arret.signal });
+    return true;
+  } catch { return false; } finally { clearTimeout(minuterie); }
+}
+async function rejoindre() {
+  if (lien.getAttribute('aria-busy') === 'true') return;
+  lien.setAttribute('aria-busy', 'true');
+  aide.hidden = true;
+  const ok = await joignable(lien.href);
+  lien.removeAttribute('aria-busy');
+  if (ok) { location.href = lien.href; return; }
+  aide.hidden = false;
+}
+lien.addEventListener('click', (e) => { e.preventDefault(); rejoindre(); });
+faille.querySelector('[data-faille-reessayer]').addEventListener('click', rejoindre);
 document.querySelector('[data-fissure]').addEventListener('click', ouvrirFaille);
 document.querySelector('[data-faille-ouvrir]').addEventListener('click', ouvrirFaille);
 document.querySelector('[data-faille-fermer]').addEventListener('click', () => faille.close());

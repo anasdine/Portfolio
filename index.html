@@ -165,6 +165,11 @@
   .faille__message { min-height: 1.6em; color: #ff5c4d; }
   .faille__ouvert { flex-direction: column; align-items: flex-start; margin: 0 0 18px; }
   .faille__ouvert p { margin: 0; }
+  .faille__aide { flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 8px; padding: 12px 14px; border: 1px solid rgba(255, 92, 77, .45); }
+  .faille__aide b { color: #ff5c4d; font-weight: 600; }
+  .faille__aide ol { margin: 0; padding-left: 1.3em; color: #9aa4ac; }
+  .faille__aide span { display: flex; flex-wrap: wrap; gap: 10px; }
+  .faille [aria-busy="true"] { opacity: .6; cursor: progress; }
   .faille-carte { display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 1320px; margin: 18px auto 0; padding: 18px 16px; text-align: left; font: inherit; font-size: 12px; color: #9aa4ac; background: rgba(13, 26, 54, .55); border: 1px solid rgba(255, 92, 77, .45); cursor: pointer; transition: border-color .25s, transform .3s; }
   .faille-carte:hover, .faille-carte:focus-visible { border-color: #ff5c4d; transform: translateY(-3px); outline: 0; }
   .faille-carte small { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: #ff5c4d; }
@@ -443,7 +448,17 @@
     <span><input id="faille-code" name="code" inputmode="numeric" autocomplete="off" maxlength="4" pattern="[0-9]{4}" required><button type="submit" data-t>Entrer</button></span>
     <output class="faille__message" data-faille-message role="status" aria-live="polite"></output>
   </form>
-  <div class="faille__ouvert" data-faille-ouvert hidden><a data-faille-lien href="#" rel="noopener" data-t>Rejoindre la partie</a><p data-t>Il faut être connecté à Tailscale et avoir reçu le partage.</p></div>
+  <div class="faille__ouvert" data-faille-ouvert hidden><a data-faille-lien href="#" rel="noopener" data-t>Rejoindre la partie</a><p data-t>Il faut être connecté à Tailscale et avoir reçu le partage.</p>
+    <div class="faille__aide" data-faille-aide role="status" hidden>
+      <p><b data-t>Le jeu ne répond pas depuis cet appareil.</b></p>
+      <ol>
+        <li data-t>Installe l'application Tailscale et connecte-toi.</li>
+        <li data-t>Ouvre le lien de partage reçu du propriétaire, puis accepte-le.</li>
+        <li data-t>Laisse Tailscale allumé et réessaie.</li>
+      </ol>
+      <span><button type="button" data-faille-reessayer data-t>Réessayer</button><a href="https://tailscale.com/download" rel="noopener">tailscale.com/download</a><a data-faille-quand-meme href="#" rel="noopener" data-t>Ouvrir quand même</a></span>
+    </div>
+  </div>
   <div><a href="https://ch.linkedin.com/in/anas-dine-732921327/en" rel="noopener" data-t>Demander un code</a><button type="button" data-faille-fermer data-t>Refermer</button></div>
 </dialog>
 <script type="module" src="src/hero.js"></script>
