@@ -280,9 +280,47 @@ function marquerChapitre() {
 addEventListener('scroll', marquerChapitre, { passive: true });
 marquerChapitre();
 
-// L'easter egg : l'adresse du jeu n'est jamais sur le site public, elle part avec le code, de la main à la main.
+// L'easter egg et la carte DEAD RIFT : un code à 4 chiffres ouvre le lien du jeu. La page ne garde que l'empreinte
+// SHA-256 du code, et l'adresse chiffrée par une clé tirée du code (AES-GCM) : ni l'un ni l'autre n'est en clair.
+// Ce n'est pas une protection : 10 000 codes se testent en un instant. La vraie porte reste le partage Tailscale.
 const faille = document.querySelector('[data-faille]');
-document.querySelector('[data-fissure]').addEventListener('click', () => faille.showModal());
+const FAILLE_EMPREINTE = '6161b2838ffa6ce17b84db3b45b4f8437855ecf43e75de2d1ad0008eaae91aa0';
+const FAILLE_ADRESSE = { iv: '1kdKFnADblQpigjm', donnees: 'YChZhc0MjQOSVIazh0M/9DZNVhsa14pqKA55rN8wIEWdQDWCZ3JxdB1b2F9ddiMjYoMkv9F6SD4PCw==' };
+const octets = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+const sha256 = async (texte) => new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(texte)));
+const enHex = (u) => Array.from(u, (b) => b.toString(16).padStart(2, '0')).join('');
+async function adresseDuJeu(code) {
+  if (!/^[0-9]{4}$/.test(code) || enHex(await sha256(code)) !== FAILLE_EMPREINTE) return null;
+  const cle = await crypto.subtle.importKey('raw', await sha256('dead-rift|' + code), 'AES-GCM', false, ['decrypt']);
+  const clair = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: octets(FAILLE_ADRESSE.iv) }, cle, octets(FAILLE_ADRESSE.donnees));
+  return new TextDecoder().decode(clair);
+}
+const formulaire = faille.querySelector('[data-faille-code]');
+const message = faille.querySelector('[data-faille-message]');
+const ouvert = faille.querySelector('[data-faille-ouvert]');
+const ouvrirFaille = () => {
+  formulaire.reset();
+  message.textContent = '';
+  formulaire.hidden = false;
+  ouvert.hidden = true;
+  faille.showModal();
+  formulaire.code.focus();
+};
+formulaire.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  let adresse = null;
+  try { adresse = await adresseDuJeu(formulaire.code.value.trim()); } catch { adresse = null; }
+  if (!adresse) {
+    message.textContent = t('Code incorrect');
+    formulaire.code.select();
+    return;
+  }
+  faille.querySelector('[data-faille-lien]').href = adresse;
+  formulaire.hidden = true;
+  ouvert.hidden = false;
+});
+document.querySelector('[data-fissure]').addEventListener('click', ouvrirFaille);
+document.querySelector('[data-faille-ouvrir]').addEventListener('click', ouvrirFaille);
 document.querySelector('[data-faille-fermer]').addEventListener('click', () => faille.close());
 
 // Les branches : depuis la table, chaque panneau ouvre son univers, avec le contenu complet du portfolio.

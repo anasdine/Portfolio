@@ -156,6 +156,19 @@
   .faille h3 { margin: 0 0 10px; font: 600 32px/1 var(--titre); letter-spacing: .14em; color: #ff5c4d; }
   .faille p { margin: 0 0 18px; color: #9aa4ac; }
   .faille div { display: flex; flex-wrap: wrap; gap: 10px; }
+  .faille [hidden] { display: none; }
+  .faille__code { display: grid; gap: 8px; margin: 0 0 18px; }
+  .faille__code label { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: #9aa4ac; }
+  .faille__code span { display: flex; gap: 10px; }
+  .faille__code input { flex: 1; min-width: 0; min-height: 44px; padding: 10px 14px; font: 600 20px/1 var(--mono); letter-spacing: .5em; color: var(--texte); background: rgba(255, 255, 255, .04); border: 1px solid var(--trait); }
+  .faille__code input:focus-visible { outline: 2px solid #ff5c4d; outline-offset: 1px; }
+  .faille__message { min-height: 1.6em; color: #ff5c4d; }
+  .faille__ouvert { flex-direction: column; align-items: flex-start; margin: 0 0 18px; }
+  .faille__ouvert p { margin: 0; }
+  .faille-carte { display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 1320px; margin: 18px auto 0; padding: 18px 16px; text-align: left; font: inherit; font-size: 12px; color: #9aa4ac; background: rgba(13, 26, 54, .55); border: 1px solid rgba(255, 92, 77, .45); cursor: pointer; transition: border-color .25s, transform .3s; }
+  .faille-carte:hover, .faille-carte:focus-visible { border-color: #ff5c4d; transform: translateY(-3px); outline: 0; }
+  .faille-carte small { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: #ff5c4d; }
+  .faille-carte b { font: 600 24px/1.1 var(--titre); letter-spacing: .14em; color: var(--texte); }
   .faille a, .faille button { min-height: 44px; padding: 13px 15px; font: 500 12px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--texte); background: none; border: 1px solid var(--trait); cursor: pointer; text-decoration: none; }
   /* L'arrivée : un flash, le titre qui s'écrase, tout le reste qui tombe en place. */
   .arcade::before { content: ''; position: fixed; inset: 0; z-index: 9; background: #ebfbff; opacity: 0; pointer-events: none; }
@@ -205,7 +218,7 @@
   /* Toutes les tailles : petit écran, paysage de téléphone, très grand écran. */
   @media (max-width: 760px) { .frise { grid-template-columns: 1fr; border-top: 0; border-left: 1px solid rgba(63, 211, 198, .5); } .frise li { padding: 0 0 15px 18px; } .frise li::before { top: 4px; left: -5px; } .une { aspect-ratio: auto; min-height: 400px; } }
   @media (max-height: 520px) { .titre { padding-bottom: 6px; } h1 { font-size: 40px; } .role, .legende, .indice { display: none; } .branches { bottom: 4px; } }
-  @media (min-width: 2200px) { .arcade__tete, .frise, .preuves, .une, .bornes, .arcade__pied { max-width: 1700px; } }
+  @media (min-width: 2200px) { .arcade__tete, .frise, .preuves, .une, .bornes, .faille-carte, .arcade__pied { max-width: 1700px; } }
   /* Le mode léger : une vraie page d'accueil, sans 3D. */
   .leger .parcours { height: 100svh; }
   .leger .hero { position: absolute; }
@@ -375,6 +388,13 @@
       <a class="preuve" href="https://claude.ai/artifact/T41Y55G1mh7rdnWUZ1cPz5" target="_blank" rel="noopener"><img src="media/preuves/fulmine.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Site · octobre</small><b>Fulmine Moda</b></a>
       <a class="preuve" href="https://claude.ai/artifact/QLLmHsfTkNYsZzofD8x8zV" target="_blank" rel="noopener"><img src="media/preuves/ocrousti.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Commande en ligne · octobre</small><b>O'Crousti Lausanne</b></a>
       <a class="preuve" href="https://claude.ai/artifact/Rcp7gLJWyDv2eBz8CkqU63" target="_blank" rel="noopener"><img src="media/preuves/phoenix.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Application · octobre</small><b>Phoenix Parc</b></a>
+      <a class="preuve" href="https://lartdorient.fr" target="_blank" rel="noopener"><img src="media/preuves/lartdorient.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Site client</small><b>L'Art d'Orient</b></a>
+      <a class="preuve" href="https://clean-dream.fr" target="_blank" rel="noopener"><img src="media/preuves/clean-dream.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Site client</small><b>Clean Dream</b></a>
+      <a class="preuve" href="https://dreamforyou.fr" target="_blank" rel="noopener"><img src="media/preuves/dreamforyou.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Site client</small><b>Dream For You</b></a>
+      <a class="preuve" href="https://one-cars.fr" target="_blank" rel="noopener"><img src="media/preuves/one-cars.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Site client</small><b>One Cars</b></a>
+      <a class="preuve" href="https://vtc-liberty.fr" target="_blank" rel="noopener"><img src="media/preuves/vtc-liberty.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Site client</small><b>VTC Liberty</b></a>
+      <a class="preuve" href="https://anasdine.github.io/elite-coiffeur/" target="_blank" rel="noopener"><img src="media/preuves/elite-barber.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Maquette</small><b>Elite Barber</b></a>
+      <a class="preuve" href="https://anasdine.github.io/elite-restaurant/" target="_blank" rel="noopener"><img src="media/preuves/elite-restaurant.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Maquette</small><b>Restaurant Élite</b></a>
       <div class="preuve preuve--outil"><small data-t>Mes usines</small><b>Plan B</b><span data-t>Ma chaîne de production de vidéos publicitaires, pilotée depuis le téléphone.</span></div>
       <div class="preuve preuve--outil"><small data-t>Mes usines</small><b>JARVIS</b><span data-t>Le générateur de sites, sur mes propres cartes graphiques.</span></div>
       <div class="preuve preuve--outil"><small data-t>Mes usines</small><b>LEONHARD</b><span data-t>La supervision de tout un parc, tenue par une seule personne.</span></div>
@@ -390,6 +410,7 @@
     <span><small data-t>Le jeu phare · clavier, manette, tactile</small><b data-t>Razor, l'Archonte</b><em data-t>Un twin-stick néon. Cinq héros, des vagues, des gardiens, et une faille vers un autre monde toutes les trois vagues.</em><i data-t>Lancer</i></span>
   </button>
   <div class="bornes" data-bornes></div>
+  <button type="button" class="faille-carte" data-faille-ouvrir><small data-t>Accès privé</small><b>DEAD RIFT</b><span data-t>Un jeu qui tourne sur une machine privée, sur invitation.</span></button>
   <footer class="arcade__pied">
     <span><span data-t>Anas Dine · Suisse romande</span> <button type="button" class="fissure" data-fissure hidden aria-label="Une fissure dans le mur" data-t-aria>⌁</button></span>
     <span style="display:flex;gap:10px;flex-wrap:wrap">
@@ -417,6 +438,12 @@
 <dialog class="faille" data-faille aria-labelledby="titre-faille">
   <h3 id="titre-faille">DEAD RIFT</h3>
   <p data-t>Vous avez trouvé la faille. Derrière, un jeu qui tourne sur une machine privée : l'entrée se fait sur invitation, avec un code.</p>
+  <form class="faille__code" data-faille-code novalidate>
+    <label for="faille-code" data-t>Code d'accès</label>
+    <span><input id="faille-code" name="code" inputmode="numeric" autocomplete="off" maxlength="4" pattern="[0-9]{4}" required><button type="submit" data-t>Entrer</button></span>
+    <output class="faille__message" data-faille-message role="status" aria-live="polite"></output>
+  </form>
+  <div class="faille__ouvert" data-faille-ouvert hidden><a data-faille-lien href="#" rel="noopener" data-t>Rejoindre la partie</a><p data-t>Il faut être connecté à Tailscale et avoir reçu le partage.</p></div>
   <div><a href="https://ch.linkedin.com/in/anas-dine-732921327/en" rel="noopener" data-t>Demander un code</a><button type="button" data-faille-fermer data-t>Refermer</button></div>
 </dialog>
 <script type="module" src="src/hero.js"></script>
