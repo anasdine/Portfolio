@@ -224,7 +224,7 @@ canvas#cv{position:absolute;inset:0;width:100%;height:100%;display:block}
 .hero b{display:block;font-size:12px;font-weight:700;line-height:1.1;color:var(--ink)}
 .hero i{display:none}
 .hero[aria-checked="true"]{border-color:var(--hc);color:var(--hc);background:color-mix(in srgb,var(--hc) 12%,rgba(9,10,22,.7));box-shadow:0 0 14px color-mix(in srgb,var(--hc) 30%,transparent)}
-#hRazor{--hc:var(--frost)} #hKross{--hc:var(--lime)} #hNitro{--hc:var(--fire)} #hYuma{--hc:var(--teal)} #hKaze{--hc:var(--sakura)}
+#hRazor{--hc:var(--frost)} #hKross{--hc:var(--lime)} #hNitro{--hc:var(--fire)} #hYuma{--hc:var(--teal)} #hKaze{--hc:var(--sakura)} #hAdam{--hc:#ffd23f}
 #app.hero-kaze .title{text-shadow:-3px 0 var(--sakura),3px 0 var(--volt)} #app.hero-kaze .sub span:first-child{color:var(--sakura)} #app.hero-kaze .kana{color:var(--volt)}
 #app.hero-kaze #bHydra{--c:var(--sakura)} #app.hero-kaze #bBlink{--c:var(--frost)} #app.hero-kaze.is-archon #bHydra{--c:var(--volt)}
 #app.hero-yuma .title{text-shadow:-3px 0 var(--teal),3px 0 #ff6a5a} #app.hero-yuma .sub span:first-child{color:var(--teal)} #app.hero-yuma .kana{color:#ff6a5a}
@@ -232,6 +232,7 @@ canvas#cv{position:absolute;inset:0;width:100%;height:100%;display:block}
 #app.hero-nitro .title{text-shadow:-3px 0 var(--fire),3px 0 var(--volt)} #app.hero-nitro .sub span:first-child{color:var(--fire)} #app.hero-nitro .kana{color:var(--volt)}
 #app.hero-nitro #bHydra{--c:var(--frost)} #app.hero-nitro #bBlink{--c:var(--fire)}
 .hero:focus-visible{outline:2px solid var(--arc);outline-offset:2px}
+#app.hero-adam .title{text-shadow:-3px 0 #ffd23f,3px 0 #fff} #app.hero-adam .kana{color:#ffd23f}
 #app.hero-kross .title{text-shadow:-3px 0 var(--lime),3px 0 var(--fire)} #app.hero-kross .sub span:first-child{color:var(--lime)} #app.hero-kross .kana{color:var(--fire)}
 .hint.rift{color:#b9ff4d}
 .m-actions{margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -415,6 +416,7 @@ canvas#cv{position:absolute;inset:0;width:100%;height:100%;display:block}
         <div class="heroes" role="radiogroup" aria-label="Choix du personnage">
           <button class="hero" id="hRazor" role="radio" aria-checked="true"><svg><use href="#i-archon"/></svg><span><b>Razor</b><i>Archonte · mode Diablo</i></span></button>
           <button class="hero" id="hKross" role="radio" aria-checked="false"><svg><use href="#i-fury"/></svg><span><b>Kross</b><i>Juggernaut · mode Dead Ops</i></span></button>
+          <button class="hero" id="hAdam" role="radio" aria-checked="false"><svg><use href="#i-dash"/></svg><span><b>Adam</b><i>Buteur · mode Mondial</i></span></button>
           <button class="hero" id="hNitro" role="radio" aria-checked="false"><svg><use href="#i-car"/></svg><span><b>Nitro</b><i>Léviathan · mode Carnage</i></span></button>
           <button class="hero" id="hYuma" role="radio" aria-checked="false"><svg><use href="#i-bear"/></svg><span><b>Yuma</b><i>Grand Ours · mode Meute</i></span></button>
           <button class="hero" id="hKaze" role="radio" aria-checked="false"><svg><use href="#i-bow"/></svg><span><b>Kaze</b><i>Dragon de cendre · mode Kyudo</i></span></button>
@@ -571,6 +573,11 @@ const UPTXT = {
     range: ['Focale', 'Lentille arcanique', '+8 % de portée sur le givre et le rayon.'],
     stock: ['Condensateur', 'Réserve', '+1 stock d\'Archonte en réserve.'],
     bulle: ['Chronofocale', 'Bulle de temps', '+1,5 s de Bulle et +8 % de rayon.'],
+  },
+  adam: {
+    cdr: ['Second souffle', 'Banc de touche', '−5 % sur toutes tes recharges. Plafonné : le creux reste.'],
+    dmg: ['Pied en or', 'Crampons', '+12 % de dégâts sur tous tes ballons.'],
+    aspd: ['Frappe rapide', 'Entraînement', '+10 % de cadence de frappe.'],
   },
   kross: {
     cdr: ['Réappro', 'La stat reine', '−5 % sur toutes tes recharges. Plafonné : le creux reste.'],
@@ -896,6 +903,16 @@ const HEROES = {
     formTip: 'L\'ours attire les ennemis et ses griffes te soignent. Quand le 1er bouton bat : il est cerné, fais-lui frapper le sol.',
     acc: '#5ad8c0', hint: 'Beaucoup de vie, une onde de choc large qui traverse tout. L\'ulti lance un Grand Ours qui traque seul et te soigne. 1er bouton : il frappe le sol et cloue tout autour de lui. Gros bouton : frénésie.',
   },
+  adam: { // le buteur : des balles de foot, une vitesse folle, et un ulti qui en met partout
+    id: 'adam', name: 'ADAM', sub: 'Buteur aux tresses', kana: 'アダム', mode: 'Mode Mondial', home: 'neo', tracers: true,
+    tagline: 'Des tresses au vent, un pied en or, et le ballon qui part de partout.',
+    form: 'FOLIE DU BUTEUR', formLow: 'la Folie du buteur', hollow: 'À BOUT DE SOUFFLE', ally: 'Coéquipier', zoneLbl: 'Surface de réparation', zoneTxt: 'BUT',
+    a1: 'Frappe en éventail', a2: 'Dribble', a2f: 'Dribble', a3: 'Coup franc', a4: 'Tir de partout', prim: 'ballon', stacks: 'Buts',
+    icons: { a: '#i-nade', a2: '#i-turret', b: '#i-dash', c: '#i-fury' },
+    hollowTip: 'Tes ballons rechargent la Folie du buteur. Dribble pour passer entre eux, éventail quand ils collent.',
+    formTip: 'Tu cours deux fois plus vite et les ballons partent tout seuls dans tous les sens. Coup franc sur le 1er bouton, Tir de partout sur le gros.',
+    acc: '#ffd23f', hint: 'Il tire de vrais ballons de foot et court très vite. Éventail de ballons, dribble invulnérable. En ulti : les ballons partent partout autour de lui et il court encore plus vite.',
+  },
   kaze: { /* l'archer : rien ne part tout seul, tout se bande. Plus la corde est tirée, plus la flèche traverse. */
     id: 'kaze', name: 'KAZE', sub: 'Archer des cendres', kana: 'カゼ', mode: 'Mode Kyudo', home: 'japan', tracers: false, archer: true,
     tagline: 'Une flèche par souffle. Au bout du souffle, le dragon.',
@@ -908,7 +925,7 @@ const HEROES = {
   },
 };
 /* Recharges propres à chaque kit : A, B (à pied / sous forme), puis les deux pouvoirs de la forme. */
-const KIT = { razor: { a: 8, b: 5, bf: 2.5, fa: 11, fc: 1.6 }, kross: { a: 5, b: 2.6, bf: 2.6, fa: 14, fc: 3 }, nitro: { a: 7, b: 6, bf: 4, fa: 9, fc: 3 }, yuma: { a: 7, b: 4, bf: 5, fa: 8, fc: 9 }, kaze: { a: 7, b: 5, bf: 3, fa: 10, fc: 2.2 } };
+const KIT = { razor: { a: 8, b: 5, bf: 2.5, fa: 11, fc: 1.6 }, kross: { a: 5, b: 2.6, bf: 2.6, fa: 14, fc: 3 }, nitro: { a: 7, b: 6, bf: 4, fa: 9, fc: 3 }, yuma: { a: 7, b: 4, bf: 5, fa: 8, fc: 9 }, kaze: { a: 7, b: 5, bf: 3, fa: 10, fc: 2.2 }, adam: { a: 4.5, b: 2.2, bf: 2.2, fa: 8, fc: 2.5 } };
 let HERO = HEROES.razor;
 
 /* Un corps = un squelette paramétré (rig) + des couleurs. Tout regarde vers la droite, le rendu retourne le sprite. */
@@ -1069,7 +1086,7 @@ const themeIndex = (id) => Math.max(0, THEMES.findIndex((t) => t.id === id));
    pour que chaque main trouve la sienne. Les menus se pilotent aussi à la manette.
    ================================================================ */
 const PAD = { on: false, name: '', ps: false, mx: 0, my: 0, ax: 0, ay: 0, aim: false, prev: [], nav: 0, sel: 0, last: -1e9, blocked: false, ref: null };
-const PAD_HEROES = ['razor', 'kross', 'nitro', 'yuma', 'kaze'];
+const PAD_HEROES = ['razor', 'kross', 'nitro', 'yuma', 'kaze', 'adam'];
 function padRead() {
   try {
     const l = navigator.getGamepads ? navigator.getGamepads() : []; let best = null;
@@ -1125,6 +1142,7 @@ const T = {};
 const enemies = [], shots = [], hydras = [], zones = [], globes = [], bolts = [], parts = [], texts = [], sings = [], rings = [], ghosts = [], trails = [], bubbles = [], decals = [], holos = [], pylons = [], corpses = [], gems = [], crates = [], rockets = [], pshots = [], nades = [], strikes = [], pools = [], waves = [], slams = [], nukeFx = [], motes = [], rains = [], dragons = [];
 const BEAR = { active: false, x: 0, y: 0, face: 1, walk: 0, atkT: 0, swipe: 0, slamT: 0, frenzyT: 0, jump: null, spawnT: 0 };
 const kit = () => KIT[HERO.id];
+function ISK() { return HERO.id === 'kross' || HERO.id === 'adam'; } /* Adam joue sur la mécanique de Kross, avec ses balles de foot */
 const GATES = [
   { x: ARENA.w * 0.22, y: 0, nx: 0, ny: 1 }, { x: ARENA.w * 0.78, y: 0, nx: 0, ny: 1 },
   { x: ARENA.w * 0.22, y: ARENA.h, nx: 0, ny: -1 }, { x: ARENA.w * 0.78, y: ARENA.h, nx: 0, ny: -1 },
@@ -1480,7 +1498,7 @@ function feedArchon(amount) {
   if (P.feedAcc >= 1) { addText(P.x + rnd(-10, 10), P.y - 34, '−' + P.feedAcc.toFixed(1).replace('.', ',') + ' s', COL.frost, 13); P.feedAcc = 0; sfx.feed(); }
 }
 function extendArchon(x) {
-  if (HERO.id === 'kross') return;
+  if (ISK()) return;
   const add = Math.min(CFG.extCap - P.archonExt, x); if (add <= 0) return;
   P.archonT += add; P.archonDur += add; P.archonExt += add; P.extAcc += add;
   if (P.extAcc >= 0.5) { addText(P.x + rnd(-12, 12), P.y - 58, '+' + P.extAcc.toFixed(1).replace('.', ',') + ' s', COL.volt, 14); P.extAcc = 0; sfx.extend(); }
@@ -1491,8 +1509,8 @@ function hitPlayer(dmg, fx, fy) {
   if (P.boostT > 0 || P.dashT > 0) return;
   if (P.buffs.shield > 0) { P.iframes = 0.25; addRing(P.x, P.y, 26, 40, 0.2, COL.arc, 3); return; }
   const archon = P.form === 'archon';
-  const jug = false, soft = HERO.summoner || HERO.id === 'kross'; // Yuma et Kross restent humains sous leur ulti
-  P.hp -= dmg * (archon ? (HERO.id === 'kross' ? 0.6 : soft ? 0.75 : 0.4) : 1); P.iframes = 0.45; P.hurtFlash = 0.25;
+  const jug = false, soft = HERO.summoner || ISK(); // Yuma et Kross restent humains sous leur ulti
+  P.hp -= dmg * (archon ? (ISK() ? 0.6 : soft ? 0.75 : 0.4) : 1); P.iframes = 0.45; P.hurtFlash = 0.25;
   G.shake = Math.max(G.shake, archon ? 4 : 10);
   const a = Math.atan2(P.y - fy, P.x - fx); if (!jug) { P.kx = Math.cos(a) * 230; P.ky = Math.sin(a) * 230; }
   burst(P.x, P.y, archon ? C_VOLT : C_FROST, 8, 6, 220);
@@ -1501,8 +1519,8 @@ function hitPlayer(dmg, fx, fy) {
 }
 function doArchon() {
   P.stocks--; if (P.archonCD <= 0) P.archonCDMax = P.archonCD = stockCD();
-  P.form = 'archon'; P.r = HERO.summoner || HERO.archer || HERO.id === 'kross' ? 12 : 16; G.zoomDyn = 1.1; /* la caméra encaisse le choc, puis recule */ P.castT = 0.6; P.trail.length = 0; P.grow = 0; P.bodyAcc = 0;
-  const nukeForm = HERO.id === 'kross', base = G.state === 'menu' ? (nukeForm ? 9 : 5.5) : nukeForm ? 30 + UP.dur * 1.5 : archonDur();
+  P.form = 'archon'; P.r = HERO.summoner || HERO.archer || ISK() ? 12 : 16; G.zoomDyn = 1.1; /* la caméra encaisse le choc, puis recule */ P.castT = 0.6; P.trail.length = 0; P.grow = 0; P.bodyAcc = 0;
+  const nukeForm = ISK(), base = G.state === 'menu' ? (nukeForm ? 9 : 5.5) : nukeForm ? (HERO.id === 'adam' ? 16 : 30) + UP.dur * 1.5 : archonDur();
   if (nukeForm) P.surcharge = 0; // 30 s pile : ni surcharge ni prolongation, c'est la Nuke qui fait le travail
   P.archonExt = P.surcharge; P.archonDur = base + P.surcharge; P.archonT = P.archonDur; P.surcharge = 0; P.extAcc = 0; P.lastBeep = 9;
   P.el.fire = CFG.elemDur; P.swamiT = 0; P.chargeAcc = 0; P.tickAcc = 0; P.blastCD = 0.5; // les stacks d'Archonte sont conservés
@@ -1529,13 +1547,13 @@ function revert() {
   if (HERO.vehicle) { for (let i = 0; i < snakeLen(); i += 2) { const sg = snakeSeg(i); if (sg) burst(sg.x, sg.y, C_FIRE, 4, 6, 200, 1); } P.trail.length = 0; }
   P.form = 'human'; P.r = HERO.vehicle ? 17 : 12; P.archonT = 0; P.tickAcc = 0;
   // Contrecoup : plus l'Archonte a été prolongé, plus la retombée est longue. Ni le matériel ni le talent ne l'effacent.
-  P.hollowLock = P.hollowLockMax = G.state === 'menu' ? 0 : CFG.hollowMin + P.archonExt * CFG.recoil + (HERO.id === 'kross' ? 6 : 0); // 30 s de Nukes se paient par une retombée plus longue
+  P.hollowLock = P.hollowLockMax = G.state === 'menu' ? 0 : CFG.hollowMin + P.archonExt * CFG.recoil + (ISK() ? 6 : 0); // 30 s de Nukes se paient par une retombée plus longue
   P.swamiT = swamiDur();
   if (P.archonDur > G.longest) G.longest = P.archonDur;
   G.flash = 0.45; G.flashCol = '255,45,126'; G.shake = Math.max(G.shake, 8); G.glitch = 0.22;
   addRing(P.x, P.y, 70, 12, 0.4, COL.neon, 5); burst(P.x, P.y, C_NEON, 18, 12, 160, 1);
   sfx.revert();
-  if (HERO.id === 'kross') for (const h of hydras) h.t = Math.min(h.t, 0.4); // les tourelles jumelles se replient avec l'armure
+  if (ISK()) for (const h of hydras) h.t = Math.min(h.t, 0.4); // les tourelles jumelles se replient avec l'armure
   P.vortexT = 0; P.dashT = 0;
   if (BEAR.active) { BEAR.active = false; burst(BEAR.x, BEAR.y - 20, C_FROST, 30, 30, 260, 1); addRing(BEAR.x, BEAR.y, 60, 10, 0.4, HERO.acc, 5); }
   for (const b of bubbles) { b.follow = false; b.t = Math.max(b.t, b.life - 1.5); } // la bulle appartient à la forme : elle s'effondre avec elle
@@ -1549,11 +1567,11 @@ function tryArchon() { // gros bouton : se transformer, puis le pouvoir lourd de
   if (!canArchon()) { deny(bArchon); return; }
   doArchon();
 }
-function formC() { if (HERO.id === 'kross') { doNuke(); P.blastCDMax = P.blastCD = 3; P.castT = 0.3; return; }
-  if (HERO.id === 'kross') doStrike(); else if (HERO.id === 'nitro') doWhip(); else if (HERO.summoner) doFrenzy(); else if (HERO.archer) doDragon(); else doBlast(); P.blastCDMax = P.blastCD = kit().fc * (1 - cdr()); P.castT = 0.3; }
-function formA() { if (HERO.id === 'kross') doTurrets(); else if (HERO.id === 'nitro') doVortex(); else if (HERO.summoner) doSlam(); else if (HERO.archer) doRain(); else doBubble(); P.bubbleCDMax = P.bubbleCD = kit().fa * (1 - cdr()); P.castT = 0.4; }
-function heroA() { if (HERO.id === 'kross') doGrenade(); else if (HERO.id === 'nitro') doOil(); else if (HERO.summoner) doPaw(); else if (HERO.archer) doStorm(); else doHydra(); P.hydraCDMax = P.hydraCD = kit().a * (1 - cdr()); P.el.light = CFG.elemDur; P.castT = 0.35; }
-function heroB() { if (HERO.id === 'kross') doDash(); else if (HERO.id === 'nitro') doBoost(); else if (HERO.summoner) { if (P.form === 'archon') doRecall(); else doLeap(); } else if (HERO.archer) doVault(); else doBlink(); P.blinkCDMax = P.blinkCD = (P.form === 'archon' ? kit().bf : kit().b) * (1 - cdr()); P.el.arcane = CFG.elemDur; P.castT = 0.35; }
+function formC() { if (ISK()) { doNuke(); P.blastCDMax = P.blastCD = 3; P.castT = 0.3; return; }
+  if (ISK()) doStrike(); else if (HERO.id === 'nitro') doWhip(); else if (HERO.summoner) doFrenzy(); else if (HERO.archer) doDragon(); else doBlast(); P.blastCDMax = P.blastCD = kit().fc * (1 - cdr()); P.castT = 0.3; }
+function formA() { if (ISK()) doTurrets(); else if (HERO.id === 'nitro') doVortex(); else if (HERO.summoner) doSlam(); else if (HERO.archer) doRain(); else doBubble(); P.bubbleCDMax = P.bubbleCD = kit().fa * (1 - cdr()); P.castT = 0.4; }
+function heroA() { if (ISK()) doGrenade(); else if (HERO.id === 'nitro') doOil(); else if (HERO.summoner) doPaw(); else if (HERO.archer) doStorm(); else doHydra(); P.hydraCDMax = P.hydraCD = kit().a * (1 - cdr()); P.el.light = CFG.elemDur; P.castT = 0.35; }
+function heroB() { if (ISK()) doDash(); else if (HERO.id === 'nitro') doBoost(); else if (HERO.summoner) { if (P.form === 'archon') doRecall(); else doLeap(); } else if (HERO.archer) doVault(); else doBlink(); P.blinkCDMax = P.blinkCD = (P.form === 'archon' ? kit().bf : kit().b) * (1 - cdr()); P.el.arcane = CFG.elemDur; P.castT = 0.35; }
 /* Déflagration arcanique : la réponse de l'Archonte au corps à corps. */
 function doBlast() {
   const gm = globalMult(), R = CFG.blast.r;
@@ -1603,7 +1621,7 @@ function doHydra() {
   sfx.hydra();
 }
 function hydraHead(h, i) { // position d'une tête : partagée par la logique (origine des éclairs) et le rendu
-  if (HERO.id === 'kross') { const a = h.ha[i] || 0; return { x: h.x + Math.cos(a) * 24, y: h.y - 22 + Math.sin(a) * 16 }; } // la tourelle n'a qu'une bouche
+  if (ISK()) { const a = h.ha[i] || 0; return { x: h.x + Math.cos(a) * 24, y: h.y - 22 + Math.sin(a) * 16 }; } // la tourelle n'a qu'une bouche
   const t = G.t, bx = (i - 1) * 14, up = Math.min(1, h.born / 0.35);
   return { x: h.x + bx * 1.5 + Math.sin(t * 2.1 + i * 2.1) * 5, y: h.y - (32 + (i === 1 ? 10 : 0) + Math.cos(t * 1.7 + i) * 3.5) * up };
 }
@@ -1709,7 +1727,7 @@ function updatePlayer(dt) {
   if (P.bubbleCD > 0) P.bubbleCD = Math.max(0, P.bubbleCD - cdRate);
   if (P.blastCD > 0) P.blastCD = Math.max(0, P.blastCD - cdRate);
 
-  const sp = (P.form === 'archon' ? (HERO.id === 'kross' ? CFG.humanSpeed * 1.08 : CFG.archonSpeed) : CFG.humanSpeed) * (P.buffs.speed > 0 ? 1.35 : 1), ox = P.x, oy = P.y;
+  const sp = (P.form === 'archon' ? (ISK() ? CFG.humanSpeed * 1.08 : CFG.archonSpeed) : CFG.humanSpeed) * (P.buffs.speed > 0 ? 1.35 : 1) * (HERO.id === 'adam' ? (P.form === 'archon' ? 1.8 : 1.3) : 1), ox = P.x, oy = P.y;
   if (P.boostT > 0) P.boostT -= dt;
   let ivx = input.mx * sp, ivy = input.my * sp;
   if (HERO.vehicle) { // une machine a de l'inertie : elle accélère, dérape, et un serpent ne s'arrête jamais
@@ -1777,19 +1795,20 @@ function updatePlayer(dt) {
   for (let i = 0; i < zones.length; i++) { const z = zones[i]; if (z.t > 0.4 && hyp(P.x - z.x, P.y - z.y) < z.r) { P.inZone = true; break; } }
 
   if (P.rapidT > 0) P.rapidT -= dt;
+  if (HERO.id === 'adam' && P.form === 'archon' && !P.dead && G.state === 'play') { P.ballT = (P.ballT || 0) - dt; if (P.ballT <= 0) { P.ballT = 0.05; const gm = globalMult(); for (let k = 0; k < 2; k++) kickBall(rnd(0, TAU), 15 * gm, 620, 0.7 * rangeMul()); } }
   if (P.inZone && HERO.id === 'nitro' && P.hp < P.maxHp) P.hp = Math.min(P.maxHp, P.hp + 6 * dt);
   if (P.inZone && HERO.summoner && P.hp < P.maxHp) P.hp = Math.min(P.maxHp, P.hp + 3 * dt);
   if (HERO.summoner) updateBear(dt);
   if (HERO.archer) bowUpdate(dt, P.fireRaw && P.dashT <= 0);
   if (P.firing && P.dashT <= 0 && !HERO.archer) {
-    const archon = P.form === 'archon', K = HERO.id === 'kross', N = HERO.id === 'nitro', Y = !!HERO.summoner;
+    const archon = P.form === 'archon', K = ISK(), N = HERO.id === 'nitro', Y = !!HERO.summoner;
     // Razor canalise un rayon, Kross tire de vraies balles, Nitro crache un cône de feu : seul l'Archonte a le laser
     const iv = K ? (archon ? 0.098 : 0.115) * (P.rapidT > 0 ? 0.6 : 1) * (P.inZone ? 0.62 : 1) : N ? 0.1 : Y ? 0.45 : archon ? CFG.beam.tick : CFG.frost.tick;
     P.tickAcc += dt * aspd(); let n = 0;
     while (P.tickAcc >= iv && n < 4) { P.tickAcc -= iv; n++; if (K) fireBullet(); else if (N) flameTick(); else if (Y) fireWave(); else if (archon) beamTick(); else frostTick(); }
     if (P.form === 'human' && Math.abs(angDiff(P.rayA, P.aim)) > 0.5) P.rayA = P.aim;
   } else { P.tickAcc = 0; P.rayA = P.aim; P.beamLen = frostRange(); }
-  if (false && HERO.id === 'kross' && P.form === 'archon' && !P.dead) { // (ancien Juggernaut)
+  if (false && ISK() && P.form === 'archon' && !P.dead) { // (ancien Juggernaut)
     P.podAcc += dt; if (P.podAcc >= 1.1) { P.podAcc = 0; podRockets(); }
   }
   P.rayShow += angDiff(P.rayShow, P.rayA) * (1 - Math.exp(-dt * 28));
@@ -1801,7 +1820,11 @@ function assist(R, wide) { // la cible la plus proche de l'axe de visée (Yuma :
   for (let i = 0; i < enemies.length; i++) { const e = enemies[i]; if (e.dead || e.spawnT > 0) continue; const dx = e.x - P.x, dy = e.y - P.y, d = hyp(dx, dy); if (d > R + e.r) continue; const sc = Math.abs(angDiff(P.aim, Math.atan2(dy, dx))) + d / 5000; if (sc < bs) { bs = sc; best = e; } }
   return best;
 }
+function kickBall(a, dmg, sp, life) { if (pshots.length >= 170) return; const c = Math.cos(a), sn = Math.sin(a); pshots.push({ x: P.x + c * 22, y: P.y + 6 + sn * 16, vx: c * sp, vy: sn * sp, t: 0, life, dmg, pierce: 1, big: false, ball: 1, spin: rnd(0, TAU), chain: false, last: null, dead: false }); }
+function ballRing(n, dmg) { const o = rnd(0, TAU), gm = globalMult(); for (let k = 0; k < n; k++) kickBall(o + k / n * TAU, dmg * gm, 640, 0.75 * rangeMul()); }
+function fireBall() { let a = P.aim; const t = assist(frostRange() * 1.15); if (t) a = Math.atan2(t.y - P.y, t.x - P.x); P.rayA = a; const n = P.weapon === 'spread' ? 3 : 1, gm = globalMult(); for (let k = 0; k < n; k++) kickBall(a + (k - (n - 1) / 2) * 0.2 + rnd(-0.03, 0.03), 19 * gm * (P.form === 'archon' ? 1.3 : 1), 700, 0.66 * rangeMul()); }
 function fireBullet() {
+  if (HERO.id === 'adam') return fireBall();
   const form = false, gm = globalMult(), wk = P.weapon, rail = wk === 'rail';
   let a = P.aim; if (!form) { const t = assist(frostRange() * 1.15); if (t) a = Math.atan2(t.y - P.y, t.x - P.x); P.rayA = a; }
   const n = wk === 'spread' ? 3 : 1, sp = form ? 1050 : 920, jit = form ? 0.085 : 0.03, range = (form ? 560 : 440) * rangeMul();
@@ -1832,6 +1855,7 @@ function podRockets() {
   if (n && G.state === 'play') sfx.blink();
 }
 function doGrenade() {
+  if (HERO.id === 'adam') { const gm = globalMult(); for (let k = -3; k <= 3; k++) kickBall(P.aim + k * 0.16, 30 * gm, 720, 0.7 * rangeMul()); return; }
   const t = assist(340), d = t ? clamp(hyp(t.x - P.x, t.y - P.y), 90, 330) : 250, a = t ? Math.atan2(t.y - P.y, t.x - P.x) : P.aim;
   nades.push({ x0: P.x, y0: P.y, x1: clamp(P.x + Math.cos(a) * d, 30, ARENA.w - 30), y1: clamp(P.y + Math.sin(a) * d, 30, ARENA.h - 30), t: 0, dur: 0.5, dead: false }); sfx.hydra();
 }
@@ -1851,12 +1875,14 @@ function doDash() {
   burst(P.x, P.y, C_LIME, 10, 8, 220); addRing(P.x, P.y, 30, 8, 0.2, COL.lime, 3); sfx.blink();
 }
 function doTurrets() {
+  if (HERO.id === 'adam') return ballRing(24, 40);
   for (const h of hydras) h.dead = true; const a = P.aim + Math.PI / 2, life = Math.min(10 + UP.bulle * 1.5, Math.max(4, P.archonT + 0.3));
   for (const sd of [-1, 1]) { const x = clamp(P.x + Math.cos(a) * 74 * sd + Math.cos(P.aim) * 36, 40, ARENA.w - 40), y = clamp(P.y + Math.sin(a) * 74 * sd + Math.sin(P.aim) * 36, 50, ARENA.h - 30); hydras.push({ x, y, t: life, life, born: 0, zapT: 0.3, head: 0, ha: [P.aim, P.aim, P.aim], fire: [0, 0, 0], dead: false }); addRing(x, y, 6, 60, 0.3, COL.lime, 4); burst(x, y, C_LIME, 10, 6, 220); }
   sfx.hydra();
 }
 /* La Nuke : l'éclair blanc de Dead Ops, mais dosé. Tout ce qui est autour de toi encaisse, les gros survivent. */
 function doNuke() {
+  if (HERO.id === 'adam') return ballRing(44, 34);
   const gm = globalMult(), R = 370; let n = 0;
   for (let j = 0; j < enemies.length; j++) { const e = enemies[j]; if (e.dead || e.spawnT > 0) continue; const d = hyp(e.x - P.x, e.y - P.y); if (d > R + e.r) continue; hurt(e, 190 * gm * (1.15 - 0.4 * d / R) * (e.type === 'boss' || e.type === 'elite' ? 1.9 : 1)); n++; /* la bombe entame aussi les gros */ if (!e.dead && e.type !== 'boss') stun(e, 0.7, false); }
   for (let j = 0; j < shots.length; j++) if (hyp(shots[j].x - P.x, shots[j].y - P.y) < R) shots[j].dead = true;
@@ -2153,7 +2179,7 @@ function oneFinger(dt) {
   if (m > 0.18) { ONE.a = Math.atan2(input.my, input.mx); ONE.hold = 0.12; ONE.seen = true; } // court maintien : le tir ne bégaie pas entre deux corrections de pouce
   else if (ONE.hold > 0) ONE.hold -= dt;
   if (ONE.seen) P.aimT = ONE.a;
-  const K = HERO.id === 'kross', N = HERO.id === 'nitro', Y = !!HERO.summoner, A = !!HERO.archer, archon = P.form === 'archon';
+  const K = ISK(), N = HERO.id === 'nitro', Y = !!HERO.summoner, A = !!HERO.archer, archon = P.form === 'archon';
   let near = null, nd = 1e9, close = 0;
   for (let i = 0; i < enemies.length; i++) { const e = enemies[i]; if (e.dead || e.spawnT > 0) continue; const d = hyp(e.x - P.x, e.y - P.y) - e.r; if (d < nd) { nd = d; near = e; } if (d < 170) close++; }
   if (!P.dead && !G.warp) {
@@ -2377,7 +2403,7 @@ function updateHydras(dt) {
     let look = null, ld = 440; for (let j = 0; j < enemies.length; j++) { const e = enemies[j]; if (e.dead || e.spawnT > 0) continue; const d = hyp(e.x - h.x, e.y - h.y); if (d < ld) { ld = d; look = e; } }
     for (let k = 0; k < 3; k++) { const hp = hydraHead(h, k), ta = look ? Math.atan2(look.y - hp.y, look.x - hp.x) : -Math.PI / 2 + (k - 1) * 0.5; h.ha[k] += angDiff(h.ha[k], ta) * Math.min(1, dt * 9); }
     h.zapT -= dt * aspd();
-    if (h.zapT > 0 || h.born < 0.35) continue; h.zapT = HERO.id === 'kross' ? 0.3 : 0.55;
+    if (h.zapT > 0 || h.born < 0.35) continue; h.zapT = ISK() ? 0.3 : 0.55;
     const hi = h.head; h.head = (h.head + 1) % 3;
     let from = hydraHead(h, hi), gm = globalMult(); const done = []; let hitN = 0;
     for (let c = 0; c < 3; c++) {
@@ -3310,7 +3336,7 @@ function drawHydras() {
 }
 /* Bulle de temps : un dôme où l'horloge des autres s'enlise. */
 function drawBubbles(top) {
-  const BC = HERO.id === 'kross' ? COL.frost : COL.plasma;
+  const BC = ISK() ? COL.frost : COL.plasma;
   for (let i = 0; i < bubbles.length; i++) {
     const b = bubbles[i]; if (!inView(b.x, b.y, b.r + 10)) continue;
     const left = b.life - b.t, grow = 1 - Math.pow(1 - Math.min(1, b.t / 0.35), 3), a = Math.min(1, left / 0.8) * (left < 1.5 && !RM ? 0.65 + 0.35 * Math.sin(G.t * 22) : 1), r = b.r * grow;
@@ -3426,7 +3452,7 @@ function drawEnemyOverlays() {
 function drawTemplar() {
   if (HERO.summoner) { if (inView(T.x, T.y, 60)) drawBear(T.x, T.y + 6, 0.62, Math.cos(T.rot) >= 0 ? 1 : -1, T.walk || 0, false); return; } // son compagnon à elle : un ourson
   if (!inView(T.x, T.y, 80)) return;
-  const f = Math.cos(T.rot) >= 0 ? 1 : -1, st = Math.sin(T.walk || 0) * 2.5, sw = T.swing > 0 ? 1 : 0, K = HERO.id === 'kross', TC = K ? COL.lime : COL.arc;
+  const f = Math.cos(T.rot) >= 0 ? 1 : -1, st = Math.sin(T.walk || 0) * 2.5, sw = T.swing > 0 ? 1 : 0, K = ISK(), TC = K ? COL.lime : COL.arc;
   ctx.globalAlpha = (1 - T.pulse) * 0.5; ctx.strokeStyle = TC; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(T.x, T.y + 18, T.r + 8 + 46 * T.pulse, (T.r + 8 + 46 * T.pulse) * 0.45, 0, 0, TAU); ctx.stroke();
   ctx.globalAlpha = 0.45; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(T.x, T.y + 19, 13, 4.5, 0, 0, TAU); ctx.fill(); ctx.globalAlpha = 1;
   ctx.save(); ctx.translate(T.x, T.y); ctx.scale(f, 1); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
@@ -3557,7 +3583,7 @@ function drawWizardGhost(x, y, f, col, a, big) {
 function handPos() { // la focale : d'où partent les rayons
   const a = P.form === 'human' && P.firing ? P.rayShow : P.aim, c = Math.cos(a), s = Math.sin(a);
   if (HERO.id === 'nitro') { const k = P.form === 'archon' ? 30 / CH : 24; HL.x = P.x + c * k; HL.y = P.y + s * k - (P.form === 'archon' ? 0 : 4); }
-  else if (HERO.id === 'kross') { HL.x = P.x + P.face * 3 + c * 25; HL.y = P.y - 6 + s * 18; }
+  else if (ISK()) { HL.x = P.x + P.face * 3 + c * 25; HL.y = P.y - 6 + s * 18; }
   else if (HERO.archer) { HL.x = P.x + c * 23; HL.y = P.y - 7 + s * 16; }
   else if (P.form === 'archon') { HL.x = P.x + c * 20; HL.y = P.y - 8 + Math.sin(G.t * 3) * 2 + s * 14; }
   else { HL.x = P.x + P.face * 3.5 + c * 19; HL.y = P.y - 8 + s * 14; }
@@ -3648,12 +3674,19 @@ function drawSaws() {
   ctx.globalAlpha = 0.25; ctx.strokeStyle = COL.neon; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(P.x, P.y, 64, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1;
 }
 /* ---------------- Balles, grenades, frappe aérienne, huile, flammes ---------------- */
+function drawBalls() {
+  for (let i = 0; i < pshots.length; i++) { const b = pshots[i]; if (!b.ball || !inView(b.x, b.y, 30)) continue; const r = 8.5;
+    ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.spin + b.t * 16); ctx.fillStyle = '#f6f6f2'; ctx.strokeStyle = '#111'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#111'; ctx.beginPath(); for (let k = 0; k < 5; k++) { const q = -Math.PI / 2 + k / 5 * TAU; ctx[k ? 'lineTo' : 'moveTo'](Math.cos(q) * 3.4, Math.sin(q) * 3.4); } ctx.closePath(); ctx.fill();
+    ctx.lineWidth = 1; ctx.beginPath(); for (let k = 0; k < 5; k++) { const q = -Math.PI / 2 + k / 5 * TAU; ctx.moveTo(Math.cos(q) * 3.4, Math.sin(q) * 3.4); ctx.lineTo(Math.cos(q) * r, Math.sin(q) * r); } ctx.stroke(); ctx.restore(); }
+}
 function drawPShots() {
   if (!pshots.length) return;
+  drawBalls();
   ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
   for (const [col, lw, a] of [[COL.volt, 6, 0.22], ['#fff6d0', 2.4, 1]]) {
     ctx.strokeStyle = col; ctx.globalAlpha = a; ctx.lineWidth = lw; ctx.beginPath();
-    for (let i = 0; i < pshots.length; i++) { const b = pshots[i]; if (b.arrow || !inView(b.x, b.y, 40)) continue; const k = b.big ? 0.03 : 0.024; ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - b.vx * k, b.y - b.vy * k); }
+    for (let i = 0; i < pshots.length; i++) { const b = pshots[i]; if (b.arrow || b.ball || !inView(b.x, b.y, 40)) continue; const k = b.big ? 0.03 : 0.024; ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - b.vx * k, b.y - b.vy * k); }
     ctx.stroke();
   }
   ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; ctx.lineCap = 'butt';
@@ -4112,7 +4145,22 @@ function drawNukes() {
   }
   ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
 }
+function drawAdam() { /* maillot jaune, short bleu, et des tresses qui flottent derrière lui */
+  const t = G.t, f = P.face, ulti = P.form === 'archon', fy = P.y + 21, hurt = P.hurtFlash > 0, acc = hurt ? '#ff5c7c' : '#ffd23f', vis = P.iframes > 0 && !RM ? (Math.sin(t * 52) > 0 ? 0.4 : 0.95) : 1, INK = '#07080c';
+  heroGround(acc, fy, 34); ctx.globalCompositeOperation = 'lighter'; halo(acc, P.x, P.y - 4, ulti ? 76 : 44, (ulti ? 0.42 : 0.26) * vis); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = vis;
+  const bob = P.moving ? Math.abs(Math.sin(P.walk)) * 2.2 : Math.sin(t * 2.4) * 0.6, s1 = P.moving ? Math.sin(P.walk) * 6 : 0, roll = P.dashT > 0;
+  ctx.save(); ctx.translate(P.x, P.y - bob); if (roll) { ctx.translate(0, 6); ctx.rotate((1 - P.dashT / 0.22) * TAU * f); ctx.scale(0.8, 0.8); } ctx.scale(f, 1); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const [x, c] of [[-3, s1], [3, -s1]]) { ctx.strokeStyle = INK; ctx.lineWidth = 6.4; ctx.beginPath(); ctx.moveTo(x, 7); ctx.lineTo(x + c, 19 + bob); ctx.stroke(); ctx.strokeStyle = '#7b4a2c'; ctx.lineWidth = 4.2; ctx.stroke(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 4.4; ctx.beginPath(); ctx.moveTo(x + c * 0.65, 13 + bob * 0.6); ctx.lineTo(x + c * 0.95, 18 + bob); ctx.stroke(); ctx.strokeStyle = '#e8352e'; ctx.lineWidth = 3.6; ctx.beginPath(); ctx.moveTo(x + c - 1, 20.5 + bob); ctx.lineTo(x + c + 5.5, 20.5 + bob); ctx.stroke(); }
+  ctx.fillStyle = '#1f4fd8'; ctx.strokeStyle = INK; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(-7.5, 1); ctx.lineTo(7.5, 1); ctx.lineTo(8, 10); ctx.lineTo(-8, 10); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.moveTo(-8, -12); ctx.lineTo(8, -12); ctx.lineTo(7.5, 3); ctx.lineTo(-7.5, 3); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#1f7a3d'; ctx.fillRect(-7.6, -8, 15.2, 1.8); ctx.fillStyle = INK; ctx.font = '800 8px sans-serif'; ctx.textAlign = 'center'; ctx.save(); ctx.scale(f, 1); ctx.fillText('10', 0, 1); ctx.restore();
+  const m = P.moving ? Math.sin(P.walk) * 5 : 0; ctx.strokeStyle = '#7b4a2c'; ctx.lineWidth = 3.6; ctx.beginPath(); ctx.moveTo(-8, -10); ctx.lineTo(-10 - m * 0.5, 1); ctx.moveTo(8, -10); ctx.lineTo(10 + m * 0.5, 1); ctx.stroke();
+  const vent = (P.moving ? 1.6 : 0.5) + (ulti ? 1 : 0); for (let k = 0; k < 6; k++) { const hx = -5 + k * 1.1, hy = -22 + k * 1.7, L = 13 + (k % 2) * 3, w = Math.sin(t * 9 + k) * 1.8; ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.quadraticCurveTo(hx - 5 * vent, hy + 5 + w, hx - 6 * vent - 2, hy + L * (1 - 0.14 * vent) + w); ctx.stroke(); ctx.strokeStyle = k % 3 ? '#2a1a12' : '#ffd23f'; ctx.lineWidth = 1.7; ctx.stroke(); }
+  ctx.fillStyle = '#7b4a2c'; ctx.strokeStyle = INK; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(1, -18.5, 6.3, 0, TAU); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#17100c'; ctx.beginPath(); ctx.arc(0.4, -20, 6.5, Math.PI * 0.92, Math.PI * 1.95); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.fillRect(2.4, -19.4, 2, 1.7); ctx.fillStyle = INK; ctx.fillRect(3.4, -19.2, 1.1, 1.4); ctx.strokeStyle = INK; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.arc(3.8, -15.6, 1.8, 0.1, 2.2); ctx.stroke();
+  ctx.restore(); ctx.globalAlpha = 1;
+}
 function drawSoldier() {
+  if (HERO.id === 'adam') return drawAdam();
   const t = G.t, f = P.face, a = P.firing ? P.rayShow : P.aim, hurt = P.hurtFlash > 0, vis = P.iframes > 0 && !RM ? (Math.sin(t * 52) > 0 ? 0.4 : 0.95) : 1;
   const nuke = P.form === 'archon', hollow = G.archons > 0 && !canArchon() && !nuke, acc = hurt ? '#ff5c7c' : hollow ? COL.neon : COL.lime, fy = P.y + 21;
   heroGround(acc, fy, 34);
@@ -4427,7 +4475,7 @@ function render() {
   drawEnemyOverlays(); drawBubbles(true); drawGems(); drawCrates(); drawPylons(); drawRift(); drawStrikes(); drawNades(); drawRockets(); drawPShots(); drawWaves(); drawDragons(); drawNukes(); if (BEAR.active) drawBear(BEAR.x, BEAR.y - (BEAR.h || 0), 1.75, BEAR.face, BEAR.walk, true); drawHydras(); drawTemplar(); drawShots(); drawTrails();
   if (!P.dead) {
     handPos();
-    const K = HERO.id === 'kross', N = HERO.id === 'nitro';
+    const K = ISK(), N = HERO.id === 'nitro';
     if (P.firing && P.dashT <= 0) {
       if (HERO.summoner) { /* les ondes se dessinent elles-mêmes */ }
       else if (HERO.archer) { /* l'arc et la flèche se dessinent avec le corps */ }
@@ -4467,7 +4515,7 @@ function render() {
 const UIE = {};
 ['hpFill', 'hpTxt', 'stk', 'stkTxt', 'stkBar', 'fxIngeom', 'fxZone', 'stocks', 'phaseFill', 'phaseTime', 'eCold', 'eLight', 'eArcane', 'eFire', 'sur',
   'waveTxt', 'scoreTxt', 'bZoom', 'bPause', 'bossBar', 'bossFill', 'dCold', 'dLight', 'dArcane', 'dFire', 'aStocks', 'toast', 'fxBuff',
-  'mTitle', 'mSub', 'mKana', 'mTag', 'mHint', 'hRazor', 'hKross', 'hNitro', 'hYuma', 'hKaze', 'overTitle', 'fxWeap', 'bZoom2', 'bOne', 'bOne2', 'bFs', 'bFull2',
+  'mTitle', 'mSub', 'mKana', 'mTag', 'mHint', 'hRazor', 'hKross', 'hAdam', 'hNitro', 'hYuma', 'hKaze', 'overTitle', 'fxWeap', 'bZoom2', 'bOne', 'bOne2', 'bFs', 'bFull2',
   'menu', 'cards', 'pause', 'over', 'cardsTitle', 'cardRow', 'bPlay', 'bSound', 'bFull', 'record', 'bResume', 'bSound2', 'bQuit', 'overLine', 'overStats', 'bAgain', 'bMenu'].forEach((id) => { UIE[id] = $(id); });
 const cdnArchon = bArchon.querySelector('.cdn'), cdnBlink = bBlink.querySelector('.cdn'), cdnHydra = bHydra.querySelector('.cdn');
 const DBG = { bot: false, hold: false };
@@ -4568,9 +4616,9 @@ function syncRecord() {
 /* ---------------- Choix du héros : le menu, les icônes et le monde de départ changent avec lui ---------------- */
 function setHero(id, quiet) {
   HERO = HEROES[id] || HEROES.razor; save.hero = HERO.id; persist();
-  app.classList.toggle('hero-kross', HERO.id === 'kross'); app.classList.toggle('hero-nitro', HERO.id === 'nitro'); app.classList.toggle('hero-yuma', HERO.id === 'yuma'); app.classList.toggle('hero-kaze', HERO.id === 'kaze');
+  app.classList.toggle('hero-kross', ISK()); app.classList.toggle('hero-adam', HERO.id === 'adam'); app.classList.toggle('hero-nitro', HERO.id === 'nitro'); app.classList.toggle('hero-yuma', HERO.id === 'yuma'); app.classList.toggle('hero-kaze', HERO.id === 'kaze');
   UIE.mTitle.textContent = HERO.name; UIE.mSub.textContent = HERO.sub + ' · ' + HERO.mode.toLowerCase(); UIE.mKana.textContent = HERO.kana; UIE.mTag.textContent = HERO.tagline; UIE.mHint.textContent = 'Glisse le pouce d\'un bouton à l\'autre pour tout enchaîner. ' + HERO.hint;
-  UIE.hRazor.setAttribute('aria-checked', String(HERO.id === 'razor')); UIE.hKross.setAttribute('aria-checked', String(HERO.id === 'kross')); UIE.hNitro.setAttribute('aria-checked', String(HERO.id === 'nitro')); UIE.hYuma.setAttribute('aria-checked', String(HERO.id === 'yuma')); UIE.hKaze.setAttribute('aria-checked', String(HERO.id === 'kaze'));
+  UIE.hRazor.setAttribute('aria-checked', String(HERO.id === 'razor')); UIE.hKross.setAttribute('aria-checked', String(HERO.id === 'kross')); UIE.hAdam.setAttribute('aria-checked', String(HERO.id === 'adam')); UIE.hNitro.setAttribute('aria-checked', String(HERO.id === 'nitro')); UIE.hYuma.setAttribute('aria-checked', String(HERO.id === 'yuma')); UIE.hKaze.setAttribute('aria-checked', String(HERO.id === 'kaze'));
   const ic = HERO.icons; for (const [el, h] of [['uA', ic.a], ['uA2', ic.a2], ['uB', ic.b], ['uC', ic.c], ['pA', ic.a], ['pB', ic.b], ['pC', ic.c]]) $(el).setAttribute('href', h);
   UIE.stk.firstChild.textContent = HERO.stacks + ' ';
   bHydra.setAttribute('aria-label', HERO.a1 + ' / ' + HERO.a3); bBlink.setAttribute('aria-label', HERO.a2); bArchon.setAttribute('aria-label', HERO.form + ' / ' + HERO.a4);
@@ -4677,7 +4725,7 @@ function botInput(dt) {
   if (P.dead) return;
   BOT.act -= dt; if (BOT.act > 0) return; // délai de réaction du pouce
   BOT.act = (1 - skill) * rnd(0.3, 0.9);
-  const K = HERO.id === 'kross', N = HERO.id === 'nitro', Y = !!HERO.summoner, A = !!HERO.archer;
+  const K = ISK(), N = HERO.id === 'nitro', Y = !!HERO.summoner, A = !!HERO.archer;
   if (A && near && nd < 150 && !G.rift) { const dx = near.x - P.x, dy = near.y - P.y, d = hyp(dx, dy) || 1; input.mx = -dx / d; input.my = -dy / d; } /* un archer recule : il veut de la distance */
   if (Y && near && nd > 190 && !G.rift) { const dx = near.x - P.x, dy = near.y - P.y, d = hyp(dx, dy) || 1; input.mx = dx / d; input.my = dy / d; } // elle doit aller au contact : ses ondes portent court
   if (P.form === 'human') {
@@ -4783,6 +4831,7 @@ UIE.bOne2.addEventListener('click', () => { AU.init(); setOne(!save.one); });
 UIE.bPlay.addEventListener('click', startRun);
 UIE.hRazor.addEventListener('click', () => { AU.init(); setHero('razor'); });
 UIE.hKross.addEventListener('click', () => { AU.init(); setHero('kross'); });
+UIE.hAdam.addEventListener('click', () => { AU.init(); setHero('adam'); });
 UIE.hNitro.addEventListener('click', () => { AU.init(); setHero('nitro'); });
 UIE.hYuma.addEventListener('click', () => { AU.init(); setHero('yuma'); });
 UIE.hKaze.addEventListener('click', () => { AU.init(); setHero('kaze'); });
