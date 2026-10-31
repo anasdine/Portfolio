@@ -94,7 +94,7 @@ function geoPlateau(graine, largeur, profondeur, epaisseur) {
   return g;
 }
 
-export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, surFoyer = () => {} } = {}) {
+export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, surFoyer = () => {}, calme = false } = {}) {
   const renderer = new THREE.WebGPURenderer({ canvas: toile, antialias: true, forceWebGL: WEBGL_SEUL });
   await renderer.init();
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1.25));
@@ -555,7 +555,11 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
   let roulis = 0, presence = 1;
   const plongee = { cible: 0, temps: 0, valeur: 0 }, devantPanneau = new THREE.Vector3();
   const souris = { x: 0, y: 0, lx: 0, ly: 0 };
-  addEventListener('pointermove', (e) => { souris.x = e.clientX / innerWidth - 0.5; souris.y = e.clientY / innerHeight - 0.5; }, { passive: true });
+  addEventListener('pointermove', (e) => {
+    if (calme || e.pointerType !== 'mouse') return;
+    souris.x = e.clientX / innerWidth - 0.5;
+    souris.y = e.clientY / innerHeight - 0.5;
+  }, { passive: true });
   const defilement = { cible: 0, valeur: 0 };
   let foyer = -1, champ = CHAMP;
 
@@ -613,11 +617,11 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     const poidsDehors = 1 - adoucir(0.3, FIN_TRAJET, p);
     // Le grand écart de la souris n'existe qu'au large : la porte fait dix mètres, il faut être dans l'axe bien avant elle.
     const large = 1 - adoucir(0.1, 0.22, p);
-    camera.position.set(pos.x + souris.lx * (large * 24 + 1.2) + Math.sin(t * 0.07) * 3 * large, pos.y - souris.ly * 0.8, pos.z);
+    camera.position.set(pos.x + souris.lx * (large * 24 + 1.2) + (calme ? 0 : Math.sin(t * 0.07) * 3 * large), pos.y - souris.ly * 0.8, pos.z);
     camera.lookAt(vise.x + souris.lx * 1.4, vise.y - souris.ly * (large * 10 + 0.7), vise.z);
     // la plongée : le monde s'éteint, la caméra roule lentement, le zoom ne dépend que du défilement
     const dansLeZoom = adoucir(DEBUT_FRACTALE - 0.02, DEBUT_FRACTALE + 0.02, p);
-    roulis += dt * 0.05 * dansLeZoom;
+    if (!calme) roulis += dt * 0.05 * dansLeZoom;
     camera.rotateZ(roulis);
     const phi = Math.min(PERIODES - 0.001, Math.max(0, (p - DEBUT_FRACTALE) / (1 - DEBUT_FRACTALE)) * PERIODES);
     // devant un panneau, l'hologramme se retire pour laisser lire
@@ -706,9 +710,14 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     parasites.value = 1 - etat.valeur;
     surEtat(etat.valeur);
 
-    souris.lx += (souris.x - souris.lx) * (1 - Math.exp(-dt * 1.6));
-    souris.ly += (souris.y - souris.ly) * (1 - Math.exp(-dt * 1.6));
-    defilement.valeur += (defilement.cible - defilement.valeur) * (1 - Math.exp(-dt * 3.2));
+    if (calme) {
+      souris.x = souris.y = souris.lx = souris.ly = 0;
+      defilement.valeur = defilement.cible;
+    } else {
+      souris.lx += (souris.x - souris.lx) * (1 - Math.exp(-dt * 1.6));
+      souris.ly += (souris.y - souris.ly) * (1 - Math.exp(-dt * 1.6));
+      defilement.valeur += (defilement.cible - defilement.valeur) * (1 - Math.exp(-dt * 3.2));
+    }
     placerCamera(defilement.valeur, t, dt);
     bureau.actualiser(foyer, t, plongee.valeur);
     if (dehors.visible) peuple.actualiser(t);

@@ -23,15 +23,19 @@ const RESTAURE = [0x3f, 0xd3, 0xc6];
 // jeux. Le visiteur ne doit jamais tomber sur un écran noir.
 let leger = false;
 function passerLeger() {
-  if (leger) return;
+  // Jamais sous le doigt : la hauteur de page change, la prochaine mesure lente s'en chargera.
+  if (leger || document.querySelector('[data-glisse]')) return;
   leger = true;
   tour?.arreter();
+  const trajetLong = document.querySelector('[data-parcours]');
+  const dansArcade = scrollY - trajetLong.offsetHeight;
   document.documentElement.classList.add('leger');
   racine.dataset.mode = 'video';
   mode = 'video';
   video.style.visibility = '';
   video.play().catch(() => {});
-  scrollTo(0, 0);
+  // Dans l'arcade, on reste au même endroit ; dans le trajet 3D, il n'existe plus : on repart de la tour.
+  scrollTo(0, dansArcade > 0 ? trajetLong.offsetHeight + dansArcade : 0);
   dispatchEvent(new Event('scroll'));
 }
 const sansGL = () => { try { return !navigator.gpu && !document.createElement('canvas').getContext('webgl2'); } catch { return true; } };
@@ -87,7 +91,7 @@ function surFoyer(foyer) {
 }
 
 function preparer() {
-  preparation ??= creerTour(toile, { surEtat, surFoyer, surFps: (n) => {
+  preparation ??= creerTour(toile, { calme, surEtat, surFoyer, surFps: (n) => {
       fps = n;
       if (mode === 'live') ecrireLegende();
       // dix secondes pour s'installer après le passage en 3D, puis huit secondes d'affilée sous 14 images : on arrête de forcer
@@ -521,6 +525,7 @@ document.documentElement.classList.toggle('guide', !leger);
 
 // Une barre tactile : aucun gestionnaire de geste sur la piste ou sur la page.
 const defilement = document.querySelector('[data-defilement]');
+const pisteDefilement = defilement.querySelector('[data-piste]');
 const poignee = defilement.querySelector('[data-poignee]');
 const ecranDefilement = matchMedia('(max-width: 760px), (pointer: coarse) and (max-height: 520px)');
 let imageDefilement = 0;
@@ -532,21 +537,29 @@ function mesurerDefilement() {
   const hauteurPage = document.documentElement.scrollHeight;
   const hauteurVue = document.documentElement.clientHeight;
   const maximum = Math.max(0, hauteurPage - hauteurVue);
-  const piste = defilement.clientHeight;
-  const taille = Math.min(piste, Math.max(44, piste * hauteurVue / hauteurPage));
-  return { maximum, taille, course: Math.max(0, piste - taille) };
+  const piste = pisteDefilement.clientHeight;
+  const taille = Math.min(piste, Math.max(64, piste * hauteurVue / hauteurPage));
+  return { maximum, taille, course: Math.max(0, piste - taille), haut: pisteDefilement.getBoundingClientRect().top };
 }
 function actualiserDefilement() {
   imageDefilement = 0;
-  defilement.hidden = !ecranDefilement.matches;
-  if (defilement.hidden) return;
-  const { maximum, taille, course } = mesurerDefilement();
-  if (prise) {
-    const delta = prise.y - prise.avant;
-    prise.avant = prise.y;
-    // Le déplacement relatif conserve le point de prise quand Safari redimensionne la vue.
-    if (delta && course && !occupe()) scrollTo({ top: borner(scrollY + delta * maximum / course, maximum), behavior: 'instant' });
+  defilement.hidden = !ecranDefilement.matches || occupe() || document.documentElement.classList.contains('plonge');
+  document.documentElement.classList.toggle('barre-tactile', !defilement.hidden);
+  if (defilement.hidden) {
+    if (prise) finirPrise(true);
+    return;
   }
+  if (prise) {
+    const { maximum, taille, course, origine, depart } = prise;
+    const position = borner(origine + prise.y - depart, course);
+    if (!occupe()) scrollTo({ top: course ? position * maximum / course : 0, behavior: 'instant' });
+    // Même image que scrollTo : aucun retour par le scrollY asynchrone de Safari.
+    poignee.style.height = taille + 'px';
+    poignee.style.transform = 'translate3d(0, ' + position + 'px, 0)';
+    poignee.setAttribute('aria-valuenow', String(Math.round(course ? position / course * 100 : 0)));
+    return;
+  }
+  const { maximum, taille, course } = mesurerDefilement();
   const position = maximum ? borner(scrollY, maximum) / maximum : 0;
   poignee.style.height = taille + 'px';
   poignee.style.transform = 'translate3d(0, ' + position * course + 'px, 0)';
@@ -561,33 +574,79 @@ function interrompreTrajet() {
   lest = enGlisse = false;
   defilementTactile = true; // Le raccord du tunnel ne doit pas reprendre la main.
 }
-poignee.addEventListener('pointerdown', (e) => {
-  if (prise || !e.isPrimary || e.button !== 0 || occupe() || arrimage) return;
+function commencerPrise(y, surPoignee, id = null) {
+  if (prise || occupe() || arrimage) return false;
   interrompreTrajet();
   // La prise annule aussi le maintien à l'arrivée de l'arcade.
   cancelAnimationFrame(imageArrivee);
   imageArrivee = 0;
-  scrollTo({ top: scrollY, behavior: 'instant' });
-  prise = { id: e.pointerId, y: e.clientY, avant: e.clientY };
+  const geometrie = mesurerDefilement();
+  const { maximum, taille, course, haut } = geometrie;
+  const position = surPoignee
+    ? borner(poignee.getBoundingClientRect().top - haut, course)
+    : maximum ? borner(scrollY, maximum) / maximum * course : 0;
+  const decalage = surPoignee ? y - haut - position : taille / 2;
+  // Origine absolue : le scroll natif ne participe plus au calcul du geste.
+  prise = { ...geometrie, id, y, depart: y, decalage,
+    origine: surPoignee ? position : borner(y - haut - decalage, course) };
   poignee.setAttribute('data-glisse', '');
-  poignee.setPointerCapture(e.pointerId);
   demanderDefilement();
+  return true;
+}
+defilement.addEventListener('pointerdown', (e) => {
+  if (!pisteDefilement.contains(e.target)) return;
+  if (!e.isPrimary || e.button !== 0) return;
+  if (!commencerPrise(e.clientY, poignee.contains(e.target), e.pointerId)) return;
+  try { defilement.setPointerCapture(e.pointerId); }
+  catch { finirPrise(true); }
 });
-poignee.addEventListener('pointermove', (e) => {
+defilement.addEventListener('pointermove', (e) => {
   if (prise?.id !== e.pointerId) return;
   prise.y = e.clientY;
   demanderDefilement();
 });
-function terminerPrise(e) {
-  if (prise?.id !== e.pointerId) return;
-  if (e.type === 'pointerup') prise.y = e.clientY;
+function finirPrise(annulee = false, y = prise?.y) {
+  if (!prise) return;
+  const id = prise.id;
+  if (!annulee) prise.y = y;
   if (imageDefilement) cancelAnimationFrame(imageDefilement);
-  actualiserDefilement();
+  imageDefilement = 0;
+  // Une annulation ne rejoue jamais un mouvement encore en attente.
+  if (!annulee) actualiserDefilement();
   prise = null;
   poignee.removeAttribute('data-glisse');
-  if (poignee.hasPointerCapture(e.pointerId)) poignee.releasePointerCapture(e.pointerId);
+  if (id !== null && defilement.hasPointerCapture(id)) defilement.releasePointerCapture(id);
+  demanderDefilement(); // La géométrie visuelle peut à nouveau suivre les barres Safari.
 }
-for (const nom of ['pointerup', 'pointercancel', 'lostpointercapture']) poignee.addEventListener(nom, terminerPrise);
+for (const nom of ['pointerup', 'pointercancel', 'lostpointercapture']) defilement.addEventListener(nom, (e) => {
+  if (prise?.id === e.pointerId) finirPrise(nom !== 'pointerup', e.clientY);
+});
+// Safari : empêcher aussi les gestes Touch natifs dans cette seule colonne.
+// Les événements de la poignée remontent ici ; le reste de la page reste natif.
+defilement.addEventListener('touchstart', (e) => {
+  if (!pisteDefilement.contains(e.target)) return;
+  if (e.cancelable) e.preventDefault();
+  const doigt = e.changedTouches[0];
+  if (!doigt) return;
+  if (!prise) commencerPrise(doigt.clientY, poignee.contains(e.target));
+  if (prise && prise.doigt === undefined) prise.doigt = doigt.identifier;
+}, { passive: false });
+defilement.addEventListener('touchmove', (e) => {
+  if (!pisteDefilement.contains(e.target)) return;
+  if (e.cancelable) e.preventDefault();
+  if (!prise) return;
+  const doigt = [...e.changedTouches].find((d) => d.identifier === prise.doigt);
+  if (doigt) { prise.y = doigt.clientY; demanderDefilement(); }
+}, { passive: false });
+// Écouteurs directs également : Safari connaît l'intention dès la poignée.
+for (const nom of ['touchstart', 'touchmove']) poignee.addEventListener(nom, (e) => {
+  if (e.cancelable) e.preventDefault();
+}, { passive: false });
+for (const nom of ['touchend', 'touchcancel']) defilement.addEventListener(nom, (e) => {
+  if (!prise) return;
+  const doigt = [...e.changedTouches].find((d) => d.identifier === prise.doigt);
+  if (doigt) finirPrise(nom === 'touchcancel', doigt.clientY);
+}, { passive: true });
 poignee.addEventListener('keydown', (e) => {
   if (occupe() || arrimage) return;
   const maximum = Math.max(0, document.documentElement.scrollHeight - document.documentElement.clientHeight);
@@ -607,6 +666,7 @@ window.visualViewport?.addEventListener('resize', demanderDefilement);
 window.visualViewport?.addEventListener('scroll', demanderDefilement, { passive: true });
 ecranDefilement.addEventListener('change', demanderDefilement);
 new ResizeObserver(demanderDefilement).observe(document.body);
+new MutationObserver(demanderDefilement).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 demanderDefilement();
 
 // ?diag : la page dit ce qu'elle fait. Rien ne sort du navigateur : c'est lu à l'écran, ou par les outils de test.

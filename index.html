@@ -261,41 +261,53 @@
     .frise li { min-width: 0; overflow-wrap: anywhere; }
   }
 
-  /* Seule la poignée intercepte le geste, la piste laisse défiler la page. */
+  /* Le geste personnalisé reste limité à la colonne de navigation. */
   .navigation-defilement { display: none; }
   @media (max-width: 760px), (pointer: coarse) and (max-height: 520px) {
     .navigation-defilement {
       position: fixed; z-index: 13;
       top: calc(var(--defilement-haut, 0px) + 64px + env(safe-area-inset-top, 0px));
-      right: calc(8px + env(safe-area-inset-right, 0px));
-      width: 44px;
+      right: calc(14px + env(safe-area-inset-right, 0px));
+      width: 52px;
       height: calc(var(--defilement-vue, 100dvh) - 80px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
-      display: block; pointer-events: none;
+      display: block;
     }
-    .navigation-defilement::before {
-      content: ''; position: absolute; top: 0; bottom: 0; right: 20px; width: 3px;
-      background: rgba(7, 13, 28, .85); border: 1px solid rgba(63, 211, 198, .45); border-radius: 3px;
+    .navigation-defilement__piste {
+      position: absolute; top: 48px; bottom: 48px; left: 0; width: 52px;
+      touch-action: none; user-select: none; -webkit-user-select: none;
+    }
+    .navigation-defilement__piste::before {
+      content: ''; position: absolute; top: 0; bottom: 0; left: 22px; width: 8px;
+      background: rgba(7, 13, 28, .95); border: 1px solid rgba(63, 211, 198, .7); border-radius: 4px;
     }
     .navigation-defilement__poignee {
-      position: absolute; top: 0; left: 0; width: 44px; min-height: 44px;
+      position: absolute; top: 0; left: 0; width: 52px; min-height: 64px;
       pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none;
       cursor: grab; border-radius: 4px;
     }
     .navigation-defilement__poignee::before {
-      content: ''; position: absolute; top: 0; bottom: 0; right: 18px; width: 7px;
+      content: ''; position: absolute; top: 0; bottom: 0; left: 19px; width: 14px;
       background: var(--sain); border: 1px solid #070d1c; border-radius: 4px;
       box-shadow: 0 0 8px rgba(63, 211, 198, .3);
+    }
+    .navigation-defilement__poignee::after {
+      content: ''; position: absolute; left: 22px; top: calc(50% - 5px); width: 8px; height: 10px;
+      background: repeating-linear-gradient(to bottom, #070d1c 0 2px, transparent 2px 4px);
+      pointer-events: none;
     }
     .navigation-defilement__poignee:focus-visible { outline: 2px solid var(--texte); outline-offset: -2px; }
     .navigation-defilement__poignee[data-glisse] { cursor: grabbing; visibility: visible; }
   }
   .navigation-defilement[hidden] { display: none; }
   html.jeu-ouvert .navigation-defilement, html.plonge .navigation-defilement { visibility: hidden; }
-  .bas { padding-right: calc(60px + env(safe-area-inset-right, 0px)); }
-  .arcade { padding-right: max(var(--marge), calc(76px + env(safe-area-inset-right, 0px))); }
-  .branches { max-width: calc(100vw - 152px - env(safe-area-inset-right, 0px)); }
+  .langue:has(> button[aria-expanded="true"]) { z-index: 14; }
+  html.barre-tactile .branches { max-width: calc(100vw - 160px - env(safe-area-inset-right, 0px)); }
+  html.barre-tactile .restaurer { margin-right: calc(66px + env(safe-area-inset-right, 0px)); }
+  html.barre-tactile .role, html.barre-tactile .legende { padding-right: calc(62px + env(safe-area-inset-right, 0px)); }
+  html.barre-tactile .fiche { right: calc(80px + env(safe-area-inset-right, 0px)); }
   @media (max-width: 640px) {
-    .branches { right: calc(72px + env(safe-area-inset-right, 0px)); max-width: none; }
+    html.barre-tactile .branches { right: calc(80px + env(safe-area-inset-right, 0px)); max-width: none; }
+    html.barre-tactile .restaurer { width: calc(100% - 66px - env(safe-area-inset-right, 0px)); }
   }
 </style>
 </head>
@@ -387,7 +399,9 @@
   </footer>
 </section>
 <div class="navigation-defilement" data-defilement hidden>
+  <div class="navigation-defilement__piste" data-piste>
   <div class="navigation-defilement__poignee" data-poignee role="scrollbar" tabindex="0" aria-label="Défilement de la page" aria-controls="page" aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+  </div>
 </div>
 <div class="eclair" data-eclair aria-hidden="true"></div>
 <div class="univers" data-univers role="dialog" aria-label="Détail du portfolio" data-t-aria>
