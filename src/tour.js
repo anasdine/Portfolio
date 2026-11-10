@@ -1,10 +1,11 @@
+import { time } from './mouvement.js';
 // Le bastion, calculé en temps réel : three.js r187, WebGPU avec repli WebGL 2, shaders en TSL.
 // Tout est à l'échelle réelle, en mètres : 300 m de tour, une caméra à hauteur d'homme, une silhouette de 1,8 m.
 // L'immensité vient de là : la perspective, la répétition (joints, lampes, feux de rampe), l'air entre l'œil et le sommet.
 // Aucune texture, aucun modèle chargé : tout est calculé.
 import * as THREE from 'three/webgpu';
 import {
-  Fn, Discard, uniform, int, instanceIndex, time, uv, luminance, cos, positionWorld, normalWorld, normalWorldGeometry, cameraPosition, screenUV, reflector, reflect,
+  Fn, Discard, uniform, int, instanceIndex,  uv, luminance, cos, positionWorld, normalWorld, normalWorldGeometry, cameraPosition, screenUV, reflector, reflect,
   mx_noise_float, mx_fractal_noise_float, mx_worley_noise_vec2, hash, fract, floor, step, smoothstep, mix, vec2, vec3, vec4,
   color, float, sin, abs, atan, max, min, pow, clamp, length, dot, normalize, fwidth, pass,
 } from 'three/tsl';
@@ -12,16 +13,13 @@ import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { chromaticAberration } from 'three/addons/tsl/display/ChromaticAberrationNode.js';
 import { radialBlur } from 'three/addons/tsl/display/radialBlur.js';
 import { creerBureau, SOL } from './bureau.js';
-import { SIMPLE, WEBGL_SEUL } from './qualite.js';
+import { SIMPLE, MOBILE, TELEPHONE, WEBGL_SEUL } from './qualite.js';
 import { creerFractale } from './fractale.js';
 import { creerPeuple } from './peuple.js';
 
 // Le calendrier du défilement, de 0 à 1.
-export const FIN_TRAJET = 0.46;           // on entre dans la salle
-export const DEBUT_PANNEAUX = 0.52;       // l'œil a fini d'arriver : le premier panneau est cadré
-export const FIN_PANNEAUX = 0.76;         // le dernier panneau a été lu
-export const DEBUT_FRACTALE = 0.82;  // on est devant LEONHARD, le zoom commence
-export const PERIODES = 3;         // la plongée compte trois niveaux, puis elle débouche sur l'arcade
+export { FIN_TRAJET, DEBUT_PANNEAUX, FIN_PANNEAUX, DEBUT_FRACTALE, PERIODES } from './contenu.js';
+import { FIN_TRAJET, DEBUT_PANNEAUX, FIN_PANNEAUX, DEBUT_FRACTALE, PERIODES } from './contenu.js';
 
 const COMPROMIS = new THREE.Color(0xff5c4d);   // accent rouge du portfolio
 const RESTAURE = new THREE.Color(0x3fd3c6);    // trait du logo AD
@@ -94,10 +92,11 @@ function geoPlateau(graine, largeur, profondeur, epaisseur) {
   return g;
 }
 
-export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, surFoyer = () => {}, calme = false } = {}) {
-  const renderer = new THREE.WebGPURenderer({ canvas: toile, antialias: true, forceWebGL: WEBGL_SEUL });
+export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, surFoyer = () => {}, calme = false, estVisible = () => !document.hidden } = {}) {
+  let actif = false, demandeImage = 0;
+  const renderer = new THREE.WebGPURenderer({ canvas: toile, antialias: !TELEPHONE, forceWebGL: WEBGL_SEUL });
   await renderer.init();
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.25));
+  renderer.setPixelRatio(Math.min(devicePixelRatio, TELEPHONE ? 0.75 : 1.25));
   renderer.toneMapping = THREE.NeutralToneMapping;   // garde la saturation des bleus, qu'ACES délave
   renderer.toneMappingExposure = 1;
   const backend = renderer.backend.isWebGPUBackend ? 'WebGPU' : 'WebGL 2';
@@ -334,7 +333,7 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
   matCendres.colorNode = mix(teinte, color(0xcfe6ff), h1).mul(1.4);
   matCendres.opacityNode = float(1).sub(smoothstep(0.1, 0.5, length(uv().sub(0.5))));
   const cendres = new THREE.Sprite(matCendres);
-  cendres.count = SIMPLE ? 1200 : 5000;
+  cendres.count = MOBILE ? 400 : SIMPLE ? 1200 : 5000;
   cendres.frustumCulled = false;
   dehors.add(cendres);
 
@@ -473,8 +472,10 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
   const lumiere = image.rgb.mul(smoothstep(0.75, 1.3, luminance(image.rgb)));
   const rayons = SIMPLE ? null : radialBlur(vec4(lumiere, 1), { center: centreRayons, weight: float(0.9), decay: float(0.94), count: int(14), exposure: float(1.1), stride: float(1), radius: float(0.8) });
   const nette = SIMPLE ? image : chromaticAberration(image, 0.1, vec2(0.5, 0.5), 1.1);
-  const eclat = bloom(image, 0.42, 0.55, 0.82);
-  eclat.setResolutionScale(SIMPLE ? 0.25 : 0.5);
+  // Le bloom ajoute douze dessins et pénalise surtout les images lentes sur téléphone.
+  // Les matériaux émissifs, les liserés et les couleurs de la scène restent identiques.
+  const eclat = TELEPHONE ? null : bloom(image, 0.42, 0.55, 0.82);
+  if (eclat) eclat.setResolutionScale(SIMPLE ? 0.25 : 0.5);
   const fondu = uniform(0);
   // Le tunnel : on vole à l'intérieur de la grille de LEONHARD. Calculé plein écran en coordonnées polaires : la profondeur
   // est l'inverse du rayon. La finesse des lignes suit la taille du pixel à cet endroit, sans dérivée : le raccord de
@@ -520,7 +521,8 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     return paroi.add(grille).add(lueurs).add(pointe).mul(smoothstep(0.015, 0.1, rayon).mul(0.8).add(0.2)).add(or.mul(brume)).add(lumiere.mul(coeur.mul(2.4)));
   })();
   pipeline.outputNode = Fn(() => {
-    const c = rayons ? nette.rgb.add(eclat.rgb).add(rayons.rgb.mul(forceRayons).mul(0.45)) : nette.rgb.add(eclat.rgb);
+    const avecEclat = eclat ? nette.rgb.add(eclat.rgb) : nette.rgb;
+    const c = rayons ? avecEclat.add(rayons.rgb.mul(forceRayons).mul(0.45)) : avecEclat;
     const centre = screenUV.sub(0.5).mul(vec2(1, 0.8));
     const vignette = float(1).sub(smoothstep(0.42, 1, length(centre))).mul(0.32).add(0.68);
     const grain = fract(sin(dot(screenUV.add(fract(time)), vec2(12.9898, 78.233))).mul(43758.5453)).sub(0.5);
@@ -626,6 +628,7 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     const phi = Math.min(PERIODES - 0.001, Math.max(0, (p - DEBUT_FRACTALE) / (1 - DEBUT_FRACTALE)) * PERIODES);
     // devant un panneau, l'hologramme se retire pour laisser lire
     const viseePresence = foyer >= 0 ? (camera.aspect < 1 ? 0.05 : 0.18) : 1;
+    if (calme) presence = viseePresence;
     presence += (viseePresence - presence) * 0.08;
     fractale.regler(phi, t, presence * (1 - plongee.valeur));
     nuit.value = adoucir(DEBUT_FRACTALE, DEBUT_FRACTALE + (1 - DEBUT_FRACTALE) / PERIODES, p);
@@ -662,6 +665,7 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     renderer.setSize(l, h, false);
     camera.aspect = l / h;
     cadrer();
+    demanderImage();
   };
   new ResizeObserver(redimensionner).observe(toile);
   redimensionner();
@@ -670,11 +674,11 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
   let images = 0, depuis = performance.now();
   // Comme igloo.inc : si l'image n'est plus tenue, on baisse la définition, puis on la remonte par petits pas. Après
   // plusieurs allers-retours, on s'arrête : une définition stable se remarque moins qu'une qui oscille.
-  const PALIERS = [1.25, 1, 0.8, 0.65];
-  let palier = SIMPLE ? 1 : 0, basculements = 0, demarrage = performance.now();
+  const PALIERS = TELEPHONE ? [0.75, 0.65] : [1.25, 1, 0.8, 0.65];
+  let palier = TELEPHONE ? 0 : SIMPLE ? 1 : 0, basculements = 0, demarrage = performance.now();
   const reglerDefinition = (fps) => {
     if (basculements >= 4 || performance.now() - demarrage < 9000) return;
-    const vise = Math.min(devicePixelRatio, 1.25);
+    const vise = Math.min(devicePixelRatio, PALIERS[0]);
     if (fps < 42 && palier < PALIERS.length - 1) palier++;
     else if (fps > 57 && palier > 0 && PALIERS[palier - 1] <= vise) palier--;
     else return;
@@ -690,6 +694,7 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     const fin = () => { renderer.setAnimationLoop(null); placerCamera(defilement.valeur, 0, 0); };
     return Promise.race([
       new Promise((ok) => renderer.setAnimationLoop(() => {
+        if (!estVisible()) { ok(); return; }
         placerCamera(p, 0, 0);
         bureau.actualiser(foyer, 0, 0);
         if (dehors.visible) peuple.actualiser(0);
@@ -700,11 +705,13 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
       new Promise((ok) => setTimeout(ok, 6000)),                   // onglet en arrière-plan : pas d'images, on ne bloque pas
     ]).then(fin);
   }
-  await chauffer();
+  if (!TELEPHONE && !calme && !document.hidden) await chauffer();
 
   function dessiner() {
+    if (!estVisible()) { actif = false; renderer.setAnimationLoop(null); return; }
     horloge.update();
-    const dt = Math.min(horloge.getDelta(), 0.1), t = horloge.getElapsed();
+    const dt = Math.min(horloge.getDelta(), 0.1), t = calme ? 0 : horloge.getElapsed();
+    if (calme) etat.valeur = etat.cible;
     etat.valeur += (etat.cible - etat.valeur) * (1 - Math.exp(-dt * 1.6));
     teinte.value.lerpColors(COMPROMIS, RESTAURE, etat.valeur);
     parasites.value = 1 - etat.valeur;
@@ -730,13 +737,29 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     if (maintenant - depuis >= 1000) { const mesure = Math.round((images * 1000) / (maintenant - depuis)); surFps(mesure); if (document.visibilityState === 'visible') reglerDefinition(mesure); images = 0; depuis = maintenant; }
   }
 
+  function demanderImage() {
+    if (actif && calme && !document.hidden && !demandeImage) demandeImage = requestAnimationFrame(() => { demandeImage = 0; dessiner(); });
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { renderer.setAnimationLoop(null); cancelAnimationFrame(demandeImage); demandeImage = 0; }
+  });
   return {
     backend,
-    demarrer() { demarrage = performance.now(); renderer.setAnimationLoop(dessiner); },
-    arreter() { renderer.setAnimationLoop(null); },
-    viser(v) { etat.cible = v; },
-    defiler(p) { defilement.cible = p; },
-    poser(p) { defilement.cible = p; defilement.valeur = p; },
+    mouvementReduit(v) {
+      if (calme === v) return;
+      calme = v;
+      renderer.setAnimationLoop(actif && !calme && !document.hidden ? dessiner : null);
+      demanderImage();
+    },
+    demarrer() {
+      if (actif || document.hidden) return;
+      actif = true; images = 0; depuis = demarrage = performance.now();
+      if (calme) demanderImage(); else renderer.setAnimationLoop(dessiner);
+    },
+    arreter() { actif = false; renderer.setAnimationLoop(null); cancelAnimationFrame(demandeImage); demandeImage = 0; },
+    viser(v) { etat.cible = v; demanderImage(); },
+    defiler(p) { if (defilement.cible !== p) { defilement.cible = p; demanderImage(); } },
+    poser(p) { defilement.cible = p; defilement.valeur = p; demanderImage(); },
     decaler(dp) { defilement.cible += dp; defilement.valeur += dp; },
     plonger(oui) { plongee.cible = oui ? 1 : 0; },
     // les quatre coins du verre à l'écran, pour que la page en sorte exactement
@@ -760,7 +783,7 @@ export async function creerTour(toile, { surFps = () => {}, surEtat = () => {}, 
     },
     stats() {
       const i = renderer.info.render;
-      return { backend, palier: PALIERS[palier], toile: toile.width + '×' + toile.height, appels: i.drawCalls, triangles: i.triangles, p: +defilement.valeur.toFixed(3), foyer: +foyer.toFixed(2) };
+      return { backend, actif, calme, telephone: TELEPHONE, bloom: !!eclat, rayons: !!rayons, aberration: nette !== image, echantillons: SIMPLE ? 0 : 2, ombres: renderer.shadowMap.enabled, palier: PALIERS[palier], toile: toile.width + '×' + toile.height, appels: i.drawCalls, triangles: i.triangles, p: +defilement.valeur.toFixed(3), foyer: +foyer.toFixed(2) };
     },
   };
 }

@@ -1,82 +1,30 @@
+import { time } from './mouvement.js';
 // La salle de commandes, à l'intérieur de la tour : une rotonde sombre, une table holographique, et quatre panneaux
 // flottants qui portent le contenu du portfolio. Elle occupe vraiment le pied du fût : on y entre sans coupure.
 import * as THREE from 'three/webgpu';
 import {
-  Fn, Discard, uniform, uv, time, positionWorld, normalWorld, cameraPosition, reflector, reflect, instanceIndex, texture, positionLocal, smoothstep, mix,
+  Fn, Discard, uniform, uv,  positionWorld, normalWorld, cameraPosition, reflector, reflect, instanceIndex, texture, positionLocal, smoothstep, mix,
   vec2, vec3, color, float, fract, floor, abs, sin, cos, length, atan, step, hash, pow, fwidth, dot, normalize, max,
 } from 'three/tsl';
 import { creerCockpit } from './cockpit.js';
-import { SIMPLE } from './qualite.js';
+import { SIMPLE, MOBILE } from './qualite.js';
 import { t, langue, surLangue } from './langues.js';
 
 export const SOL = 21.05;          // le dessus de l'assise, là où la porte débouche
 export const RAYON = 29.4;
-export const PANNEAUX = [
-  {
-    titre: 'OFFRE', lignes: [
-      ['Indépendant à 20 %, en plus de DM Surfaces', 1],
-      ['IA · sites web · applications', 1],
-      ['', 0],
-      ['Automatisation', 0],
-      ['IA hébergée en local', 0],
-      ['Rien de ce qui se passe chez un client ne sort d\'ici.', 0],
-    ],
-  },
-  {
-    titre: 'PROJETS', lignes: [
-      ['ULTRON COCKPIT', 1],
-      ['Mon assistance de chaque jour', 0],
-      ['LEAP 57', 1],
-      ['Boîtier : une vraie conception technique', 0],
-      ['Razor, l\'Archonte et treize jeux', 1],
-      ['one-cars.fr · vtc-liberty.fr · clean-dream.fr', 0],
-      ['lartdorient.fr · dreamforyou.fr', 0],
-    ],
-  },
-  {
-    titre: 'ULTRON', cockpit: true, lignes: [
-      ['Mon exosquelette d\'IA', 1],
-      ['20 min à l\'oral le matin, 20 le soir.', 0],
-      ['', 0],
-      ['Un routage intelligent entre usines.', 0],
-      ['Des centaines d\'agents produisent.', 0],
-      ['', 0],
-      ['Je décide, j\'envoie les demandes clients.', 0],
-      ['Je garde l\'essentiel.', 1],
-    ],
-  },
-  {
-    titre: 'PARCOURS', lignes: [
-      ['DM Surfaces · 80 %', 1],
-      ['Indépendant · 20 %', 1],
-      ['', 0],
-      ['Administrateur systèmes et réseaux', 0],
-      ['Suisse romande', 0],
-      ['Autodidacte depuis l\'enfance', 0],
-    ],
-  },
-  {
-    titre: 'CONTACT', lignes: [
-      ['Anas Dine', 1],
-      ['', 0],
-      ['Disponible pour vos projets', 0],
-      ['IA · sites · applications', 0],
-      ['', 0],
-      ['Toute la suite est dans cette branche', 0],
-    ],
-  },
-];
+import { PANNEAUX } from './contenu.js';
+export { PANNEAUX } from './contenu.js';
 
 // Le texte est dessiné dans une toile, puis posé sur le panneau : il partage la lumière de la salle.
 // Les textes se réécrivent sur la même toile quand la langue change ; les noms propres ne se traduisent pas.
 function toilePanneau(contenu, numero) {
   const c = document.createElement('canvas');
-  c.width = 2048; c.height = 1152;
+  c.width = MOBILE ? 1024 : 2048; c.height = MOBILE ? 576 : 1152;
   const g = c.getContext('2d');
   const t2 = new THREE.CanvasTexture(c);
   t2.colorSpace = THREE.SRGBColorSpace;
   t2.anisotropy = 8;
-  const peindre = () => { peindrePanneau(g, contenu, numero); t2.needsUpdate = true; };
+  const peindre = () => { g.save(); g.scale(c.width / 2048, c.height / 1152); peindrePanneau(g, contenu, numero); g.restore(); t2.needsUpdate = true; };
   peindre();
   surLangue(peindre);
   return t2;
@@ -316,7 +264,7 @@ export async function creerBureau(scene) {
   matPoussiere.colorNode = color(0xa8e4f0).mul(0.9);
   matPoussiere.opacityNode = float(1).sub(smoothstep(0.1, 0.5, length(uv().sub(0.5))));
   const poussiere = new THREE.Sprite(matPoussiere);
-  poussiere.count = SIMPLE ? 220 : 700;
+  poussiere.count = MOBILE ? 80 : SIMPLE ? 220 : 700;
   poussiere.frustumCulled = false;
   salle.add(poussiere);
 

@@ -327,6 +327,28 @@
     html.barre-tactile .branches { right: calc(80px + env(safe-area-inset-right, 0px)); max-width: none; }
     html.barre-tactile .restaurer { width: calc(100% - 66px - env(safe-area-inset-right, 0px)); }
   }
+
+  /* Même palette et même parcours, avec un budget de composition adapté au téléphone. */
+  button, a { touch-action: manipulation; }
+  @media (max-width: 767px) {
+    .bascule, .fiche, .branches, .langue > button, .faille::backdrop { backdrop-filter: none; }
+    .borne, .borne:hover, .borne:focus-visible, .balayage, .navigation-defilement__poignee::before { box-shadow: none; }
+    h1, .legende, .rail span, .fissure:hover { text-shadow: none; }
+    .borne:hover img, .borne:focus-visible img { filter: brightness(1.75) saturate(1.3); }
+    .bascule button, .langue > button, .langue li button { min-height: 44px; min-width: 44px; }
+    .branches button, [data-arcade-grille] button, [data-arcade-grille] input { min-height: 44px; min-width: 44px; }
+    .marque { min-height: 44px; }
+    .univers__barre { flex-wrap: wrap; overflow-wrap: anywhere; }
+    .univers__barre button { white-space: normal; }
+    .fiche { padding: 12px; bottom: 112px; }
+    .fiche h2 { font-size: 24px; }
+    .fiche p { font-size: 13px; }
+    .une > span { right: 20px; }
+    .contact { max-width: calc(100% - 32px); white-space: normal; text-align: center; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  }
 </style>
 </head>
 <body id="page">
@@ -336,7 +358,7 @@
   <ul hidden></ul>
 </div>
 <main class="hero" data-hero data-mode="video">
-  <video src="media/tour.mp4" poster="media/tour.jpg" muted loop playsinline autoplay preload="auto" aria-hidden="true"></video>
+  <video src="media/tour.mp4" poster="media/tour.jpg" muted loop playsinline preload="none" aria-hidden="true"></video>
   <canvas aria-hidden="true"></canvas>
   <i class="balayage" aria-hidden="true"></i>
 
@@ -389,29 +411,29 @@
       <li><b data-t>Aujourd'hui</b><span data-t>BASTION</span></li>
     </ol>
     <div class="preuves">
-      <a class="preuve" href="https://claude.ai/artifact/XDR28AoSxV4tvVT4rPLpCQ" target="_blank" rel="noopener"><img src="media/preuves/bahia.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Site · octobre</small><b>Le Palais de Bahia</b></a>
-      <a class="preuve" href="https://claude.ai/artifact/T41Y55G1mh7rdnWUZ1cPz5" target="_blank" rel="noopener"><img src="media/preuves/fulmine.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Site · octobre</small><b>Fulmine Moda</b></a>
-      <a class="preuve" href="https://claude.ai/artifact/QLLmHsfTkNYsZzofD8x8zV" target="_blank" rel="noopener"><img src="media/preuves/ocrousti.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Commande en ligne · octobre</small><b>O'Crousti Lausanne</b></a>
-      <a class="preuve" href="https://claude.ai/artifact/Rcp7gLJWyDv2eBz8CkqU63" target="_blank" rel="noopener"><img src="media/preuves/phoenix.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Application · octobre</small><b>Phoenix Parc</b></a>
-      <a class="preuve" href="https://lartdorient.fr" target="_blank" rel="noopener"><img src="media/preuves/lartdorient.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Site client</small><b>L'Art d'Orient</b></a>
-      <a class="preuve" href="https://clean-dream.fr" target="_blank" rel="noopener"><img src="media/preuves/clean-dream.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Site client</small><b>Clean Dream</b></a>
-      <a class="preuve" href="https://dreamforyou.fr" target="_blank" rel="noopener"><img src="media/preuves/dreamforyou.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Site client</small><b>Dream For You</b></a>
-      <a class="preuve" href="https://one-cars.fr" target="_blank" rel="noopener"><img src="media/preuves/one-cars.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Site client</small><b>One Cars</b></a>
-      <a class="preuve" href="https://vtc-liberty.fr" target="_blank" rel="noopener"><img src="media/preuves/vtc-liberty.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Site client</small><b>VTC Liberty</b></a>
-      <a class="preuve" href="https://anasdine.github.io/elite-coiffeur/" target="_blank" rel="noopener"><img src="media/preuves/elite-barber.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Maquette</small><b>Elite Barber</b></a>
-      <a class="preuve" href="https://anasdine.github.io/elite-restaurant/" target="_blank" rel="noopener"><img src="media/preuves/elite-restaurant.jpg" alt="" loading="lazy" width="640" height="340"><small data-t>Maquette</small><b>Restaurant Élite</b></a>
+      <a class="preuve" href="https://claude.ai/artifact/XDR28AoSxV4tvVT4rPLpCQ" target="_blank" rel="noopener"><img src="media/preuves/bahia.jpg" alt="" loading="lazy" decoding="async" width="640" height="340"><small data-t>Site · octobre</small><b>Le Palais de Bahia</b></a>
+      <a class="preuve" href="https://claude.ai/artifact/T41Y55G1mh7rdnWUZ1cPz5" target="_blank" rel="noopener"><img src="media/preuves/fulmine.jpg" alt="" loading="lazy" decoding="async" width="640" height="340"><small data-t>Site · octobre</small><b>Fulmine Moda</b></a>
+      <a class="preuve" href="https://claude.ai/artifact/QLLmHsfTkNYsZzofD8x8zV" target="_blank" rel="noopener"><img src="media/preuves/ocrousti.jpg" alt="" loading="lazy" decoding="async" width="640" height="340"><small data-t>Commande en ligne · octobre</small><b>O'Crousti Lausanne</b></a>
+      <a class="preuve" href="https://claude.ai/artifact/Rcp7gLJWyDv2eBz8CkqU63" target="_blank" rel="noopener"><img src="media/preuves/phoenix.jpg" alt="" loading="lazy" decoding="async" width="640" height="340"><small data-t>Application · octobre</small><b>Phoenix Parc</b></a>
+      <a class="preuve" href="https://lartdorient.fr" target="_blank" rel="noopener"><img src="media/preuves/lartdorient.jpg" alt="" loading="lazy" decoding="async" width="640" height="340"><small data-t>Site client</small><b>L'Art d'Orient</b></a>
+      <a class="preuve" href="https://clean-dream.fr" target="_blank" rel="noopener"><img src="media/preuves/clean-dream.jpg" alt="" loading="lazy" decoding="async" width="640" height="340"><small data-t>Site client</small><b>Clean Dream</b></a>
+      <a class="preuve" href="https://dreamforyou.fr" target="_blank" rel="noopener"><img src="media/preuves/dreamforyou.jpg" alt="" loading="lazy" decoding="async" width="640" height="340"><small data-t>Site client</small><b>Dream For You</b></a>
+      <a class="preuve" href="https://one-cars.fr" target="_blank" rel="noopener"><img src="media/preuves/one-cars.jpg" alt="" loading="lazy" decoding="async" width="640" height="340"><small data-t>Site client</small><b>One Cars</b></a>
+      <a class="preuve" href="https://vtc-liberty.fr" target="_blank" rel="noopener"><img src="media/preuves/vtc-liberty.jpg" alt="" loading="lazy" decoding="async" width="640" height="340"><small data-t>Site client</small><b>VTC Liberty</b></a>
+      <a class="preuve" href="https://anasdine.github.io/elite-coiffeur/" target="_blank" rel="noopener"><img src="media/preuves/elite-barber.jpg" alt="" loading="lazy" decoding="async" width="640" height="340"><small data-t>Maquette</small><b>Elite Barber</b></a>
+      <a class="preuve" href="https://anasdine.github.io/elite-restaurant/" target="_blank" rel="noopener"><img src="media/preuves/elite-restaurant.jpg" alt="" loading="lazy" decoding="async" width="640" height="340"><small data-t>Maquette</small><b>Restaurant Élite</b></a>
       <div class="preuve preuve--outil"><small data-t>Mes usines</small><b>Plan B</b><span data-t>Ma chaîne de production de vidéos publicitaires, pilotée depuis le téléphone.</span></div>
       <div class="preuve preuve--outil"><small data-t>Mes usines</small><b>JARVIS</b><span data-t>Le générateur de sites, sur mes propres cartes graphiques.</span></div>
       <div class="preuve preuve--outil"><small data-t>Mes usines</small><b>LEONHARD</b><span data-t>La supervision de tout un parc, tenue par une seule personne.</span></div>
       <div class="preuve preuve--outil"><small data-t>Mes usines</small><b>ULTRON COCKPIT</b><span data-t>20 minutes le matin, 20 le soir : je décide, les agents produisent.</span></div>
     </div>
   </section>
-  <header class="arcade__tete" id="arcade">
+  <header class="arcade__tete" id="arcade-bornes">
     <h2 id="titre-arcade" data-t>L'arcade</h2>
     <p class="arcade__sous" data-t>Un jeu phare et treize bornes, écrits pour ce portfolio. Tout tourne dans votre navigateur.</p>
   </header>
   <button type="button" class="une" data-lance="razor">
-    <img src="media/jeux/razor.jpg" alt="" loading="lazy">
+    <img src="media/jeux/razor.jpg" alt="" loading="lazy" decoding="async">
     <span><small data-t>Le jeu phare · clavier, manette, tactile</small><b data-t>Razor, l'Archonte</b><em data-t>Un twin-stick néon. Cinq héros, des vagues, des gardiens, et une faille vers un autre monde toutes les trois vagues.</em><i data-t>Lancer</i></span>
   </button>
   <div class="bornes" data-bornes></div>
