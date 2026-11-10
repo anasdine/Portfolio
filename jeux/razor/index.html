@@ -639,7 +639,7 @@ const SAVE_KEY = 'razor_archonte_v2';
 const save = { best: 0, bestWave: 0, muted: false, zoom: 1, hero: 'razor', lastTheme: -1, one: false, gold: false };
 try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && typeof s === 'object') Object.assign(save, s); } catch (e) { /* stockage indisponible */ }
 function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { /* ignoré */ } }
-function vibrate(p) { if (G.state !== 'play') return; try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) { /* ignoré */ } const ms = Array.isArray(p) ? p.reduce((a, b) => a + b, 0) : p; padRumble(Math.max(60, ms * 2), ms >= 40 ? 0.7 : 0.35); }
+function vibrate(p) { if (RM || G.state !== 'play') return; try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) { /* ignoré */ } const ms = Array.isArray(p) ? p.reduce((a, b) => a + b, 0) : p; padRumble(Math.max(60, ms * 2), ms >= 40 ? 0.7 : 0.35); }
 
 /* ---------------- Audio : aucun morceau, uniquement des sons numériques ----------------
    Tout passe par un écrêteur en marches d'escalier (bitcrush) : carrés, triangles, bruit échantillonné-bloqué. */
@@ -801,7 +801,7 @@ function layoutControls() {
 function resize() {
   W = Math.max(1, window.innerWidth); H = Math.max(1, window.innerHeight);
   LAND = W >= H;
-  DPR = Math.min(window.devicePixelRatio || 1, 2) * qual;
+  DPR = Math.min(window.devicePixelRatio || 1, W < 768 ? 1.5 : 2) * qual;
   cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
   SCALE = clamp(Math.sqrt((W * H) / (980 * 520)), 0.5, 1.7) * ZOOMS[clamp(save.zoom | 0, 0, ZOOMS.length - 1)];
   ZS = SCALE;
@@ -1300,6 +1300,7 @@ const distMult = (d, range) => 1 + clamp(d / (range * 0.92), 0, 1);
 
 /* ---------------- Effets ---------------- */
 function burst(x, y, ci, n, r, spd, kind) {
+  n = Math.ceil(n * (RM ? 0.15 : W < 768 ? 0.45 : 1));
   r = r || 8; spd = spd || 260;
   for (let i = 0; i < n; i++) {
     if (parts.length > 380) return;
@@ -2653,7 +2654,9 @@ function updateCam(dt) {
    Parti pris : l'écran a deux états comme le héros. Humain = nuit,
    rayon de lumière qui se resserre. Archonte = surexposé or et blanc.
    ================================================================ */
-const RM = (() => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } })();
+const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+let RM = motionQuery.matches;
+motionQuery.addEventListener('change', () => { RM = motionQuery.matches; });
 const COARSE = (() => { try { return window.matchMedia('(pointer: coarse)').matches; } catch (e) { return false; } })();
 const F_ARC = 'DotGothic16, "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Courier New", monospace';
 const hexA = (hex, a) => { const n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')'; };
@@ -4457,7 +4460,7 @@ function drawStick(s, hm, col) {
 /* ---------------- Image complète ---------------- */
 function render() {
   BS = DPR * ZS; TXS = clamp(0.72 / ZS, 1, 2);
-  const sh = G.shake * (RM ? 0.25 : 1), shx = sh ? rnd(-sh, sh) : 0, shy = sh ? rnd(-sh, sh) : 0;
+  const sh = RM ? 0 : G.shake, shx = sh ? rnd(-sh, sh) : 0, shy = sh ? rnd(-sh, sh) : 0;
   TX = (W / 2 - cam.x * ZS + shx) * DPR; TY = (H * FY - cam.y * ZS + shy) * DPR;
   const hw = W / 2 / ZS, hT = (H * FY) / ZS, hB = (H * (1 - FY)) / ZS;
   V.x0 = cam.x - hw - 30; V.x1 = cam.x + hw + 30; V.y0 = cam.y - hT - 30; V.y1 = cam.y + hB + 30;
@@ -4493,7 +4496,7 @@ function render() {
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   drawGlow(px, py);
-  if (G.flash > 0) { ctx.fillStyle = 'rgba(' + G.flashCol + ',' + (G.flash * (RM ? 0.25 : 0.6)).toFixed(3) + ')'; ctx.fillRect(0, 0, cv.width, cv.height); }
+  if (G.flash > 0 && !RM) { ctx.fillStyle = 'rgba(' + G.flashCol + ',' + (G.flash * (RM ? 0.25 : 0.6)).toFixed(3) + ')'; ctx.fillRect(0, 0, cv.width, cv.height); }
   drawGlitch();
   if (G.warp) drawWarp(px, py);
 
@@ -4931,8 +4934,18 @@ function tick(dt) {
     if (G.state === 'dying') { G.deathT -= dt; if (G.deathT <= 0) showOver(); }
   } else if (st === 'cards') { G.t += dt; updateFx(dt); }
 }
+let frameId = 0, toileVisible = true;
+function demanderFrame() { if (!frameId && !document.hidden && toileVisible) frameId = requestAnimationFrame(frame); }
+function synchroniserFrame() {
+  if (document.hidden || !toileVisible) { cancelAnimationFrame(frameId); frameId = 0; lastTs = 0; }
+  else demanderFrame();
+}
+document.addEventListener('visibilitychange', synchroniserFrame);
+new IntersectionObserver(([e]) => { toileVisible = e.isIntersecting; synchroniserFrame(); }).observe(cv);
 function frame(ts) {
-  requestAnimationFrame(frame);
+  frameId = 0;
+  if (document.hidden || !toileVisible) return;
+  demanderFrame();
   const raw = lastTs ? ts - lastTs : 16.7; lastTs = ts;
   const dt = Math.min(0.05, Math.max(0.001, raw / 1000));
   if (raw < 250) perfWatch(raw);
@@ -4956,7 +4969,7 @@ resize();
 toMenu();
 window.__build = buildMap; window.__blocked = blocked; window.__gob = spawnGoblin; window.__hurt = hurt; window.__cards = openCards; window.__map = { MAP, MC, MR, CELL, get style() { return MAPSTYLE; } };
 window.__razor = { UPS, UP, upTxt, setGold, BEAR, PAD, pollPad, mouse, setOne, ONE, save, G, P, T, UP, UPS, CFG, DBG, AU, HEROES, THEMES, WEAPONS, KIT, pshots, nades, strikes, pools, waves, slams, motes, rains, dragons, BOW, looseArrow, bearCrowd, BEAR, heroA, heroB, formA, formC, giveWeapon, spawnCrate, crates, gems, rockets, setHero, applyTheme, openRift, spawnPylon, spawnEnemy, pylons, get THEME() { return THEME; }, get HERO() { return HERO; }, input, sticks, enemies, shots, zones, bubbles, hydras, tick, startRun, toMenu, pickCard, tryArchon, tryBlink, tryHydra, tryBubble, canArchon, cam, get qual() { return qual; }, get ZS() { return ZS; }, get FY() { return FY; } };
-requestAnimationFrame(frame);
+demanderFrame();
 
 })();
 </script>

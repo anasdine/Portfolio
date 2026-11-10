@@ -23,11 +23,16 @@ const scene = document.querySelector('[data-scene]');
 const grille = document.querySelector('[data-arcade-grille]');
 const fermer = document.querySelector('[data-scene-fermer]');
 const cadre = document.querySelector('[data-scene-razor]');
-let chargement = null, ouvreur = null;
+let chargement = null, donnees = null, ouvreur = null, ouverture = 0;
 
 export function chargerArcade() {
+  donnees ??= fetch('jeux/grille.html').then((r) => { if (!r.ok) throw new Error('Arcade : ' + r.status); return r.text(); }).catch((e) => { donnees = null; throw e; });
+  return donnees;
+}
+
+function preparerJeux() {
   chargement ??= (async () => {
-    grille.innerHTML = await (await fetch('jeux/grille.html')).text();
+    grille.innerHTML = await chargerArcade();
     if (!window.THREE) window.THREE = await import('three');
     await new Promise((ok, non) => {
       const s = document.createElement('script');
@@ -36,7 +41,7 @@ export function chargerArcade() {
       document.body.append(s);
     });
     traduireJeux();
-  })();
+  })().catch((e) => { chargement = null; throw e; });
   return chargement;
 }
 
@@ -56,6 +61,7 @@ function traduireJeux() {
 }
 
 function fermerScene() {
+  ouverture++;
   scene.classList.remove('ouverte');
   document.documentElement.classList.remove('jeu-ouvert');
   grille.querySelector('.actif')?.classList.remove('actif');
@@ -65,6 +71,7 @@ function fermerScene() {
 }
 
 async function ouvrir(id, bouton) {
+  const ce = ++ouverture;
   ouvreur = bouton;
   scene.classList.add('ouverte');
   document.documentElement.classList.add('jeu-ouvert');
@@ -74,7 +81,8 @@ async function ouvrir(id, bouton) {
     cadre.src = 'jeux/razor/index.html';
     return;
   }
-  await chargerArcade();
+  try { await preparerJeux(); } catch (e) { console.warn(e); fermerScene(); return; }
+  if (ce !== ouverture) return;
   grille.querySelector(`[data-game="${id}"]`)?.classList.add('actif');
   window.I18N?.rescan();
   scene.scrollTop = 0;
@@ -87,7 +95,7 @@ function ecrireBornes() {
     b.type = 'button';
     b.className = 'borne';
     b.dataset.lance = id;
-    b.innerHTML = `<img src="media/jeux/${id}.jpg" alt="" loading="lazy" width="640" height="360">
+    b.innerHTML = `<img src="media/jeux/${id}.jpg" alt="" loading="lazy" decoding="async" width="640" height="360">
     <span class="borne__n">${String(i + 1).padStart(2, '0')} · ${t(genre)}</span><b>${t(titre)}</b><span>${t(ligne)}</span>`;
     return b;
   });

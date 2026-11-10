@@ -1,8 +1,9 @@
+import { time } from './mouvement.js';
 // L'écosystème d'ULTRON, dans la salle : l'archipel du vrai cockpit en table au sol, sa carte au plafond, et sa chaîne de
 // commandement en bandeau. Aucune donnée réelle. Des textures fixes, animées dans le shader : rien à renvoyer à la carte
 // graphique à chaque image, donc aucun coût par image quel que soit le navigateur.
 import * as THREE from 'three/webgpu';
-import { Fn, uv, time, texture, positionWorld, cameraPosition, uniform, length, fract, pow, vec2, float, smoothstep } from 'three/tsl';
+import { Fn, uv,  texture, positionWorld, cameraPosition, uniform, length, fract, pow, vec2, float, smoothstep } from 'three/tsl';
 import { SIMPLE } from './qualite.js';
 import { t, surLangue } from './langues.js';
 

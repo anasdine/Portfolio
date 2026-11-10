@@ -3,5 +3,7 @@
 // WebGPU n'est fiable que sur les navigateurs Chromium : ailleurs, WebGL 2 tourne partout.
 export const WEBGL_SEUL = !navigator.userAgent.includes('Chrome/');
 const coeurs = navigator.hardwareConcurrency || 4, memoire = navigator.deviceMemory || 8;
+export const MOBILE = matchMedia('(max-width: 767px)').matches;
+export const TELEPHONE = MOBILE || matchMedia('(pointer: coarse)').matches;
 export const SIMPLE = new URLSearchParams(location.search).has('simple')
   || matchMedia('(pointer: coarse)').matches || innerWidth < 820 || coeurs <= 4 || memoire <= 4 || !navigator.gpu || WEBGL_SEUL;

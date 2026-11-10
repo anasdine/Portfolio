@@ -1,4 +1,4 @@
-/* Généré par outils/extraire-jeux.mjs depuis le dépôt Portfolio. Ne pas modifier ici. */
+/* Extrait du dépôt Portfolio ; adaptations mobiles locales dans les utilitaires de rendu. */
 (function(){
 'use strict';
 
@@ -9,12 +9,13 @@ var clamp = function(v,a,b){ return Math.min(b, Math.max(a, v)); };
 var mix = function(a,b,t){ return a + (b-a)*t; };
 var sm = function(a,b,y){ var t = clamp((y-a)/(b-a),0,1); return t*t*(3-2*t); };
 var damp = function(a,b,l,dt){ return mix(a,b,1-Math.exp(-l*dt)); };
-var RM = false, CALM = false;
+var motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
+var RM = motionQuery.matches, CALM = RM;
 var TOUCH = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
 var MOB = TOUCH || innerWidth < 820;
 var BOOT_TIER = TOUCH ? 1 : 0;
 var PERF = { avg: .016, lvl: 0, n: 0, acc: 0, frame: 0, floor: 0 };
-function CDPR(){ return Math.min(devicePixelRatio || 1, 2); }
+function CDPR(){ return Math.min(devicePixelRatio || 1, innerWidth < 768 ? 1.5 : 2); }
 function TR(x){ return x; }
 function TRn(x){ return x; }
 function setTR(el, txt, attr){ if(!el || txt == null) return; if(attr) el.setAttribute(attr, txt); else el.textContent = txt; }
@@ -22,17 +23,31 @@ function askResize(fn){ requestAnimationFrame(fn); }
 function keepGL(r){ return r; }
 var ADA = { ready: false, say: function(){}, focus: function(){}, release: function(){} };
 var PIPES = [];
-/* La boucle commune du moteur d'origine : chaque jeu y dessine, et s'abstient seul quand il est hors champ. */
-(function(){
-  var tp = 0;
-  function pas(ts){
-    var dt = tp ? Math.min(.05, (ts - tp) / 1000) : .016;
-    tp = ts;
-    for(var i = 0; i < PIPES.length; i++){ var p = PIPES[i]; if(p.vis){ try{ p.frame(dt, ts / 1000); }catch(e){ console.error('[jeu] ' + e.message); } } }
-    requestAnimationFrame(pas);
-  }
-  requestAnimationFrame(pas);
-})();
+/* Aucun ordonnanceur permanent lorsque les jeux sont masqués. */
+var imageCommune = 0, tempsPrecedent = 0;
+function jeuVisible(p) {
+  return !doc.hidden && p.vis && p.element.closest('[data-game]').classList.contains('actif')
+    && qs('[data-scene]').classList.contains('ouverte');
+}
+function demanderJeux() {
+  if (!imageCommune && PIPES.some(jeuVisible)) imageCommune = requestAnimationFrame(dessinerJeux);
+}
+function dessinerJeux(ts) {
+  imageCommune = 0;
+  var dt = tempsPrecedent ? Math.min(.05, (ts - tempsPrecedent) / 1000) : .016;
+  tempsPrecedent = ts;
+  PIPES.forEach(function(p) { if(jeuVisible(p)) { try { p.frame(dt, RM ? 0 : ts / 1000); } catch(e) { console.error('[jeu] ' + e.message); } } });
+  demanderJeux();
+}
+function synchroniserJeux() {
+  if (!PIPES.some(jeuVisible)) { cancelAnimationFrame(imageCommune); imageCommune = 0; tempsPrecedent = 0; }
+  else demanderJeux();
+}
+var vueJeux = new IntersectionObserver(synchroniserJeux);
+qsa('[data-game] canvas').forEach(function(cv) { vueJeux.observe(cv); });
+new MutationObserver(synchroniserJeux).observe(qs('[data-scene]'), { attributes: true, subtree: true, attributeFilter: ['class'] });
+doc.addEventListener('visibilitychange', synchroniserJeux);
+// Les variantes de jeu sont choisies à leur initialisation ; le CSS suit aussi les changements système.
 var EASE = 'expo.out';
 /* Les jeux n'emploient que trois gestes de GSAP : une petite animation native suffit, sans charger la bibliothèque. */
 function etapes(o){ var r = {}, t = []; if('opacity' in o) r.opacity = o.opacity; if('y' in o) t.push('translateY(' + o.y + 'px)'); if('scale' in o) t.push('scale(' + o.scale + ')'); if(t.length) r.transform = t.join(' '); return r; }
@@ -120,16 +135,24 @@ function vif(el, rendu){
 
 function boucleFigee(frame, enJeu){
   if(!RM) return null;
-  var on = false, tp = 0;
+  var on = false, tp = 0, image = 0, carte = null, dansVue = true;
+  function visible(){ return !doc.hidden && dansVue && carte && carte.classList.contains('actif') && qs('[data-scene]').classList.contains('ouverte'); }
+  function demander(){ if(on && visible() && !image) image = requestAnimationFrame(pas); }
   function pas(ts){
+    image = 0;
+    if(!visible()) { tp = 0; return; }
     var fin = !enJeu();
     var dt = tp ? Math.min(.05, (ts - tp) / 1000) : .016;
     tp = ts;
-    try{ frame(dt, ts / 1000); }catch(e){}
+    try{ frame(dt, 0); }catch(e){}
     if(fin){ on = false; tp = 0; return; }
-    requestAnimationFrame(pas);
+    demander();
   }
-  return function(){ if(on) return; on = true; tp = 0; requestAnimationFrame(pas); };
+  function sync(){ if(!visible()){ cancelAnimationFrame(image); image = 0; tp = 0; } else demander(); }
+  doc.addEventListener('visibilitychange', sync);
+  new MutationObserver(sync).observe(qs('[data-scene]'), {attributes:true, subtree:true, attributeFilter:['class']});
+  var vue = new IntersectionObserver(function(entrees){ dansVue = entrees.some(function(e){ return e.isIntersecting; }); sync(); });
+  return function(){ carte = qs('[data-game].actif'); vue.disconnect(); if(carte) vue.observe(carte.querySelector('canvas') || carte); dansVue = true; on = true; tp = 0; demander(); };
 }
 
 try{
@@ -264,7 +287,7 @@ try{
       .observe(alertEl.closest('[data-game]') || alertEl);
   }
   function tick1(){
-    if(!run || !ADA.ready || !vu) return;
+    if(doc.hidden || !run || !ADA.ready || !vu) return;
     idle += .5;
     if(idle > 6.5 && cur){
       idle = 0;
@@ -352,6 +375,7 @@ try{
   /* ADA surveille la moitié droite : elle bloque, mais lentement */
   var aT = 0, aCell = -1, aLock = 0, said = 0;
   function layout(){
+    DPR2 = CDPR();
     var r = cv.getBoundingClientRect();
     W = Math.max(2, r.width); H = Math.max(2, r.height);
     cv.width = W * DPR2; cv.height = H * DPR2;
@@ -522,9 +546,9 @@ try{
   /* hors écran, la partie attend avec le sablier : rien ne vieillit, rien
      ne fuit, et douze cases ne sont pas repeintes pour personne */
   api.frame = function(dt, t){ if(!api.vis) return; step(dt); draw(t); };
-  PIPES.push(api);
+  api.element = cv; PIPES.push(api);
   if(window.IntersectionObserver){
-    new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; }, { rootMargin: '80px' }).observe(cv);
+    new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; synchroniserJeux(); }, { rootMargin: '80px' }).observe(cv);
   }else{ api.vis = true; }
 })();
 
@@ -561,6 +585,7 @@ try{
   var items = [], G = {};
 
   function layout(){
+    DPR2 = CDPR();
     var r = cv.getBoundingClientRect();
     W = Math.max(2, r.width); H = Math.max(2, r.height);
     cv.width = W * DPR2; cv.height = H * DPR2;
@@ -945,9 +970,9 @@ try{
   }
   var api = { vis: true };
   api.frame = function(dt, t){ if(!api.vis) return; draw(t); };
-  PIPES.push(api);
+  api.element = cv; PIPES.push(api);
   if(window.IntersectionObserver){
-    new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; }, { rootMargin: '60px' }).observe(cv);
+    new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; synchroniserJeux(); }, { rootMargin: '60px' }).observe(cv);
   }
 })();
 
@@ -1681,10 +1706,10 @@ try{
     if(run) step(Math.min(.04, dt));
     draw(Math.min(.04, dt));
   };
-  PIPES.push(api);
+  api.element = cv; if(!RM) PIPES.push(api);
   var relance = boucleFigee(function(dt, t){ api.frame(dt, t); }, function(){ return run; });
   if(window.IntersectionObserver){
-    new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; }, { threshold: .2 }).observe(cv);
+    new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; synchroniserJeux(); }, { threshold: .2 }).observe(cv);
   }else api.vis = true;
   if(hint) vif(hint, function(){ return TR(TOUCH ? 'gardez le doigt posé : la sonde suit et tire · récupérez les données'
                                        : 'flèches ou souris · espace pour tirer · récupérez les données'); });
@@ -1706,6 +1731,7 @@ try{
   if(bestEl) vif(bestEl, function(){ return TR('record ') + Math.round(best) + ' m'; });
 
   function layout(){
+    DPR2 = CDPR();
     var r = cv.getBoundingClientRect();
     W = Math.max(2, r.width); H = Math.max(2, r.height);
     cv.width = W * DPR2; cv.height = H * DPR2;
@@ -2015,7 +2041,7 @@ try{
     draw(t);
   };
   if(window.IntersectionObserver){
-    new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; }, { threshold: .3 }).observe(cv);
+    new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; synchroniserJeux(); }, { threshold: .3 }).observe(cv);
   }else{ api.vis = true; }
   if(RM){
     /* la boucle s'arrête avec la partie : la dernière image (pause, chute)
@@ -2023,7 +2049,7 @@ try{
     relance = boucleFigee(api.frame, function(){ return run; });
     return;
   }
-  PIPES.push(api);
+  api.element = cv; PIPES.push(api);
 })();
 
 }catch(e){ console.error('[jeu] ' + e.message); }
@@ -2154,6 +2180,7 @@ try{
   });
 
   function layout(){
+    DPR2 = CDPR();
     var r = cv.getBoundingClientRect();
     W = Math.max(2, r.width); H = Math.max(2, r.height);
     cv.width = W * DPR2; cv.height = H * DPR2;
@@ -2273,14 +2300,14 @@ try{
     if(!api.vis) return;
     draw(t);
   };
-  PIPES.push(api);
+  api.element = cv; PIPES.push(api);
   if(window.IntersectionObserver){
     new IntersectionObserver(function(en){
       var v = en[0].isIntersecting;
       /* on quitte la vue : on fige l'état une dernière fois, l'écriture
          périodique s'arrêtant tant que la fiche n'est pas à l'écran */
       if(api.vis && !v) save();
-      api.vis = v;
+      api.vis = v; synchroniserJeux();
     }, { threshold: .2 }).observe(cv);
   }else{ api.vis = true; }
   /* iOS ne déclenche pas toujours beforeunload : sans pagehide, l'horodatage
@@ -2302,6 +2329,7 @@ try{
   try{ best = parseInt(localStorage.getItem('ad2026.g7.best'), 10) || 0; }catch(e){}
   if(bestEl) vif(bestEl, function(){ return TR('record ') + best; });
   function layout(){
+    DPR2 = CDPR();
     var r = cv.getBoundingClientRect();
     W = Math.max(2, r.width); H = Math.max(2, r.height);
     cv.width = Math.round(W * DPR2); cv.height = Math.round(H * DPR2);
@@ -2440,9 +2468,9 @@ try{
     if(run){ acc += dt; if(acc >= step){ acc = 0; step1(); } }
     draw(t);
   };
-  PIPES.push(api);
+  api.element = cv; PIPES.push(api);
   if(window.IntersectionObserver){
-    new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; }, { threshold: .25 }).observe(cv);
+    new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; synchroniserJeux(); }, { threshold: .25 }).observe(cv);
   }else api.vis = true;
 })();
 
@@ -2467,6 +2495,7 @@ try{
     return lblMem[k] || (lblMem[k] = TR(LBL[k]));
   }
   function layout(){
+    DPR2 = CDPR();
     var r = cv.getBoundingClientRect();
     W = Math.max(2, r.width); H = Math.max(2, r.height);
     cv.width = Math.round(W * DPR2); cv.height = Math.round(H * DPR2);
@@ -2661,9 +2690,9 @@ try{
   if(RM) return;
   var api = { vis: false };
   api.frame = function(dt, t){ if(!api.vis) return; step(Math.min(.032, dt)); draw(t); };
-  PIPES.push(api);
+  api.element = cv; PIPES.push(api);
   if(window.IntersectionObserver){
-    new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; }, { threshold: .25 }).observe(cv);
+    new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; synchroniserJeux(); }, { threshold: .25 }).observe(cv);
   }else api.vis = true;
 })();
 
@@ -2679,6 +2708,7 @@ try{
   var G2 = [], run = false, won = false, lost = false, flags = 0, hover = -1;
   function idx(x, y){ return y * CW + x; }
   function layout(){
+    DPR2 = CDPR();
     var r = cv.getBoundingClientRect();
     W = Math.max(2, r.width); H = Math.max(2, r.height);
     cv.width = Math.round(W * DPR2); cv.height = Math.round(H * DPR2);
@@ -2866,9 +2896,9 @@ try{
   if(RM) return;
   var api = { vis: false };
   api.frame = function(dt, t){ if(!api.vis) return; draw(t); };
-  PIPES.push(api);
+  api.element = cv; PIPES.push(api);
   if(window.IntersectionObserver){
-    new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; }, { threshold: .25 }).observe(cv);
+    new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; synchroniserJeux(); }, { threshold: .25 }).observe(cv);
   }else api.vis = true;
 })();
 
@@ -2884,6 +2914,7 @@ try{
   var NAMES = ['SW-CORE', 'SW-ACC', 'FW-01', 'ESX-01', 'SAN-01', 'BKP-01', 'UPS-A', 'AP-WIFI'];
   var cards = [], open = [], pairs = 0, moves = 0, run = false, lock = 0, hover = -1;
   function layout(){
+    DPR2 = CDPR();
     var r = cv.getBoundingClientRect();
     W = Math.max(2, r.width); H = Math.max(2, r.height);
     cv.width = Math.round(W * DPR2); cv.height = Math.round(H * DPR2);
@@ -3024,9 +3055,9 @@ try{
   if(RM) return;
   var api = { vis: false };
   api.frame = function(dt, t){ if(!api.vis) return; draw(t, dt); };
-  PIPES.push(api);
+  api.element = cv; PIPES.push(api);
   if(window.IntersectionObserver){
-    new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; }, { threshold: .25 }).observe(cv);
+    new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; synchroniserJeux(); }, { threshold: .25 }).observe(cv);
   }else api.vis = true;
 })();
 
@@ -3042,6 +3073,7 @@ try{
   try{ best = parseInt(localStorage.getItem('ad2026.g11.best'), 10) || 0; }catch(e){}
   if(bestEl && best) vif(bestEl, function(){ return TR('record ') + best + ' ms'; });
   function layout(){
+    DPR2 = CDPR();
     var r = cv.getBoundingClientRect();
     W = Math.max(2, r.width); H = Math.max(2, r.height);
     cv.width = Math.round(W * DPR2); cv.height = Math.round(H * DPR2);
@@ -3149,9 +3181,9 @@ try{
   if(RM) return;
   var api = { vis: false };
   api.frame = function(dt){ if(!api.vis) return; step(dt); draw(); };
-  PIPES.push(api);
+  api.element = cv; PIPES.push(api);
   if(window.IntersectionObserver){
-    new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; }, { threshold: .25 }).observe(cv);
+    new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; synchroniserJeux(); }, { threshold: .25 }).observe(cv);
   }else api.vis = true;
 })();
 
@@ -3180,6 +3212,7 @@ try{
   try{ best = parseInt(localStorage.getItem('ad2026.g12.best'), 10) || 0; }catch(e){}
   if(bestEl) vif(bestEl, function(){ return TR('record ') + best; });
   function layout(){
+    DPR2 = CDPR();
     var r = cv.getBoundingClientRect();
     W = Math.max(2, r.width); H = Math.max(2, r.height);
     cv.width = Math.round(W * DPR2); cv.height = Math.round(H * DPR2);
@@ -3293,9 +3326,9 @@ try{
   if(RM) return;
   var api = { vis: false };
   api.frame = function(dt, t){ if(!api.vis) return; step(dt); draw(t); };
-  PIPES.push(api);
+  api.element = cv; PIPES.push(api);
   if(window.IntersectionObserver){
-    new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; }, { threshold: .25 }).observe(cv);
+    new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; synchroniserJeux(); }, { threshold: .25 }).observe(cv);
   }else api.vis = true;
 })();
 
@@ -3613,6 +3646,7 @@ try{
   }
 
   function layout(){
+    DPR2 = CDPR();
     var r = cv.getBoundingClientRect();
     W = Math.max(2, r.width); H = Math.max(2, r.height);
     cv.width = Math.round(W * DPR2); cv.height = Math.round(H * DPR2);
@@ -3711,9 +3745,9 @@ try{
   if(RM) return;
   var api = { vis: false };
   api.frame = function(dt, t){ if(!api.vis) return; draw(t); };
-  PIPES.push(api);
+  api.element = cv; PIPES.push(api);
   if(window.IntersectionObserver){
-    new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; }, { threshold: .2 }).observe(cv);
+    new IntersectionObserver(function(en){ api.vis = en[0].isIntersecting; synchroniserJeux(); }, { threshold: .2 }).observe(cv);
   }else api.vis = true;
 })();
 
